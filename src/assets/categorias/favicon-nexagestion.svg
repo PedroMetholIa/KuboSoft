@@ -1,0 +1,33 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#ffffff"/>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4DDEAA"/>
+      <stop offset="100%" stop-color="#00875A"/>
+    </linearGradient>
+  </defs>
+  <!-- Red de nodos compacta -->
+  <g transform="translate(16,16)">
+    <!-- conexiones -->
+    <line x1="84" y1="84" x2="42" y2="42" stroke="url(#g)" stroke-width="3" stroke-linecap="round" opacity="0.45"/>
+    <line x1="84" y1="84" x2="42" y2="126" stroke="url(#g)" stroke-width="3" stroke-linecap="round" opacity="0.45"/>
+    <line x1="84" y1="84" x2="126" y2="42" stroke="url(#g)" stroke-width="3" stroke-linecap="round" opacity="0.45"/>
+    <line x1="84" y1="84" x2="126" y2="126" stroke="url(#g)" stroke-width="3" stroke-linecap="round" opacity="0.45"/>
+    <line x1="42" y1="42" x2="42" y2="126" stroke="url(#g)" stroke-width="2" stroke-linecap="round" opacity="0.2"/>
+    <line x1="126" y1="42" x2="126" y2="126" stroke="url(#g)" stroke-width="2" stroke-linecap="round" opacity="0.2"/>
+    <line x1="42" y1="42" x2="126" y2="42" stroke="url(#g)" stroke-width="2" stroke-linecap="round" opacity="0.15"/>
+    <line x1="42" y1="126" x2="126" y2="126" stroke="url(#g)" stroke-width="2" stroke-linecap="round" opacity="0.15"/>
+    <!-- nodos satélite -->
+    <circle cx="42"  cy="42"  r="14" fill="rgba(77,222,170,0.14)" stroke="url(#g)" stroke-width="3"/>
+    <circle cx="42"  cy="42"  r="5.5" fill="url(#g)"/>
+    <circle cx="42"  cy="126" r="14" fill="rgba(77,222,170,0.14)" stroke="url(#g)" stroke-width="3"/>
+    <circle cx="42"  cy="126" r="5.5" fill="url(#g)"/>
+    <circle cx="126" cy="42"  r="14" fill="rgba(77,222,170,0.14)" stroke="url(#g)" stroke-width="3"/>
+    <circle cx="126" cy="42"  r="5.5" fill="url(#g)"/>
+    <circle cx="126" cy="126" r="14" fill="rgba(77,222,170,0.14)" stroke="url(#g)" stroke-width="3"/>
+    <circle cx="126" cy="126" r="5.5" fill="url(#g)"/>
+    <!-- nodo central -->
+    <circle cx="84" cy="84" r="24" fill="url(#g)"/>
+    <circle cx="84" cy="84" r="34" fill="none" stroke="url(#g)" stroke-width="2" opacity="0.22"/>
+  </g>
+</svg>

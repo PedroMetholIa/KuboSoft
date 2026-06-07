@@ -49,7 +49,7 @@ export class LoginComponent {
     this.errorMessage = '';
     try {
       await this.auth.signIn(this.email, this.password);
-      this.router.navigate(['/dashboard']);
+      this.router.navigate(['/inicio']);
     } catch (err: any) {
       this.errorMessage = err.message || 'Error al iniciar sesión';
     } finally {

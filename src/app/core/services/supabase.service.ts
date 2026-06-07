@@ -110,6 +110,10 @@ export class SupabaseService {
   getCurrentUser(): User | null { return this.currentUserSubject.getValue() ?? null; }
 
   // ── Profiles ──────────────────────────────────────────
+  getProfileById(userId: string) {
+    return this.supabase.from('usuario').select('nombre, apellido').eq('id', userId).single();
+  }
+
   getAllProfiles() {
     return this.supabase.from('usuario').select('*')
       .order('is_online', { ascending: false })
@@ -127,6 +131,16 @@ export class SupabaseService {
   }
 
   // ── Suscripciones ─────────────────────────────────────
+  async isSubscribedToProduct(userId: string, productId: string): Promise<boolean> {
+    const { data } = await this.supabase
+      .from('suscripcion')
+      .select('id')
+      .eq('usuario_id', userId)
+      .eq('producto_id', productId)
+      .maybeSingle();
+    return !!data;
+  }
+
   async getUsuariosPorProducto(nombreProducto: string): Promise<{ data: any[] | null; error: any }> {
     const { data: prod, error: e1 } = await this.supabase
       .from('producto').select('id').eq('nombre', nombreProducto).single();
@@ -213,6 +227,13 @@ export class SupabaseService {
     return this.supabase.from('partida_jugador').update({ puntos }).eq('id', id);
   }
 
+  eliminarPartidaJugador(partidaId: string, usuarioId: string) {
+    return this.supabase.from('partida_jugador')
+      .delete()
+      .eq('partida_id', partidaId)
+      .eq('usuario_id', usuarioId);
+  }
+
   // ── Turnos ────────────────────────────────────────────
   crearTurno(data: { partida_id: string; usuario_id: string; numero_a: number; numero_b: number; respuesta_correcta: number }) {
     return this.supabase.from('turno').insert(data).select().single();
@@ -257,6 +278,40 @@ export class SupabaseService {
     return this.supabase.from('partida_jugador')
       .select('partida_id, usuario!partida_jugador_usuario_id_fkey(nombre, apellido, email)')
       .in('partida_id', partidaIds);
+  }
+
+  // ── Categorias ────────────────────────────────────────
+  getCategorias() {
+    return this.supabase.from('categoria').select('*').order('nombre');
+  }
+
+  getCategoriaByNombre(nombre: string) {
+    return this.supabase.from('categoria').select('id, nombre, logo').eq('nombre', nombre).single();
+  }
+
+  getProductosPorCategoria() {
+    return this.supabase.from('categoria_producto')
+      .select('categoria_id, producto:producto_id(id, nombre)');
+  }
+
+  async getProductosByCategoriaNombre(nombre: string): Promise<{ data: any[] | null; error: any }> {
+    const { data: cat, error: e1 } = await this.supabase
+      .from('categoria')
+      .select('id')
+      .eq('nombre', nombre)
+      .single();
+
+    if (e1 || !cat) return { data: [], error: e1 };
+
+    const { data, error } = await this.supabase
+      .from('categoria_producto')
+      .select('producto:producto_id(*)')
+      .eq('categoria_id', cat.id);
+
+    return {
+      data: (data ?? []).map((r: any) => r.producto).filter(Boolean),
+      error,
+    };
   }
 
   getSuscripciones() {

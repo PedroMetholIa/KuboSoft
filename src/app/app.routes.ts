@@ -2,7 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard, publicGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+  { path: '', redirectTo: 'inicio', pathMatch: 'full' },
   {
     path: 'auth',
     canActivate: [publicGuard],
@@ -21,16 +21,34 @@ export const routes: Routes = [
     ],
   },
   {
-    path: 'dashboard',
+    path: 'inicio',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent),
+      import('./features/inicio/inicio.component').then(m => m.InicioComponent),
   },
   {
-    path: 'teg-juego/:id',
+    path: 'nexajuegos',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/teg-juego/teg-juego.component').then(m => m.TegJuegoComponent),
+      import('./features/nexajuegos/nexajuegos.component').then(m => m.NexaJuegosComponent),
   },
-  { path: '**', redirectTo: 'dashboard' },
+  {
+    path: 'partida',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/partida/partida.component').then(m => m.PartidaComponent),
+  },
+  {
+    path: 'nexateg',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/nexateg/nexateg.component').then(m => m.NexaTegComponent),
+  },
+  {
+    path: 'mat-juego/:id',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/mat-juego/mat-juego.component').then(m => m.MatJuegoComponent),
+  },
+  { path: '**', redirectTo: 'inicio' },
 ];

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <g transform="translate(100, 95)">
+    <!-- Base del joystick -->
+    <rect x="-70" y="45" width="140" height="30" rx="8" fill="#ff4757"/>
+    <!-- Pedestal -->
+    <rect x="-12" y="-10" width="24" height="60" rx="6" fill="#ff4757"/>
+    <!-- Bola del joystick -->
+    <circle cx="0" cy="-22" r="28" fill="#ff4757"/>
+    <!-- Brillo bola -->
+    <circle cx="-8" cy="-30" r="10" fill="white" opacity="0.25"/>
+    <!-- Sombra base bola -->
+    <ellipse cx="0" cy="-6" rx="14" ry="5" fill="#cc1a29" opacity="0.5"/>
+    <!-- Botones en la base -->
+    <circle cx="-38" cy="58" r="10" fill="white" opacity="0.9"/>
+    <circle cx="-12" cy="58" r="10" fill="white" opacity="0.9"/>
+    <circle cx="14" cy="58" r="10" fill="white" opacity="0.9"/>
+    <circle cx="38" cy="58" r="10" fill="white" opacity="0.9"/>
+    <!-- Detalles botones -->
+    <circle cx="-38" cy="58" r="6" fill="#ff4757"/>
+    <circle cx="-12" cy="58" r="6" fill="#ff4757"/>
+    <circle cx="14" cy="58" r="6" fill="#ff4757"/>
+    <circle cx="38" cy="58" r="6" fill="#ff4757"/>
+  </g>
+</svg>

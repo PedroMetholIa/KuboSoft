@@ -1,0 +1,138 @@
+<app-nav></app-nav>
+
+<div class="hero-wrap">
+  <div class="hero">
+    <div class="container">
+      <span class="tag">Videojuegos Indie + IA</span>
+      <h1>Publica tu juego, <em>conoce a tus jugadores</em></h1>
+      <p class="hero-sub">Plataforma indie con analítica IA de jugadores en tiempo real.</p>
+      <div class="hero-actions">
+        <a [routerLink]="['/nexajuegos']" fragment="contacto" class="btn btn-fill">Publicar mi juego →</a>
+        <a [routerLink]="['/nexajuegos']" fragment="juegos" class="btn btn-ghost">Ver juegos publicados</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sec-wrap" id="juegos">
+  <div class="section">
+    <div class="container">
+      <div class="section-header">
+        <div>
+          <span class="section-tag">Productos</span>
+          <h2>Juegos publicados</h2>
+          <p class="section-lead">Los mejores juegos indie, potenciados con analítica inteligente.</p>
+        </div>
+        @if (categoriaNombre) {
+          <div class="section-logo">
+            @if (categoriaLogo) {
+              <img class="section-logo-img" [src]="categoriaLogo" [alt]="categoriaNombre">
+            }
+            <span class="section-brand-text">{{ categoriaNombre }}</span>
+          </div>
+        }
+      </div>
+
+      <div class="grid-3">
+        @for (j of juegos; track j.id) {
+          <div class="card prod-card card--clickable" (click)="navigateTo(j)">
+            <div class="card-header">
+              <div class="card-logo">
+                <img [src]="getImgPath(j.nombre)" [alt]="j.nombre">
+              </div>
+              <h3 class="cat-title">{{ j.nombre }}</h3>
+            </div>
+            <p class="prod-desc">{{ j.descripcion }}</p>
+          </div>
+        }
+        @for (_ of emptySlots; track $index) {
+          <div class="card prod-card empty-card"></div>
+        }
+      </div>
+
+    </div>
+  </div>
+</div>
+
+@if (popupType === 'not-published') {
+  <div class="popup-overlay" (click)="closePopup()">
+    <div class="popup" (click)="$event.stopPropagation()">
+      <div class="popup-icon-wrap popup-icon-soon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <h3 class="popup-title">Próximamente</h3>
+      <p class="popup-body">
+        <strong>{{ selectedJuego?.nombre }}</strong> todavía no fue publicado en la plataforma.
+        Estamos trabajando en ello — volvé pronto.
+      </p>
+      <div class="popup-actions">
+        <button class="btn-popup-primary" (click)="closePopup()">Entendido</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (popupType === 'subscription') {
+  <div class="popup-overlay" (click)="closePopup()">
+    <div class="popup" (click)="$event.stopPropagation()">
+      <div class="popup-icon-wrap popup-icon-lock">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </div>
+      <h3 class="popup-title">Suscripción requerida</h3>
+      <p class="popup-body">
+        Para acceder a <strong>{{ selectedJuego?.nombre }}</strong> necesitás una suscripción activa.
+        Contactanos y te asesoramos.
+      </p>
+      <div class="popup-actions">
+        <button class="btn-popup-primary" (click)="goToSubscription()">Suscribirse →</button>
+        <button class="btn-popup-secondary" (click)="closePopup()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+}
+
+<div class="contact-box" id="contacto">
+  <div class="contact-inner">
+    <div class="container">
+      <div class="contact-grid">
+        <div class="contact-left">
+          <span class="section-tag">Contacto</span>
+          <h2>Hablemos</h2>
+          <p class="contact-lead">¿Tenés un juego indie? <br>Respondemos en menos de 48 horas.</p>
+        </div>
+        <div>
+          <div class="form-row">
+            <div class="form-field"><label>Nombre</label><input type="text" placeholder="Tu nombre"/></div>
+            <div class="form-field"><label>Email</label><input type="email" placeholder="tu@estudio.com"/></div>
+          </div>
+          <div class="form-row">
+            <div class="form-field"><label>Estudio</label><input type="text" placeholder="Nombre del estudio"/></div>
+            <div class="form-field">
+              <label>Género</label>
+              <select>
+                <option value="" disabled selected>Seleccioná</option>
+                <option>Estrategia</option>
+                <option>Acción / Aventura</option>
+                <option>RPG</option>
+                <option>Puzzle</option>
+                <option>Plataformero</option>
+                <option>Otro</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-field">
+            <label>Mensaje</label>
+            <textarea placeholder="Contanos sobre tu juego..."></textarea>
+          </div>
+          <button class="btn-submit" [disabled]="submitted()" (click)="submitForm()">
+            {{ submitted() ? '✓ Enviado — te contactamos pronto' : 'Enviar consulta →' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

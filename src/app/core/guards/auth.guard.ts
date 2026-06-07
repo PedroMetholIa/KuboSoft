@@ -27,7 +27,7 @@ export const publicGuard: CanActivateFn = () => {
     take(1),
     map(user => {
       if (!user) return true;
-      router.navigate(['/dashboard']);
+      router.navigate(['/inicio']);
       return false;
     })
   );
