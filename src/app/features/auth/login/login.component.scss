@@ -1,0 +1,88 @@
+.auth-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0f0f13;
+}
+
+.auth-card {
+  background: #1a1a24;
+  border: 1px solid #2a2a38;
+  border-radius: 16px;
+  padding: 2.5rem;
+  width: 100%;
+  max-width: 400px;
+
+  .brand {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 0.25rem;
+    span { color: #6c63ff; }
+  }
+
+  h2 {
+    color: #888;
+    font-size: 1rem;
+    font-weight: 400;
+    margin-bottom: 2rem;
+  }
+
+  .field {
+    margin-bottom: 1.25rem;
+    label {
+      display: block;
+      color: #aaa;
+      font-size: 0.85rem;
+      margin-bottom: 0.4rem;
+    }
+    input {
+      width: 100%;
+      background: #0f0f13;
+      border: 1px solid #2a2a38;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+      box-sizing: border-box;
+      transition: border-color 0.2s;
+      &:focus { border-color: #6c63ff; }
+    }
+  }
+
+  .btn-primary {
+    width: 100%;
+    background: #6c63ff;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.85rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    transition: background 0.2s;
+    &:hover:not(:disabled) { background: #574fd6; }
+    &:disabled { opacity: 0.6; cursor: not-allowed; }
+  }
+
+  .error {
+    background: rgba(255, 80, 80, 0.1);
+    border: 1px solid rgba(255, 80, 80, 0.3);
+    color: #ff6b6b;
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+  }
+
+  .link {
+    text-align: center;
+    margin-top: 1.25rem;
+    color: #666;
+    font-size: 0.9rem;
+    a { color: #6c63ff; text-decoration: none; &:hover { text-decoration: underline; } }
+  }
+}

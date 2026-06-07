@@ -1,0 +1,205 @@
+.jc-panel {
+  background: linear-gradient(160deg, rgba(13,42,30,.7) 0%, rgba(8,14,35,.7) 100%);
+  border: 1px solid rgba(52,211,153,.2);
+  border-radius: 14px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-sizing: border-box;
+}
+
+// ── Header ─────────────────────────────────────────────
+.jc-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.jc-icon {
+  font-size: 1rem;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  background: rgba(52,211,153,.15);
+  flex-shrink: 0;
+}
+
+.jc-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+  flex: 1;
+}
+
+.jc-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.1rem 0.5rem;
+  border-radius: 20px;
+  background: rgba(52,211,153,.15);
+  color: #34d399;
+}
+
+// ── Lista de jugadores ──────────────────────────────────
+.jc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  overflow-y: auto;
+  max-height: calc(38px * 10);
+
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 4px; &:hover { background: rgba(255,255,255,.22); } }
+}
+
+.jc-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  background: rgba(255,255,255,.03);
+  transition: background .15s;
+
+  &:hover { background: rgba(52,211,153,.06); }
+  &.jc-me { border-left: 2px solid #34d399; }
+  &.jc-offline { opacity: 0.4; }
+}
+
+.jc-data {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.jc-nombre {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jc-email {
+  font-size: 0.72rem;
+  color: #555;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jc-last {
+  font-size: 0.67rem;
+  color: #444;
+}
+
+.jc-empty {
+  color: #444;
+  font-size: 0.82rem;
+  font-style: italic;
+  padding: 0.5rem 0;
+  margin: 0;
+}
+
+// ── Modo chat: sin recuadros ───────────────────────────
+.jc-chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  overflow-y: auto;
+  max-height: calc(38px * 10);
+
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 4px; &:hover { background: rgba(255,255,255,.22); } }
+}
+
+.jc-chat-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 6px;
+  transition: background .15s;
+
+  &:hover { background: rgba(255,255,255,.03); }
+
+  &.jc-chat-me .jc-chat-name { color: #34d399; }
+}
+
+.jc-chat-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #aaa;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &::after { content: ':'; }
+}
+
+.jc-chat-msg {
+  font-size: 0.82rem;
+  color: #ccc;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.jc-chat-nomsg {
+  font-size: 0.78rem;
+  color: #444;
+}
+
+// ── Formulario mensaje (línea única al pie) ─────────────
+.jc-form {
+  border-top: 1px solid rgba(255,255,255,.05);
+  padding-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+
+.jc-input-row {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+  align-items: center;
+
+  textarea {
+    flex: 1;
+    background: rgba(0,0,0,.3);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 8px;
+    padding: 0.45rem 0.7rem;
+    color: #fff;
+    font-size: 0.82rem;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    line-height: 1.4;
+    &:focus { border-color: #34d399; }
+    &::placeholder { color: #444; }
+  }
+
+  button {
+    background: rgba(52,211,153,.2);
+    color: #34d399;
+    border: 1px solid rgba(52,211,153,.3);
+    border-radius: 8px;
+    padding: 0.45rem 1rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+    &:hover:not(:disabled) { background: rgba(52,211,153,.35); }
+    &:disabled { opacity: .4; cursor: not-allowed; }
+  }
+}
