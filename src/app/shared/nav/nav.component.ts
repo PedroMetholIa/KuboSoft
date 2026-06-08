@@ -18,6 +18,7 @@ import { filter, take } from 'rxjs/operators';
         </a>
         <div class="nav-actions">
           <span class="nav-welcome" *ngIf="userName">¡Bienvenido {{ userName }}!</span>
+          <button class="nav-btn nav-logout" (click)="logout()">Cerrar sesión</button>
         </div>
       </div>
     </nav>
@@ -84,6 +85,30 @@ import { filter, take } from 'rxjs/operators';
       font-weight: 500;
       font-family: 'Outfit', sans-serif;
       color: #555570;
+    }
+
+    .nav-btn {
+      font-size: 13.5px;
+      font-weight: 500;
+      font-family: 'Outfit', sans-serif;
+      border-radius: 7px;
+      padding: 8px 20px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: all .15s;
+      border: none;
+    }
+
+    .nav-logout {
+      background: #6b7280;
+      color: #fff;
+      border: none;
+    }
+
+    .nav-logout:hover {
+      background: #4b5563;
+      color: #fff;
     }
   `]
 })

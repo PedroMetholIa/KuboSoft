@@ -436,6 +436,32 @@ footer {
   p { font-size: 12px; color: var(--sub); }
 }
 
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+
+  .footer-logo-img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+  }
+
+  .footer-logo-text {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -.4px;
+    color: #1A1A2E;
+    font-family: 'Outfit', sans-serif;
+
+    em {
+      font-style: normal;
+      color: #7C5CFC;
+    }
+  }
+}
+
 // ── RESPONSIVE ─────────────────────────────────────────
 @media(max-width: 900px) {
   .nav-login { display: none; }

@@ -45,6 +45,12 @@ export const routes: Routes = [
       import('./features/nexateg/nexateg.component').then(m => m.NexaTegComponent),
   },
   {
+    path: 'pruebateg',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/pruebateg/pruebateg.component').then(m => m.PruebaTegComponent),
+  },
+  {
     path: 'mat-juego/:id',
     canActivate: [authGuard],
     loadComponent: () =>

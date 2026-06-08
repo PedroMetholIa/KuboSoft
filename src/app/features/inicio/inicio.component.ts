@@ -132,7 +132,10 @@ interface Categoria {
       <footer>
         <div class="footer-inner">
           <p>© 2025 NexaBuild · Todos los derechos reservados</p>
-          <p>Desarrollo de software + IA</p>
+          <a class="footer-brand" href="#">
+            <img class="footer-logo-img" src="assets/favicon-nexabuild.svg" alt="NexaBuild">
+            <span class="footer-logo-text">Nexa<em>Build</em></span>
+          </a>
         </div>
       </footer>
 
