@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { SupabaseService, Partida, PartidaJugador, Turno } from '../../core/services/supabase.service';
+import { MapComponent } from '../pruebateg33/map/map.component';
 
 @Component({
   selector: 'app-mat-juego',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MapComponent],
   template: `
     <div class="mat-juego">
 
@@ -20,22 +21,10 @@ import { SupabaseService, Partida, PartidaJugador, Turno } from '../../core/serv
 
       <ng-container *ngIf="!loading && partida">
 
-        <!-- Header -->
-        <header class="game-header">
-          <button class="btn-back" (click)="volver()">← Salir</button>
-          <div class="game-title">
-            <h1>{{ partida.nombre }}</h1>
-            <span class="estado-tag" [ngClass]="partida.estado === 'En juego' ? 'live' : 'done'">
-              {{ partida.estado }}
-            </span>
-          </div>
-          <div class="header-spacer"></div>
-        </header>
-
         <!-- Body -->
         <div class="game-body">
 
-          <!-- Scoreboard -->
+          <!-- Panel izquierdo: jugadores + juego -->
           <aside class="scoreboard">
             <h3 class="score-title">Jugadores</h3>
             <div class="score-list">
@@ -58,14 +47,11 @@ import { SupabaseService, Partida, PartidaJugador, Turno } from '../../core/serv
               </div>
             </div>
 
-            <!-- Leyenda sala de espera -->
             <p class="waiting-legend" *ngIf="!todosAdentro">
               ● dentro &nbsp; ○ esperando
             </p>
-          </aside>
 
-          <!-- Game area -->
-          <main class="game-area">
+            <div class="panel-divider"></div>
 
             <!-- Finalizada -->
             <div class="game-over" *ngIf="partida.estado === 'Finalizada'">
@@ -84,7 +70,7 @@ import { SupabaseService, Partida, PartidaJugador, Turno } from '../../core/serv
               <button class="btn-volver" (click)="volver()">← Volver al inicio</button>
             </div>
 
-            <!-- Sala de espera: estado En juego pero no todos adentro -->
+            <!-- Sala de espera -->
             <div class="sala-espera" *ngIf="partida.estado === 'En juego' && !todosAdentro">
               <div class="wait-icon">🎮</div>
               <h2>Sala de espera</h2>
@@ -142,13 +128,31 @@ import { SupabaseService, Partida, PartidaJugador, Turno } from '../../core/serv
               <p>Esperá tu turno para resolver la suma</p>
             </div>
 
-            <!-- Todos dentro pero turno aún no listo -->
+            <!-- Turno aún no listo -->
             <div class="esperando" *ngIf="todosAdentro && esMiTurno && !turnoActual && partida.estado === 'En juego'">
               <div class="wait-icon">⏳</div>
               <p>Preparando tu suma...</p>
             </div>
 
+          </aside>
+
+          <!-- Panel central: mapa -->
+          <main class="game-area">
+            <app-map />
           </main>
+
+          <!-- Panel derecho: info de partida -->
+          <aside class="side-panel-right">
+            <div class="game-info">
+              <div class="game-title-block">
+                <h1 class="game-name">{{ partida.nombre }}</h1>
+                <span class="estado-tag" [ngClass]="partida.estado === 'En juego' ? 'live' : 'done'">
+                  {{ partida.estado }}
+                </span>
+              </div>
+              <button class="btn-back" (click)="volver()">← Salir</button>
+            </div>
+          </aside>
         </div>
 
       </ng-container>

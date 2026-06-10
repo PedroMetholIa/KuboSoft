@@ -22,7 +22,6 @@ export const routes: Routes = [
   },
   {
     path: 'inicio',
-    canActivate: [authGuard],
     loadComponent: () =>
       import('./features/inicio/inicio.component').then(m => m.InicioComponent),
   },
@@ -45,16 +44,15 @@ export const routes: Routes = [
       import('./features/nexateg/nexateg.component').then(m => m.NexaTegComponent),
   },
   {
-    path: 'pruebateg',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/pruebateg/pruebateg.component').then(m => m.PruebaTegComponent),
-  },
-  {
     path: 'mat-juego/:id',
     canActivate: [authGuard],
     loadComponent: () =>
       import('./features/mat-juego/mat-juego.component').then(m => m.MatJuegoComponent),
+  },
+  {
+    path: 'pruebateg33',
+    loadComponent: () =>
+      import('./features/pruebateg33/pruebateg33.component').then(m => m.PruebaTeg33Component),
   },
   { path: '**', redirectTo: 'inicio' },
 ];

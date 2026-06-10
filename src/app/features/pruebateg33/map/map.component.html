@@ -1,0 +1,161 @@
+<div class="map-wrapper">
+
+  <svg class="teg-map" viewBox="0 50 1100 550" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+
+    <defs>
+      <filter id="filter-na" x="0%" y="0%" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" result="noise"/>
+        <feColorMatrix type="saturate" values="0" in="noise" result="grayNoise"/>
+        <feBlend in="SourceGraphic" in2="grayNoise" mode="multiply" result="blend"/>
+        <feComposite in="blend" in2="SourceGraphic" operator="in"/>
+      </filter>
+      <filter id="filter-sa" x="0%" y="0%" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" stitchTiles="stitch" result="noise"/>
+        <feColorMatrix type="saturate" values="0" in="noise" result="grayNoise"/>
+        <feBlend in="SourceGraphic" in2="grayNoise" mode="multiply" result="blend"/>
+        <feComposite in="blend" in2="SourceGraphic" operator="in"/>
+      </filter>
+      <filter id="filter-eu" x="0%" y="0%" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.80" numOctaves="3" stitchTiles="stitch" result="noise"/>
+        <feColorMatrix type="saturate" values="0" in="noise" result="grayNoise"/>
+        <feBlend in="SourceGraphic" in2="grayNoise" mode="multiply" result="blend"/>
+        <feComposite in="blend" in2="SourceGraphic" operator="in"/>
+      </filter>
+      <filter id="filter-af" x="0%" y="0%" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.70" numOctaves="3" stitchTiles="stitch" result="noise"/>
+        <feColorMatrix type="saturate" values="0" in="noise" result="grayNoise"/>
+        <feBlend in="SourceGraphic" in2="grayNoise" mode="multiply" result="blend"/>
+        <feComposite in="blend" in2="SourceGraphic" operator="in"/>
+      </filter>
+      <filter id="filter-as" x="0%" y="0%" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.60" numOctaves="3" stitchTiles="stitch" result="noise"/>
+        <feColorMatrix type="saturate" values="0" in="noise" result="grayNoise"/>
+        <feBlend in="SourceGraphic" in2="grayNoise" mode="multiply" result="blend"/>
+        <feComposite in="blend" in2="SourceGraphic" operator="in"/>
+      </filter>
+      <filter id="filter-oc" x="0%" y="0%" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch" result="noise"/>
+        <feColorMatrix type="saturate" values="0" in="noise" result="grayNoise"/>
+        <feBlend in="SourceGraphic" in2="grayNoise" mode="multiply" result="blend"/>
+        <feComposite in="blend" in2="SourceGraphic" operator="in"/>
+      </filter>
+      <!-- Textura de territorios -->
+      <pattern id="tex-pattern" patternUnits="userSpaceOnUse" x="0" y="0" width="1100" height="650">
+        <image href="assets/NexaTeg/textura.png" x="0" y="0" width="1100" height="650" preserveAspectRatio="xMidYMid slice"/>
+      </pattern>
+      <!-- Sombra exterior de territorios para contraste con el fondo -->
+      <filter id="terr-shadow" x="-12%" y="-12%" width="124%" height="124%">
+        <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#67e8f9" flood-opacity="0.5"/>
+      </filter>
+      <!-- Glow violeta potente para China -->
+      <filter id="terr-shadow-china" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#7E22CE" flood-opacity="0.9"/>
+        <feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="#D8B4FE" flood-opacity="0.5"/>
+      </filter>
+      <!-- Glow amarillo potente para Asia -->
+      <filter id="terr-shadow-asia" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#A16207" flood-opacity="0.9"/>
+        <feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="#FDE047" flood-opacity="0.5"/>
+      </filter>
+      <!-- Glow verde potente para Europa -->
+      <filter id="terr-shadow-europe" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#15803D" flood-opacity="0.9"/>
+        <feDropShadow dx="0" dy="0" stdDeviation="11" flood-color="#4ADE80" flood-opacity="0.5"/>
+      </filter>
+      <!-- Badge styles -->
+      <filter id="badge-glow" x="-60%" y="-60%" width="220%" height="220%">
+        <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#A0AEC0" flood-opacity="0.65"/>
+      </filter>
+    </defs>
+
+    <!-- Fondo: imagen del mapa -->
+    <image href="assets/NexaTeg/FondoOceano.png" x="0" y="50" width="1100" height="550" preserveAspectRatio="xMidYMid slice"/>
+
+    <!-- ── Contenedor zoomeable ───────────────────────────────────────────── -->
+    <g id="map-content">
+
+      <!-- ── Capa 1: paths de territorios ──────────────────────────────────── -->
+      <g id="territories">
+        <path
+          *ngFor="let t of territories"
+          [attr.d]="t.svgPath"
+          [attr.fill]="getTerritoryFill(t)"
+          [style.stroke]="getTerritoryStroke(t)"
+          [style.stroke-width]="getTerritoryStrokeWidth(t)"
+          filter="url(#terr-shadow)"
+          class="terr"
+          [class.selected]="t.isSelected"
+          [class.highlighted]="t.isHighlighted"
+          (click)="onTerritoryClick(t)"
+          (mouseenter)="onTerritoryHover(t, $event)"
+          (mouseleave)="onTerritoryLeave()"
+        />
+        <!-- Capa de textura sobre el color base -->
+        <path
+          *ngFor="let t of territories"
+          [attr.d]="t.svgPath"
+          fill="url(#tex-pattern)"
+          opacity="1.00"
+          pointer-events="none"
+          style="mix-blend-mode: multiply;"
+        />
+      </g>
+
+      <!-- ── Capa 2: badges de tropas — siempre al frente ──────────────────── -->
+      <g id="badges" pointer-events="none">
+        <ng-container *ngFor="let t of territories">
+          <ng-container *ngIf="t.troops > 0">
+            <!-- Anillo exterior gris -->
+            <circle
+              [attr.cx]="t.labelPosition.x"
+              [attr.cy]="t.labelPosition.y"
+              r="16"
+              fill="none"
+              stroke="#9CA3AF"
+              stroke-width="0.7"
+              opacity="0.5"
+            />
+            <!-- Cuerpo gris oscuro con borde gris y glow plateado -->
+            <circle
+              [attr.cx]="t.labelPosition.x"
+              [attr.cy]="t.labelPosition.y"
+              r="13"
+              fill="#2D3748"
+              stroke="#9CA3AF"
+              stroke-width="1.5"
+              filter="url(#badge-glow)"
+            />
+            <!-- Número de tropas -->
+            <text
+              [attr.x]="t.labelPosition.x"
+              [attr.y]="t.labelPosition.y + 5"
+              text-anchor="middle"
+              fill="#ffffff"
+              font-size="12"
+              font-weight="600"
+              font-family="'Outfit', sans-serif"
+            >{{ t.troops }}</text>
+          </ng-container>
+        </ng-container>
+      </g>
+
+    </g>
+
+  </svg>
+
+  <!-- ── Tooltip HTML ───────────────────────────────────────────────────── -->
+  <div
+    class="tooltip"
+    *ngIf="tooltip"
+    [style.left.px]="tooltipX"
+    [style.top.px]="tooltipY"
+  >
+    <div class="tooltip-name">{{ tooltip.name }}</div>
+    <div class="tooltip-continent">{{ continentLabel(tooltip.continent) }}</div>
+    <div class="tooltip-owner" *ngIf="tooltip.owner">Dueño: <strong>{{ tooltip.owner }}</strong></div>
+    <div class="tooltip-owner" *ngIf="!tooltip.owner">Sin dueño</div>
+    <div class="tooltip-troops">Tropas: <strong>{{ tooltip.troops }}</strong></div>
+  </div>
+
+
+</div>

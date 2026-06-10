@@ -35,15 +35,24 @@
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-// ── Header ─────────────────────────────────────────────
-.game-header {
+.game-info {
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem 2rem;
-  border-bottom: 1px solid rgba(255,255,255,.06);
-  background: rgba(6, 9, 26, 0.8);
-  backdrop-filter: blur(8px);
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem 1.25rem;
+}
+
+.game-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.game-name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin: 0;
+  color: #f1f5f9;
 }
 
 .btn-back {
@@ -56,20 +65,8 @@
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
+  width: fit-content;
   &:hover { color: #fff; border-color: rgba(255,255,255,.25); }
-}
-
-.game-title {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex: 1;
-
-  h1 {
-    font-size: 1.4rem;
-    font-weight: 800;
-    margin: 0;
-  }
 }
 
 .estado-tag {
@@ -78,6 +75,7 @@
   padding: 0.2rem 0.65rem;
   border-radius: 20px;
   letter-spacing: 0.04em;
+  width: fit-content;
 
   &.live {
     background: rgba(52, 211, 153, 0.15);
@@ -91,31 +89,29 @@
   }
 }
 
-.header-spacer { flex: 1; }
-
 // ── Body layout ────────────────────────────────────────
 .game-body {
   flex: 1;
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 0;
+  position: relative;
   min-height: 0;
-
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
-  }
 }
 
 // ── Scoreboard ─────────────────────────────────────────
 .scoreboard {
-  background: rgba(255,255,255,.025);
-  border-right: 1px solid rgba(255,255,255,.06);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 272px;
+  height: 100%;
+  background: rgba(10, 14, 30, 0.78);
+  backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(255,255,255,.08);
   padding: 1.5rem 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
   overflow-y: auto;
+  z-index: 10;
 }
 
 .score-title {
@@ -211,11 +207,13 @@
 
 // ── Game area ──────────────────────────────────────────
 .game-area {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  overflow: auto;
+  width: 100%;
+  height: 100%;
+
+  app-map {
+    display: block;
+    width: 100%;
+  }
 }
 
 // ── My turn card ───────────────────────────────────────
@@ -391,6 +389,26 @@
       border: 1px solid rgba(255,255,255,.08);
     }
   }
+}
+
+.side-panel-right {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 272px;
+  height: 100%;
+  background: rgba(10, 14, 30, 0.78);
+  backdrop-filter: blur(10px);
+  border-left: 1px solid rgba(255,255,255,.08);
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.panel-divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(255,255,255,.06);
+  margin: 0.5rem 0;
 }
 
 .waiting-legend {
