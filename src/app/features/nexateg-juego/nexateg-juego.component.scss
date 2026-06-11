@@ -1,6 +1,7 @@
 // ── Root ───────────────────────────────────────────────
 .nexateg-juego {
-  min-height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   background: #06091a;
   background-image:
     radial-gradient(ellipse at 20% 60%, rgba(13, 42, 80, 0.3) 0%, transparent 55%),
@@ -92,16 +93,71 @@
 // ── Body layout ────────────────────────────────────────
 .game-body {
   flex: 1;
-  position: relative;
   min-height: 0;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+// ── Rotate overlay (portrait mobile) ───────────────────
+.rotate-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #06091a;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  color: #ccc;
+  text-align: center;
+  padding: 2rem;
+
+  .rotate-icon {
+    font-size: 4rem;
+    animation: rotateHint 2s ease-in-out infinite;
+  }
+
+  p {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #94a3b8;
+    margin: 0;
+  }
+}
+
+@keyframes rotateHint {
+  0%, 100% { transform: rotate(0deg); }
+  50%       { transform: rotate(90deg); }
+}
+
+// ── Toggle panel button (solo mobile) ──────────────────
+.panel-toggle-btn {
+  display: none;
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  z-index: 20;
+  width: 36px;
+  height: 36px;
+  background: rgba(10, 14, 30, 0.85);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 8px;
+  color: #ccc;
+  font-size: 1rem;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+
+  &:hover { color: #fff; border-color: rgba(255,255,255,.3); }
 }
 
 // ── Scoreboard ─────────────────────────────────────────
 .scoreboard {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 272px;
+  width: 260px;
+  flex-shrink: 0;
   height: 100%;
   background: rgba(10, 14, 30, 0.78);
   backdrop-filter: blur(10px);
@@ -111,7 +167,14 @@
   flex-direction: column;
   gap: 1rem;
   overflow-y: auto;
-  z-index: 10;
+  transition: width 0.25s ease, padding 0.25s ease, opacity 0.2s ease;
+
+  &.panel-cerrado {
+    width: 0;
+    padding: 0;
+    opacity: 0;
+    overflow: hidden;
+  }
 }
 
 .score-title {
@@ -207,12 +270,16 @@
 
 // ── Game area ──────────────────────────────────────────
 .game-area {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   height: 100%;
+  overflow: hidden;
+  position: relative;
 
   app-map {
     display: block;
     width: 100%;
+    height: 100%;
   }
 }
 
@@ -339,16 +406,13 @@
 }
 
 .side-panel-right {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 272px;
+  width: 240px;
+  flex-shrink: 0;
   height: 100%;
   background: rgba(10, 14, 30, 0.78);
   backdrop-filter: blur(10px);
   border-left: 1px solid rgba(255,255,255,.08);
   overflow-y: auto;
-  z-index: 10;
 }
 
 .panel-divider {
@@ -1018,4 +1082,59 @@
     border-color: #f59e0b;
   }
   &:disabled { opacity: 0.4; cursor: not-allowed; }
+}
+
+// ══════════════════════════════════════════════════════
+// RESPONSIVE BREAKPOINTS
+// ══════════════════════════════════════════════════════
+
+// ── Tablet (< 1200px) ──────────────────────────────────
+@media (max-width: 1199px) {
+  .scoreboard       { width: 220px; padding: 1.25rem 1rem; }
+  .side-panel-right { width: 200px; }
+}
+
+// ── Tablet chico / mobile landscape (< 900px) ──────────
+@media (max-width: 899px) {
+  .side-panel-right { display: none; }
+  .scoreboard       { width: 190px; padding: 1rem 0.85rem; }
+  .score-title      { font-size: 0.7rem; }
+}
+
+// ── Mobile landscape (< 768px landscape) ───────────────
+@media (max-width: 767px) and (orientation: landscape) {
+  .scoreboard {
+    width: 175px;
+    padding: 0.75rem 0.75rem;
+    gap: 0.6rem;
+  }
+
+  .score-item {
+    padding: 0.5rem 0.6rem;
+    gap: 0.45rem;
+  }
+
+  .panel-toggle-btn { display: flex; }
+
+  .scoreboard.panel-cerrado {
+    width: 0;
+    padding: 0;
+  }
+}
+
+// ── Mobile muy pequeño landscape (< 540px landscape) ───
+@media (max-width: 539px) and (orientation: landscape) {
+  .scoreboard   { width: 160px; padding: 0.6rem 0.6rem; gap: 0.4rem; }
+  .score-title  { display: none; }
+  .score-item   { padding: 0.4rem 0.5rem; }
+  .player-lider { display: none; }
+}
+
+// ── Mobile portrait → mostrar overlay, ocultar juego ───
+@media (max-width: 767px) and (orientation: portrait) {
+  .rotate-overlay { display: flex; }
+
+  .game-body,
+  .loading-screen,
+  .color-selector-overlay { visibility: hidden; }
 }

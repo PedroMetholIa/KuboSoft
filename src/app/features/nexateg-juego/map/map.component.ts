@@ -106,7 +106,7 @@ export class MapComponent implements OnInit, AfterViewInit {
       return this.lightenColor('#6B7280', 40);
     }
     const color = this.getOwnerColor(t);
-    if (color) return this.hexToRgba(color, this.fillAlpha(color, 0.80));
+    if (color) return this.hexToRgba(this.lightenColor(color, 14), this.fillAlpha(color, 0.96));
     return '#6B7280';
   }
 
@@ -119,39 +119,69 @@ export class MapComponent implements OnInit, AfterViewInit {
 
   private fillAlpha(color: string, defaultAlpha: number): number {
     const [r, g, b] = this.parseRgb(color);
-    if (r > 170 && g > 170 && b > 170) return 0.68;
-    if (r < 60  && g < 60  && b < 60)  return 0.42;
+    if (r > 170 && g > 170 && b > 170) return 0.88;
+    if (r < 60  && g < 60  && b < 60)  return 0.72;
     return defaultAlpha;
   }
 
   getTerritoryStroke(t: Territory): string {
-    if (this.isSelected(t)) return '#ffffff';
-    if (this.isHighlighted(t)) return '#ffffff';
+    if (this.isSelected(t))    return 'rgba(255,255,255,0.92)';
+    if (this.isHighlighted(t)) return 'rgba(255,255,255,0.68)';
     const color = this.getOwnerColor(t);
-    if (color) return this.darkenDesaturate(color, 0.38, 0.20);
-    return '#111827';
+    if (color) return this.darkenDesaturate(color, 0.22, 0.12);
+    return 'rgba(8,6,20,0.88)';
   }
 
   getTerritoryStrokeWidth(t: Territory): number {
-    if (this.isSelected(t)) return 3;
-    if (this.isHighlighted(t)) return 2.5;
-    if (this.territoriosOwner[t.id]) return 2.2;
-    return 1.8;
+    if (this.isSelected(t))    return 2.5;
+    if (this.isHighlighted(t)) return 2.0;
+    if (this.territoriosOwner[t.id]) return 1.6;
+    return 1.3;
   }
 
   getTerritoryFilter(t: Territory): string {
     const color = this.getOwnerColor(t);
     if (this.isSelected(t) && color) {
-      const s = this.hexToRgba(color, 1.0);
-      const d = this.hexToRgba(color, 0.75);
-      return `drop-shadow(0 0 7px ${s}) drop-shadow(0 0 18px ${d})`;
+      const s = this.hexToRgba(color, 0.80);
+      const d = this.hexToRgba(color, 0.55);
+      const e = this.hexToRgba(color, 0.20);
+      return `drop-shadow(0 0 9px ${s}) drop-shadow(0 0 26px ${d}) drop-shadow(0 0 48px ${e})`;
     }
     if (color) {
-      const s = this.hexToRgba(color, 1.0);
-      const d = this.hexToRgba(color, 0.65);
-      return `drop-shadow(0 0 5px ${s}) drop-shadow(0 0 13px ${d})`;
+      const s = this.hexToRgba(color, 0.72);
+      const d = this.hexToRgba(color, 0.40);
+      const e = this.hexToRgba(color, 0.14);
+      return `drop-shadow(0 0 8px ${s}) drop-shadow(0 0 22px ${d}) drop-shadow(0 0 42px ${e})`;
     }
-    return 'drop-shadow(0 0 5px rgba(103,232,249,0.5))';
+    return 'drop-shadow(0 0 2px rgba(103,232,249,0.15))';
+  }
+
+  getBadgeFill(id: string): string {
+    const ownerId = this.territoriosOwner[id];
+    if (!ownerId || !this.jugadorColores[ownerId]) return '#09152a';
+    return this.darkenDesaturate(this.jugadorColores[ownerId], 0.82, 0.04);
+  }
+
+  getBadgeStroke(id: string): string {
+    const ownerId = this.territoriosOwner[id];
+    if (!ownerId || !this.jugadorColores[ownerId]) return 'rgba(165,205,255,0.80)';
+    const [r, g, b] = this.parseRgb(this.jugadorColores[ownerId]);
+    return `rgba(${Math.min(255, r + 95)},${Math.min(255, g + 95)},${Math.min(255, b + 95)},0.82)`;
+  }
+
+  getBadgeHighlight(id: string): string {
+    const ownerId = this.territoriosOwner[id];
+    if (!ownerId || !this.jugadorColores[ownerId]) return 'rgba(255,255,255,0.09)';
+    const [r, g, b] = this.parseRgb(this.jugadorColores[ownerId]);
+    return `rgba(${Math.min(255, r + 85)},${Math.min(255, g + 85)},${Math.min(255, b + 85)},0.20)`;
+  }
+
+  getHaloColor(t: Territory): string {
+    return this.getOwnerColor(t) ?? 'transparent';
+  }
+
+  getHaloOpacity(t: Territory): number {
+    return this.getOwnerColor(t) ? 0.68 : 0;
   }
 
   private getOwnerColor(t: Territory): string | null {

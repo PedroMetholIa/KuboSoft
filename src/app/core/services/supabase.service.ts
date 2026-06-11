@@ -280,6 +280,28 @@ export class SupabaseService {
       .eq('usuario_id', usuarioId);
   }
 
+  // ── RPCs de juego (lógica server-side) ───────────────
+  resolverCombate(partidaId: string, origenId: string, destinoId: string) {
+    return this.supabase.rpc('resolver_combate', {
+      p_partida_id: partidaId,
+      p_origen_id:  origenId,
+      p_destino_id: destinoId,
+    });
+  }
+
+  moverTropasConquista(partidaId: string, origenId: string, destinoId: string, tropas: number) {
+    return this.supabase.rpc('mover_tropas_conquista', {
+      p_partida_id: partidaId,
+      p_origen_id:  origenId,
+      p_destino_id: destinoId,
+      p_tropas:     tropas,
+    });
+  }
+
+  declararGanador(partidaId: string) {
+    return this.supabase.rpc('declarar_ganador', { p_partida_id: partidaId });
+  }
+
   // ── Territorios ───────────────────────────────────────
   getTerritoriosEstado(partidaId: string) {
     return this.supabase.from('territorio_estado')

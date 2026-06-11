@@ -16,6 +16,23 @@ interface ResultadoCombate {
   conquista: boolean;
 }
 
+interface ConquistaPendiente {
+  origenId: string;
+  destinoId: string;
+  tropasOrigenFinal: number;
+}
+
+interface CombateRpc {
+  error?: string;
+  dados_ataque?: number[];
+  dados_defensa?: number[];
+  bajas_atacante?: number;
+  bajas_defensor?: number;
+  conquista?: boolean;
+  tropas_origen_final?: number;
+  tropas_destino_final?: number;
+}
+
 @Component({
   selector: 'app-nexateg-juego',
   standalone: true,
@@ -23,10 +40,22 @@ interface ResultadoCombate {
   template: `
     <div class="nexateg-juego">
 
+      <!-- Overlay: rotar dispositivo (mostrado en portrait mobile via CSS) -->
+      <div class="rotate-overlay">
+        <div class="rotate-icon">&#8635;</div>
+        <p>Girá el dispositivo para jugar</p>
+      </div>
+
       <!-- Loading -->
       <div class="loading-screen" *ngIf="loading">
         <div class="spinner"></div>
         <p>Cargando partida...</p>
+      </div>
+
+      <!-- Error de carga -->
+      <div class="loading-screen" *ngIf="!loading && loadError">
+        <p style="color:#f87171;font-size:1.1rem">No se pudo conectar con el servidor.</p>
+        <button class="btn-back" style="margin-top:1rem" (click)="loadGameState()">↺ Reintentar</button>
       </div>
 
       <!-- Modal: selección de color y líder -->
@@ -110,7 +139,7 @@ interface ResultadoCombate {
         <div class="game-body">
 
           <!-- Panel izquierdo -->
-          <aside class="scoreboard">
+          <aside class="scoreboard" [class.panel-cerrado]="!panelAbierto">
             <h3 class="score-title">Jugadores</h3>
             <div class="score-list">
               <div
@@ -198,31 +227,57 @@ interface ResultadoCombate {
             <!-- FASE: Ataque - mi turno -->
             <div class="phase-panel" *ngIf="fase === 'ataque' && esMiTurno">
               <div class="phase-title">⚔️ Fase de Ataque</div>
-              <p class="phase-hint" *ngIf="!territorioAtacanteId">
-                Seleccioná un territorio con más de 1 tropa para atacar
-              </p>
-              <p class="phase-hint" *ngIf="territorioAtacanteId">
-                <strong>{{ nombreTerritorio(territorioAtacanteId) }}</strong> seleccionado —
-                elegí un enemigo adyacente destacado
-              </p>
 
-              <!-- Resultado combate -->
-              <div class="combate-result" *ngIf="resultadoCombate">
-                <div class="dados-row">
-                  <span class="dado dado-ataque" *ngFor="let d of resultadoCombate.dadosAtaque">{{ d }}</span>
-                </div>
-                <div class="dados-row">
-                  <span class="dado dado-defensa" *ngFor="let d of resultadoCombate.dadosDefensa">{{ d }}</span>
-                </div>
-                <p class="combate-summary" *ngIf="resultadoCombate.conquista">¡Territorio conquistado! 🏴</p>
-                <p class="combate-summary" *ngIf="!resultadoCombate.conquista">
-                  Bajas — vos: {{ resultadoCombate.bajasAtacante }} · rival: {{ resultadoCombate.bajasDefensor }}
+              <!-- Conquista pendiente: elegir tropas a mover -->
+              <ng-container *ngIf="conquistaPendiente">
+                <p class="phase-hint conquista-hint">
+                  ¡Territorio conquistado! Movés tropas a<br>
+                  <strong>{{ nombreTerritorio(conquistaPendiente.destinoId) }}</strong>
                 </p>
-              </div>
+                <div class="tropas-control">
+                  <button class="btn-tropas"
+                    [disabled]="conquistaTropasAMover <= 1"
+                    (click)="conquistaTropasAMover = conquistaTropasAMover - 1">−</button>
+                  <span class="tropas-valor">{{ conquistaTropasAMover }}</span>
+                  <button class="btn-tropas"
+                    [disabled]="conquistaTropasAMover >= maxTropasMovibles"
+                    (click)="conquistaTropasAMover = conquistaTropasAMover + 1">+</button>
+                </div>
+                <p class="tropas-rango">Mín: 1 &nbsp;·&nbsp; Máx: {{ maxTropasMovibles }}</p>
+                <button class="btn-phase-action" (click)="confirmarMovimientoConquista()">
+                  Mover tropas →
+                </button>
+              </ng-container>
 
-              <button class="btn-phase-action btn-end-attack" (click)="terminarAtaque()">
-                Terminar ataque →
-              </button>
+              <!-- Estado normal del ataque -->
+              <ng-container *ngIf="!conquistaPendiente">
+                <p class="phase-hint" *ngIf="!territorioAtacanteId">
+                  Seleccioná un territorio con más de 1 tropa para atacar
+                </p>
+                <p class="phase-hint" *ngIf="territorioAtacanteId">
+                  <strong>{{ nombreTerritorio(territorioAtacanteId) }}</strong> seleccionado —
+                  elegí un enemigo adyacente destacado
+                </p>
+
+                <!-- Resultado combate -->
+                <div class="combate-result" *ngIf="resultadoCombate">
+                  <div class="dados-row">
+                    <span class="dado dado-ataque" *ngFor="let d of resultadoCombate.dadosAtaque">{{ d }}</span>
+                  </div>
+                  <div class="dados-row">
+                    <span class="dado dado-defensa" *ngFor="let d of resultadoCombate.dadosDefensa">{{ d }}</span>
+                  </div>
+                  <p class="combate-summary">
+                    Bajas — vos: {{ resultadoCombate.bajasAtacante }} · rival: {{ resultadoCombate.bajasDefensor }}
+                  </p>
+                </div>
+
+                <button class="btn-phase-action btn-end-attack"
+                  [disabled]="procesandoTurno"
+                  (click)="terminarAtaque()">
+                  {{ procesandoTurno ? 'Procesando...' : 'Terminar ataque →' }}
+                </button>
+              </ng-container>
             </div>
 
             <!-- FASE: Ataque - turno ajeno -->
@@ -241,8 +296,10 @@ interface ResultadoCombate {
                 <strong>{{ nombreTerritorio(territorioOrigenId) }}</strong> —
                 elegí un territorio propio adyacente
               </p>
-              <button class="btn-phase-action btn-skip" (click)="saltarReagrupacion()">
-                Saltar →
+              <button class="btn-phase-action btn-skip"
+                [disabled]="procesandoTurno"
+                (click)="saltarReagrupacion()">
+                {{ procesandoTurno ? 'Procesando...' : 'Saltar →' }}
               </button>
             </div>
 
@@ -263,6 +320,9 @@ interface ResultadoCombate {
 
           <!-- Mapa -->
           <main class="game-area">
+            <button class="panel-toggle-btn" (click)="togglePanel()" [attr.aria-label]="panelAbierto ? 'Cerrar panel' : 'Abrir panel'">
+              {{ panelAbierto ? '✕' : '☰' }}
+            </button>
             <app-map
               [territoriosOwner]="territoriosOwnerMap"
               [jugadorColores]="jugadorColores"
@@ -312,7 +372,10 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
 
   userId = '';
   loading = true;
+  loadError = false;
   declarando = false;
+  procesandoTurno = false;
+  panelAbierto = true;
 
   // ── Color / Lider modal ────────────────────────────────
   readonly coloresDisponibles = [
@@ -342,11 +405,14 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
   resultadoCombate: ResultadoCombate | null = null;
   procesandoCombate = false;
   territorioOrigenId: string | null = null;
+  conquistaPendiente: ConquistaPendiente | null = null;
+  conquistaTropasAMover = 1;
 
   private partidaId = '';
   private channelPartida: RealtimeChannel | null = null;
   private channelPJ: RealtimeChannel | null = null;
   private channelTerritorio: RealtimeChannel | null = null;
+  private reloadJugadoresTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -369,6 +435,7 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     this.channelPartida?.unsubscribe();
     this.channelPJ?.unsubscribe();
     this.channelTerritorio?.unsubscribe();
+    if (this.reloadJugadoresTimer) clearTimeout(this.reloadJugadoresTimer);
   }
 
   // ── Computed ──────────────────────────────────────────
@@ -456,6 +523,11 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     );
   }
 
+  get maxTropasMovibles(): number {
+    if (!this.conquistaPendiente) return 1;
+    return Math.min(3, this.conquistaPendiente.tropasOrigenFinal - 1);
+  }
+
   get lideresOcupados(): Set<string> {
     const set = new Set<string>();
     for (const j of this.jugadores) {
@@ -482,37 +554,64 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
   // ── Load ──────────────────────────────────────────────
   async loadGameState() {
     this.loading = true;
-    const [{ data: partida }, { data: jugadores }, { data: lideres }, { data: territorios }] = await Promise.all([
-      this.service.getPartidaById(this.partidaId),
-      this.service.getPartidaJugadores(this.partidaId),
-      this.service.getLideres(),
-      this.service.getTerritoriosEstado(this.partidaId),
-    ]);
+    this.loadError = false;
 
-    this.partida   = partida as Partida | null;
-    this.jugadores = (jugadores as unknown as PartidaJugador[]) ?? [];
-    this.lideres   = (lideres as Lider[] | null) ?? [];
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), 12000)
+    );
 
-    const terrArray = (territorios as TerritorioEstado[] | null) ?? [];
-    this.territorios = {};
-    terrArray.forEach(t => { this.territorios[t.territorio_id] = t; });
+    try {
+      const [{ data: partida }, { data: jugadores }, { data: lideres }, { data: territorios }] =
+        await Promise.race([
+          Promise.all([
+            this.service.getPartidaById(this.partidaId),
+            this.service.getPartidaJugadores(this.partidaId),
+            this.service.getLideres(),
+            this.service.getTerritoriosEstado(this.partidaId),
+          ]),
+          timeout,
+        ]);
 
-    this.buildJugadorColores();
-    this.buildJugadorLideres();
-    this.loading = false;
+      this.partida   = partida as Partida | null;
+      this.jugadores = (jugadores as unknown as PartidaJugador[]) ?? [];
+      this.lideres   = (lideres as Lider[] | null) ?? [];
 
-    const miJugador = this.jugadores.find(j => j.usuario_id === this.userId);
-    if (miJugador) {
-      const colorGuardado = localStorage.getItem(`mat-color-${this.partidaId}-${this.userId}`);
-      const liderGuardado = localStorage.getItem(`mat-lider-${this.partidaId}-${this.userId}`);
-      if (colorGuardado && liderGuardado) {
-        this.jugadorColores[this.userId] = colorGuardado;
-        this.jugadorLideres[this.userId] = liderGuardado;
-        await this.service.marcarEstaDentroConColor(this.partidaId, this.userId, colorGuardado, liderGuardado);
-      } else {
-        this.mostrarSelectorModal = true;
+      const terrArray = (territorios as TerritorioEstado[] | null) ?? [];
+      this.territorios = {};
+      terrArray.forEach(t => { this.territorios[t.territorio_id] = t; });
+
+      this.buildJugadorColores();
+      this.buildJugadorLideres();
+      this.loading = false;
+
+      const miJugador = this.jugadores.find(j => j.usuario_id === this.userId);
+      if (miJugador) {
+        // BD es fuente de verdad; localStorage es fallback por si la BD aún no lo tiene
+        const color = miJugador.color
+          || localStorage.getItem(`mat-color-${this.partidaId}-${this.userId}`);
+        const lider = miJugador.lider
+          || localStorage.getItem(`mat-lider-${this.partidaId}-${this.userId}`);
+
+        if (color && lider) {
+          // Resincronizar localStorage con los valores actuales
+          localStorage.setItem(`mat-color-${this.partidaId}-${this.userId}`, color);
+          localStorage.setItem(`mat-lider-${this.partidaId}-${this.userId}`, lider);
+          await this.service.marcarEstaDentroConColor(this.partidaId, this.userId, color, lider);
+        } else {
+          this.mostrarSelectorModal = true;
+        }
       }
+    } catch {
+      this.loading = false;
+      this.loadError = true;
     }
+  }
+
+  togglePanel() { this.panelAbierto = !this.panelAbierto; }
+
+  private scheduleReloadJugadores() {
+    if (this.reloadJugadoresTimer) clearTimeout(this.reloadJugadoresTimer);
+    this.reloadJugadoresTimer = setTimeout(() => this.reloadJugadores(), 400);
   }
 
   private async reloadJugadores() {
@@ -531,14 +630,22 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
           this.partida = payload.new as Partida;
         }
       })
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          this.toast.show('Conexión perdida. Reconectando...', 'error');
+          setTimeout(() => this.loadGameState(), 3000);
+        }
+        if (err) console.error('[Realtime partida]', err);
+      });
 
     this.channelPJ = this.service.client
       .channel(`nexateg-pj-${this.partidaId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'partida_jugador' }, () => {
-        this.reloadJugadores();
+        this.scheduleReloadJugadores();
       })
-      .subscribe();
+      .subscribe((status, err) => {
+        if (err) console.error('[Realtime partida_jugador]', err);
+      });
 
     this.channelTerritorio = this.service.client
       .channel(`nexateg-terr-${this.partidaId}`)
@@ -549,7 +656,9 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
           this.territorios = { ...this.territorios, [t.territorio_id]: t };
         }
       })
-      .subscribe();
+      .subscribe((status, err) => {
+        if (err) console.error('[Realtime territorio_estado]', err);
+      });
   }
 
   // ── Host: iniciar juego ───────────────────────────────
@@ -557,7 +666,12 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     if (this.iniciandoJuego || !this.partida) return;
     this.iniciandoJuego = true;
 
-    await this.service.setTropasIniciales(this.partidaId, this.tropasIniciales);
+    const { error: errTropas } = await this.service.setTropasIniciales(this.partidaId, this.tropasIniciales);
+    if (errTropas) {
+      this.toast.show('Error al guardar tropas iniciales.', 'error');
+      this.iniciandoJuego = false;
+      return;
+    }
 
     const ids = this.jugadores.map(j => j.usuario_id);
     const orden = this.randomShuffle(ids);
@@ -565,19 +679,35 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     const terrIds = TERRITORIES.map(t => t.id);
     const shuffled = this.seededShuffle(terrIds, this.partidaId);
     const territoriosData = shuffled.map((tid, i) => ({
-      partida_id: this.partidaId,
+      partida_id:    this.partidaId,
       territorio_id: tid,
-      usuario_id: orden[i % orden.length],
-      tropas: 1,
+      usuario_id:    orden[i % orden.length],
+      tropas:        1,
     }));
-    const { error } = await this.service.initTerritorios(territoriosData);
-    if (error) { this.toast.show('Error al inicializar territorios.', 'error'); this.iniciandoJuego = false; return; }
 
-    for (const uid of orden) {
-      await this.service.setTropasPorColocar(this.partidaId, uid, this.tropasIniciales);
+    const { error: errTerr } = await this.service.initTerritorios(territoriosData);
+    if (errTerr) {
+      this.toast.show('Error al inicializar territorios.', 'error');
+      this.iniciandoJuego = false;
+      return;
     }
 
-    await this.service.iniciarFaseColocacion(this.partidaId, orden, 1, 0);
+    const resultadosTropas = await Promise.all(
+      orden.map(uid => this.service.setTropasPorColocar(this.partidaId, uid, this.tropasIniciales))
+    );
+    if (resultadosTropas.some(r => r.error)) {
+      this.toast.show('Error al asignar tropas a los jugadores.', 'error');
+      this.iniciandoJuego = false;
+      return;
+    }
+
+    const { error: errFase } = await this.service.iniciarFaseColocacion(this.partidaId, orden, 1, 0);
+    if (errFase) {
+      this.toast.show('Error al iniciar la fase de colocación.', 'error');
+      this.iniciandoJuego = false;
+      return;
+    }
+
     this.iniciandoJuego = false;
   }
 
@@ -648,6 +778,7 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
 
   // ── Ataque ────────────────────────────────────────────
   handleAtaqueClick(territorioId: string) {
+    if (this.conquistaPendiente) return;
     const estado = this.territorios[territorioId];
     if (!estado) return;
 
@@ -675,49 +806,67 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
 
   async ejecutarAtaque(origenId: string, destinoId: string) {
     this.procesandoCombate = true;
-    const origen  = this.territorios[origenId];
-    const destino = this.territorios[destinoId];
-    if (!origen || !destino) { this.procesandoCombate = false; return; }
 
-    const nAtaque  = this.calcularDadosAtaque(origen.tropas);
-    const nDefensa = this.calcularDadosDefensa(destino.tropas);
-    if (nAtaque === 0) { this.procesandoCombate = false; return; }
-
-    const tiradaAtaque  = this.tirarDados(nAtaque).sort((a, b) => b - a);
-    const tiradaDefensa = this.tirarDados(nDefensa).sort((a, b) => b - a);
-
-    let bajasAtacante = 0;
-    let bajasDefensor = 0;
-    const pares = Math.min(tiradaAtaque.length, tiradaDefensa.length);
-    for (let i = 0; i < pares; i++) {
-      if (tiradaAtaque[i] > tiradaDefensa[i]) bajasDefensor++;
-      else bajasAtacante++;
+    const { data: rpcData, error } = await this.service.resolverCombate(this.partidaId, origenId, destinoId);
+    if (error) {
+      this.toast.show('Error en el servidor al resolver el combate.', 'error');
+      this.procesandoCombate = false;
+      return;
     }
 
-    const tropasOrigenFinal  = origen.tropas  - bajasAtacante;
-    const tropasDestinoFinal = destino.tropas - bajasDefensor;
-    const conquista = tropasDestinoFinal <= 0;
+    const res = rpcData as CombateRpc;
+    if (res.error) {
+      this.toast.show(res.error, 'error');
+      this.procesandoCombate = false;
+      return;
+    }
 
-    this.resultadoCombate = { dadosAtaque: tiradaAtaque, dadosDefensa: tiradaDefensa, bajasAtacante, bajasDefensor, conquista };
+    const conquista = res.conquista ?? false;
+    this.resultadoCombate = {
+      dadosAtaque:   res.dados_ataque   ?? [],
+      dadosDefensa:  res.dados_defensa  ?? [],
+      bajasAtacante: res.bajas_atacante ?? 0,
+      bajasDefensor: res.bajas_defensor ?? 0,
+      conquista,
+    };
 
     if (conquista) {
-      const aMover = Math.max(1, Math.min(3, tropasOrigenFinal - 1));
-      await this.updateTerritorio(origenId,  { tropas: tropasOrigenFinal - aMover });
-      await this.updateTerritorio(destinoId, { usuario_id: this.userId, tropas: aMover });
+      this.conquistaTropasAMover = 1;
+      this.conquistaPendiente = {
+        origenId,
+        destinoId,
+        tropasOrigenFinal: res.tropas_origen_final ?? 1,
+      };
       this.territorioAtacanteId = null;
-    } else {
-      await this.updateTerritorio(origenId,  { tropas: tropasOrigenFinal });
-      await this.updateTerritorio(destinoId, { tropas: tropasDestinoFinal });
     }
 
     this.procesandoCombate = false;
   }
 
+  async confirmarMovimientoConquista() {
+    if (!this.conquistaPendiente) return;
+    const { origenId, destinoId } = this.conquistaPendiente;
+    const aMover = Math.max(1, Math.min(this.conquistaTropasAMover, this.maxTropasMovibles));
+
+    const { data: rpcData, error } = await this.service.moverTropasConquista(
+      this.partidaId, origenId, destinoId, aMover
+    );
+    if (error || (rpcData as any)?.error) {
+      this.toast.show((rpcData as any)?.error ?? 'Error al mover tropas.', 'error');
+      return;
+    }
+
+    this.conquistaPendiente = null;
+    this.resultadoCombate = null;
+  }
+
   async terminarAtaque() {
-    if (!this.partida) return;
+    if (!this.partida || this.conquistaPendiente || this.procesandoTurno) return;
+    this.procesandoTurno = true;
     this.territorioAtacanteId = null;
     this.resultadoCombate = null;
     await this.service.setFase(this.partidaId, 'reagrupacion', this.partida.jugador_actual_index!);
+    this.procesandoTurno = false;
   }
 
   // ── Reagrupación ──────────────────────────────────────
@@ -760,22 +909,28 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   async saltarReagrupacion() {
+    if (this.procesandoTurno) return;
     this.territorioOrigenId = null;
     await this.avanzarTurno();
   }
 
   // ── Rotación de turnos ────────────────────────────────
   async avanzarTurno() {
-    if (!this.partida) return;
-    const orden    = this.partida.orden_jugadores!;
-    const ronda    = this.partida.ronda_actual!;
-    const startIdx = (ronda - 1) % orden.length;
-    const nextIdx  = (this.partida.jugador_actual_index! + 1) % orden.length;
+    if (!this.partida || this.procesandoTurno) return;
+    this.procesandoTurno = true;
+    try {
+      const orden    = this.partida.orden_jugadores!;
+      const ronda    = this.partida.ronda_actual!;
+      const startIdx = (ronda - 1) % orden.length;
+      const nextIdx  = (this.partida.jugador_actual_index! + 1) % orden.length;
 
-    if (nextIdx === startIdx) {
-      await this.iniciarNuevaRonda();
-    } else {
-      await this.service.setFase(this.partidaId, 'ataque', nextIdx);
+      if (nextIdx === startIdx) {
+        await this.iniciarNuevaRonda();
+      } else {
+        await this.service.setFase(this.partidaId, 'ataque', nextIdx);
+      }
+    } finally {
+      this.procesandoTurno = false;
     }
   }
 
@@ -785,12 +940,21 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     const newRonda = this.partida.ronda_actual! + 1;
     const newStart = (newRonda - 1) % orden.length;
 
-    for (const jugador of this.jugadores) {
-      const uid = jugador.usuario_id;
-      const misIds = Object.values(this.territorios).filter(t => t.usuario_id === uid).map(t => t.territorio_id);
-      const base   = Math.max(1, Math.floor(misIds.length / 2));
-      const bonus  = this.calcularBonusContinente(uid, misIds);
-      await this.service.setTropasPorColocar(this.partidaId, uid, base + bonus);
+    const resultados = await Promise.all(
+      this.jugadores.map(jugador => {
+        const uid    = jugador.usuario_id;
+        const misIds = Object.values(this.territorios)
+          .filter(t => t.usuario_id === uid)
+          .map(t => t.territorio_id);
+        const base   = Math.max(1, Math.floor(misIds.length / 2));
+        const bonus  = this.calcularBonusContinente(uid, misIds);
+        return this.service.setTropasPorColocar(this.partidaId, uid, base + bonus);
+      })
+    );
+
+    if (resultados.some(r => r.error)) {
+      this.toast.show('Error al calcular tropas para la nueva ronda.', 'error');
+      return;
     }
 
     await this.service.iniciarFaseColocacion(this.partidaId, orden, newRonda, newStart);
@@ -799,7 +963,10 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
   async declararseGanador() {
     if (this.declarando) return;
     this.declarando = true;
-    await this.service.finalizarPartida(this.partidaId, this.userId);
+    const { data: rpcData, error } = await this.service.declararGanador(this.partidaId);
+    if (error || (rpcData as any)?.error) {
+      this.toast.show((rpcData as any)?.error ?? 'No se pudo declarar ganador.', 'error');
+    }
     this.declarando = false;
   }
 
@@ -888,16 +1055,22 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     for (const j of this.jugadores) {
       if (j.color) this.jugadorColores[j.usuario_id] = j.color;
     }
-    const local = localStorage.getItem(`mat-color-${this.partidaId}-${this.userId}`);
-    if (local) this.jugadorColores[this.userId] = local;
+    // Solo usar localStorage si la BD no devolvió color para este jugador
+    if (!this.jugadorColores[this.userId]) {
+      const local = localStorage.getItem(`mat-color-${this.partidaId}-${this.userId}`);
+      if (local) this.jugadorColores[this.userId] = local;
+    }
   }
 
   private buildJugadorLideres() {
     for (const j of this.jugadores) {
       if (j.lider) this.jugadorLideres[j.usuario_id] = j.lider;
     }
-    const local = localStorage.getItem(`mat-lider-${this.partidaId}-${this.userId}`);
-    if (local) this.jugadorLideres[this.userId] = local;
+    // Solo usar localStorage si la BD no devolvió líder para este jugador
+    if (!this.jugadorLideres[this.userId]) {
+      const local = localStorage.getItem(`mat-lider-${this.partidaId}-${this.userId}`);
+      if (local) this.jugadorLideres[this.userId] = local;
+    }
   }
 
   private randomShuffle<T>(arr: T[]): T[] {
