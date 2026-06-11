@@ -1,25 +1,9 @@
 import { Routes } from '@angular/router';
-import { authGuard, publicGuard } from './core/guards/auth.guard';
+import { authGuard } from './core/guards/auth.guard';
+import { LobbyConfig } from './shared/game-lobby/game-lobby.component';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'inicio', pathMatch: 'full' },
-  {
-    path: 'auth',
-    canActivate: [publicGuard],
-    children: [
-      {
-        path: 'login',
-        loadComponent: () =>
-          import('./features/auth/login/login.component').then(m => m.LoginComponent),
-      },
-      {
-        path: 'register',
-        loadComponent: () =>
-          import('./features/auth/register/register.component').then(m => m.RegisterComponent),
-      },
-      { path: '', redirectTo: 'login', pathMatch: 'full' },
-    ],
-  },
   {
     path: 'inicio',
     loadComponent: () =>
@@ -27,7 +11,6 @@ export const routes: Routes = [
   },
   {
     path: 'nexajuegos',
-    canActivate: [authGuard],
     loadComponent: () =>
       import('./features/nexajuegos/nexajuegos.component').then(m => m.NexaJuegosComponent),
   },
@@ -35,24 +18,29 @@ export const routes: Routes = [
     path: 'partida',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/partida/partida.component').then(m => m.PartidaComponent),
+      import('./shared/game-lobby/game-lobby.component').then(m => m.GameLobbyComponent),
+    data: {
+      productNombre: 'NexaTeg', channelPrefix: 'partida',
+      showBrand: false, showProductSelector: true,
+      finalizadasLabel: 'Finalizadas', showNavBack: false
+    } satisfies LobbyConfig,
   },
   {
     path: 'nexateg',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/nexateg/nexateg.component').then(m => m.NexaTegComponent),
+      import('./shared/game-lobby/game-lobby.component').then(m => m.GameLobbyComponent),
+    data: {
+      productNombre: 'NexaTeg', channelPrefix: 'nexateg',
+      showBrand: true, showProductSelector: false,
+      finalizadasLabel: 'Ganadores', showNavBack: true
+    } satisfies LobbyConfig,
   },
   {
-    path: 'mat-juego/:id',
+    path: 'nexateg-juego/:id',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/mat-juego/mat-juego.component').then(m => m.MatJuegoComponent),
-  },
-  {
-    path: 'pruebateg33',
-    loadComponent: () =>
-      import('./features/pruebateg33/pruebateg33.component').then(m => m.PruebaTeg33Component),
+      import('./features/nexateg-juego/nexateg-juego.component').then(m => m.NexaTegJuegoComponent),
   },
   { path: '**', redirectTo: 'inicio' },
 ];

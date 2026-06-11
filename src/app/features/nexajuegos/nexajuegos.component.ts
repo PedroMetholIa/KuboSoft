@@ -1,6 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { RouterLink, Router } from '@angular/router';
 import { SupabaseService } from '../../core/services/supabase.service';
+import { ToastService } from '../../core/services/toast.service';
 import { NavComponent } from '../../shared/nav/nav.component';
 import { filter, take } from 'rxjs/operators';
 
@@ -35,7 +36,7 @@ export class NexaJuegosComponent implements OnInit {
     return Array.from({ length: Math.max(0, 6 - this.juegos.length) });
   }
 
-  constructor(private supabase: SupabaseService, private router: Router) {}
+  constructor(private supabase: SupabaseService, private router: Router, private toast: ToastService) {}
 
   ngOnInit() {
     this.supabase.currentUser$.pipe(
@@ -49,7 +50,7 @@ export class NexaJuegosComponent implements OnInit {
       this.supabase.getProductosByCategoriaNombre('NexaJuegos'),
       this.supabase.getCategoriaByNombre('NexaJuegos'),
     ]);
-    if (productosRes.error) console.error('[nexajuegos]', productosRes.error);
+    if (productosRes.error) this.toast.show('Error al cargar los juegos.', 'error');
     this.juegos = (productosRes.data as Juego[]) ?? [];
     if (categoriaRes.data) {
       this.categoriaNombre = (categoriaRes.data as any).nombre;

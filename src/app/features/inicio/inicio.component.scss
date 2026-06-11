@@ -399,6 +399,12 @@ h2 {
   textarea { min-height: 140px; }
 }
 
+.form-error {
+  font-size: 0.82rem;
+  color: #e53e3e;
+  margin: 0 0 0.5rem;
+}
+
 .btn-submit {
   background: linear-gradient(135deg,#7C5CFC,#00BCD4);
   color: #ffffff;

@@ -1,4 +1,4 @@
-<div class="map-wrapper">
+<div class="map-wrapper" (click)="deseleccionar.emit()">
 
   <svg class="teg-map" viewBox="0 50 1100 550" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
 
@@ -66,10 +66,24 @@
       <filter id="badge-glow" x="-60%" y="-60%" width="220%" height="220%">
         <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#A0AEC0" flood-opacity="0.65"/>
       </filter>
+      <!-- Malla de fondo -->
+      <pattern id="bg-mesh" patternUnits="userSpaceOnUse" x="0" y="0" width="28" height="28">
+        <path d="M 28 0 L 0 0 0 28" fill="none" stroke="rgba(30,80,200,0.28)" stroke-width="0.45"/>
+      </pattern>
+      <!-- Degradado circular (vignette azul marino) -->
+      <radialGradient id="bg-vignette" cx="50%" cy="50%" r="65%" gradientUnits="objectBoundingBox">
+        <stop offset="0%"   stop-color="#020b2a" stop-opacity="0.0"/>
+        <stop offset="60%"  stop-color="#03124a" stop-opacity="0.30"/>
+        <stop offset="100%" stop-color="#010820" stop-opacity="0.72"/>
+      </radialGradient>
     </defs>
 
     <!-- Fondo: imagen del mapa -->
     <image href="assets/NexaTeg/FondoOceano.png" x="0" y="50" width="1100" height="550" preserveAspectRatio="xMidYMid slice"/>
+    <!-- Malla azul marina -->
+    <rect x="0" y="50" width="1100" height="550" fill="url(#bg-mesh)" pointer-events="none"/>
+    <!-- Vignette azul marino con degradado circular -->
+    <rect x="0" y="50" width="1100" height="550" fill="url(#bg-vignette)" pointer-events="none"/>
 
     <!-- ── Contenedor zoomeable ───────────────────────────────────────────── -->
     <g id="map-content">
@@ -82,11 +96,12 @@
           [attr.fill]="getTerritoryFill(t)"
           [style.stroke]="getTerritoryStroke(t)"
           [style.stroke-width]="getTerritoryStrokeWidth(t)"
-          filter="url(#terr-shadow)"
+          [style.filter]="getTerritoryFilter(t)"
           class="terr"
-          [class.selected]="t.isSelected"
-          [class.highlighted]="t.isHighlighted"
-          (click)="onTerritoryClick(t)"
+          [class.selected]="isSelected(t)"
+          [class.highlighted]="isHighlighted(t)"
+          (click)="onTerritoryClick(t); $event.stopPropagation()"
+          (contextmenu)="onTerritoryRightClick(t, $event); $event.stopPropagation()"
           (mouseenter)="onTerritoryHover(t, $event)"
           (mouseleave)="onTerritoryLeave()"
         />
@@ -95,16 +110,23 @@
           *ngFor="let t of territories"
           [attr.d]="t.svgPath"
           fill="url(#tex-pattern)"
-          opacity="1.00"
+          opacity="0.55"
           pointer-events="none"
           style="mix-blend-mode: multiply;"
+        />
+        <!-- Capa de blanqueo: neutraliza la textura solo en territorios blancos -->
+        <path
+          *ngFor="let t of territories"
+          [attr.d]="t.svgPath"
+          [attr.fill]="getWhiteOverlay(t)"
+          pointer-events="none"
         />
       </g>
 
       <!-- ── Capa 2: badges de tropas — siempre al frente ──────────────────── -->
       <g id="badges" pointer-events="none">
         <ng-container *ngFor="let t of territories">
-          <ng-container *ngIf="t.troops > 0">
+          <ng-container *ngIf="getTropas(t.id) > 0">
             <!-- Anillo exterior gris -->
             <circle
               [attr.cx]="t.labelPosition.x"
@@ -134,7 +156,7 @@
               font-size="12"
               font-weight="600"
               font-family="'Outfit', sans-serif"
-            >{{ t.troops }}</text>
+            >{{ getTropas(t.id) }}</text>
           </ng-container>
         </ng-container>
       </g>
@@ -152,9 +174,9 @@
   >
     <div class="tooltip-name">{{ tooltip.name }}</div>
     <div class="tooltip-continent">{{ continentLabel(tooltip.continent) }}</div>
-    <div class="tooltip-owner" *ngIf="tooltip.owner">Dueño: <strong>{{ tooltip.owner }}</strong></div>
-    <div class="tooltip-owner" *ngIf="!tooltip.owner">Sin dueño</div>
-    <div class="tooltip-troops">Tropas: <strong>{{ tooltip.troops }}</strong></div>
+    <div class="tooltip-owner" *ngIf="getOwnerName(tooltip.id)">Dueño: <strong>{{ getOwnerName(tooltip.id) }}</strong></div>
+    <div class="tooltip-owner" *ngIf="!getOwnerName(tooltip.id)">Sin dueño</div>
+    <div class="tooltip-troops">Tropas: <strong>{{ getTropas(tooltip.id) }}</strong></div>
   </div>
 
 

@@ -2,7 +2,7 @@ import { Component, Input, OnChanges, OnDestroy, SimpleChanges, ViewChild, Eleme
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { SupabaseService } from '../../../core/services/supabase.service';
+import { SupabaseService } from '../../core/services/supabase.service';
 
 interface Jugador {
   nombre: string | null;
@@ -28,7 +28,7 @@ const CHAT_COLORS = [
 ];
 
 @Component({
-  selector: 'app-nexateg-jugadores-chat',
+  selector: 'app-jugadores-chat',
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
@@ -39,7 +39,6 @@ const CHAT_COLORS = [
         <span class="jc-badge" *ngIf="!chatMode">{{ onlineCount }}</span>
       </div>
 
-      <!-- Modo jugadores: nombre + apellido + última conexión -->
       <div class="jc-list" *ngIf="!chatMode">
         <div class="jc-item" *ngFor="let j of jugadores"
              [class.jc-me]="j.email === userEmail"
@@ -54,7 +53,6 @@ const CHAT_COLORS = [
         <p class="jc-empty" *ngIf="!loading && jugadores.length === 0">Sin jugadores suscritos</p>
       </div>
 
-      <!-- Modo chat: historial en memoria -->
       <div class="jc-chat-list" *ngIf="chatMode" #chatList>
         <div class="jc-chat-row" *ngFor="let m of chatMessages">
           <span class="jc-chat-name" [style.color]="m.color">{{ m.nombre }}</span>
@@ -63,7 +61,6 @@ const CHAT_COLORS = [
         <p class="jc-empty" *ngIf="!loading && chatMessages.length === 0">Sin mensajes aún</p>
       </div>
 
-      <!-- Formulario -->
       <div class="jc-form" *ngIf="showForm">
         <div class="jc-input-row">
           <textarea
@@ -91,6 +88,7 @@ export class JugadoresChatComponent implements OnChanges, OnDestroy, AfterViewCh
   @Input() icon = '👥';
   @Input() showForm = false;
   @Input() chatMode = false;
+  @Input() channelName = 'chat-usuario-mensajes';
 
   @ViewChild('chatList') private chatListRef?: ElementRef<HTMLDivElement>;
 
@@ -134,7 +132,7 @@ export class JugadoresChatComponent implements OnChanges, OnDestroy, AfterViewCh
     }
 
     this.channelChat = this.service.client
-      .channel('nexateg-chat-usuario-mensajes')
+      .channel(this.channelName)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'usuario' }, (payload) => {
         const nuevoMensaje = payload.new['mensaje'] as string | null;
         if (!nuevoMensaje) return;
@@ -175,12 +173,7 @@ export class JugadoresChatComponent implements OnChanges, OnDestroy, AfterViewCh
     this.saving = true;
 
     const me = this.jugadores.find(j => j.email === this.userEmail);
-    this.pushMessage(
-      me?.nombre ?? null,
-      me?.apellido ?? null,
-      this.userEmail,
-      texto
-    );
+    this.pushMessage(me?.nombre ?? null, me?.apellido ?? null, this.userEmail, texto);
 
     await this.service.updateMensaje(this.userId, texto);
     this.mensajeInput = '';

@@ -1,0 +1,391 @@
+// ── Notification banner ────────────────────────────────
+.notif-banner {
+  position: fixed;
+  top: 1.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(8, 6, 18, 0.94);
+  border: 1px solid rgba(255, 71, 87, 0.28);
+  border-left: 3px solid #FF4757;
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 0 0 1px rgba(255,71,87,.06), 0 12px 48px rgba(0,0,0,.75), 0 0 70px rgba(255,71,87,.1);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  animation: notifSlide 0.38s cubic-bezier(.21,1.02,.73,1) forwards;
+  max-width: 520px;
+  width: calc(100% - 3rem);
+
+  @keyframes notifSlide {
+    from { transform: translateX(-50%) translateY(-72px); opacity: 0; }
+    to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+  }
+
+  .notif-icon-wrap {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(255,71,87,.18), rgba(224,92,138,.18));
+    border: 1px solid rgba(255,71,87,.28);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem; flex-shrink: 0;
+  }
+
+  .notif-body {
+    flex: 1; min-width: 0;
+    .notif-label {
+      display: block;
+      background: linear-gradient(90deg, #FF4757, #E05C8A);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .1em; margin-bottom: 0.28rem;
+    }
+    .notif-msg {
+      margin: 0; color: #c8c8d8; font-size: 0.84rem; line-height: 1.4;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+  }
+
+  .btn-ir {
+    background: linear-gradient(135deg, #FF4757 0%, #E05C8A 100%);
+    color: #fff; border: none; border-radius: 10px;
+    padding: 0.55rem 1.15rem; font-size: 0.83rem; font-weight: 700;
+    cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    transition: all .2s; box-shadow: 0 4px 18px rgba(255,71,87,.35);
+    &:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(255,71,87,.55); }
+  }
+
+  .btn-notif-close {
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+    color: #666; cursor: pointer; padding: 0.42rem; line-height: 1;
+    flex-shrink: 0; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s;
+    &:hover { background: rgba(255,255,255,.12); color: #bbb; }
+  }
+}
+
+// ── Base ───────────────────────────────────────────────
+.partida {
+  min-height: 100vh;
+  background:
+    linear-gradient(rgba(4,6,16,.45), rgba(4,6,16,.45)),
+    url('/assets/NexaTeg/MundoFondoNegro.png') center / cover fixed;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+}
+
+// ── Container ──────────────────────────────────────────
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+// ── Header: modo NexaTeg (con brand) ──────────────────
+.page-header {
+  padding: 5rem 0 0.75rem;
+
+  .container { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 1rem; }
+  .page-brand { display: flex; align-items: center; gap: 1.1rem; }
+  .page-logo {
+    width: 72px; height: 72px; object-fit: contain;
+    filter: drop-shadow(0 6px 28px rgba(255,71,87,.45)); flex-shrink: 0;
+  }
+  .page-title {
+    margin: 0; font-size: 2.8rem; font-weight: 800;
+    letter-spacing: -1px; line-height: 1; font-family: 'Outfit', sans-serif;
+    .title-nexa { color: #f0f0fa; }
+    .title-teg {
+      background: linear-gradient(135deg, #FF4757 0%, #E05C8A 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+  }
+  .page-actions { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+}
+
+// ── Header: modo simple (Partidas) ────────────────────
+.top-bar {
+  padding: 1.25rem 2rem;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  background: rgba(4,6,18,.82);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+
+  .container { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+}
+
+.title-block {
+  h1 { font-size: 1.6rem; font-weight: 800; margin: 0 0 0.1rem; }
+  p  { font-size: 0.8rem; color: #555; margin: 0; }
+}
+
+// ── Btn fill (NexaTeg brand) ───────────────────────────
+.btn {
+  font-size: 13.5px; font-weight: 500; font-family: 'Outfit', sans-serif;
+  border-radius: 7px; padding: 10px 22px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: all .15s; border: none; text-decoration: none;
+}
+
+.btn-fill {
+  background: linear-gradient(135deg, #FF4757 0%, #E05C8A 100%);
+  color: #fff; box-shadow: 0 4px 22px rgba(255,71,87,.35);
+  &:hover { opacity: .88; transform: translateY(-1px); box-shadow: 0 6px 28px rgba(255,71,87,.45); }
+}
+
+// ── Main content ───────────────────────────────────────
+.content {
+  flex: 1;
+  padding: 0.5rem 2rem 1.5rem;
+  overflow: auto;
+}
+
+.main-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+// ── Shared panel ───────────────────────────────────────
+.panel {
+  border-radius: 14px; padding: 1.25rem;
+  display: flex; flex-direction: column; gap: 0.75rem;
+}
+
+.panel-header {
+  display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;
+  h3 { font-size: 0.95rem; font-weight: 600; margin: 0; flex: 1; }
+}
+
+.panel-icon {
+  font-size: 1rem; width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center; border-radius: 8px;
+  &.green  { background: rgba(52,211,153,.15); }
+  &.red    { background: rgba(239,68,68,.15); }
+  &.purple { background: rgba(139,92,246,.15); }
+  &.gold   { background: rgba(255,180,0,.15); }
+}
+
+.count-badge {
+  font-size: 0.75rem; font-weight: 700; padding: 0.1rem 0.5rem; border-radius: 20px;
+  &.green  { background: rgba(52,211,153,.15);  color: #34d399; }
+  &.red    { background: rgba(239,68,68,.15);   color: #f87171; }
+  &.purple { background: rgba(139,92,246,.15);  color: #a78bfa; }
+  &.gold   { background: rgba(255,180,0,.15);   color: #ffb400; }
+}
+
+// ── Bottom row: Jugadores + Chat ───────────────────────
+.bottom-panel-row {
+  grid-column: span 4;
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+
+  > app-jugadores-chat:first-child {
+    flex: 1;
+    min-width: 0;
+  }
+
+  > app-jugadores-chat:last-child {
+    flex: 3;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    max-height: var(--jug-height, none);
+    overflow: hidden;
+  }
+}
+
+// ── Partidas panels ────────────────────────────────────
+$panel-row-h: 38px;
+$panel-thead-h: 34px;
+$panel-header-h: 52px;
+$panel-padding-v: 2.5rem;
+
+.panel-creadas,
+.panel-disponibles,
+.panel-en-juego,
+.panel-finalizadas {
+  grid-column: span 1;
+  height: calc(#{$panel-header-h} + #{$panel-padding-v} + #{$panel-thead-h} + #{$panel-row-h} * 3 + 0.75rem);
+  .table-wrap { flex: 1; overflow-y: auto; min-height: 0; }
+}
+
+.panel-creadas   { background: linear-gradient(160deg,rgba(40,10,55,.45),rgba(8,12,30,.55));   border: 1px solid rgba(239,68,68,.25);   backdrop-filter: blur(12px); }
+.panel-disponibles { background: linear-gradient(160deg,rgba(15,18,55,.45),rgba(8,12,30,.55)); border: 1px solid rgba(139,92,246,.25); backdrop-filter: blur(12px); }
+.panel-finalizadas { background: linear-gradient(160deg,rgba(40,30,8,.45),rgba(8,12,30,.55));  border: 1px solid rgba(255,180,0,.25);  backdrop-filter: blur(12px); }
+.panel-en-juego  { background: linear-gradient(160deg,rgba(8,38,22,.45),rgba(8,12,30,.55));    border: 1px solid rgba(52,211,153,.25); backdrop-filter: blur(12px); }
+
+// ── Tables ─────────────────────────────────────────────
+.table-wrap {
+  overflow-x: auto;
+  &::-webkit-scrollbar { width: 4px; height: 4px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 4px; &:hover { background: rgba(255,255,255,.22); } }
+}
+
+table {
+  width: 100%; border-collapse: collapse; font-size: 0.85rem;
+  th { padding: 0.5rem 0.75rem; text-align: left; color: #444; font-size: 0.72rem; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+  td { padding: 0.6rem 0.75rem; color: #bbb; border-top: 1px solid rgba(255,255,255,.04); vertical-align: middle; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+}
+
+.empty-row { color: #444; font-size: 0.82rem; font-style: italic; text-align: center; padding: 1rem 0.75rem !important; }
+.no-clave { color: #444; }
+.ganador-tag { color: #ffb400; font-weight: 600; font-size: 0.83rem; }
+.date-cell { white-space: nowrap; color: #666; font-size: 0.8rem; }
+.jugadores-cell { text-align: center; }
+.num-cell { white-space: nowrap; }
+
+.btn-ver-jugadores {
+  background: transparent; border: none; color: #ffb400;
+  padding: 0; font-size: 1rem; cursor: pointer; opacity: 0.7;
+  transition: opacity .15s; &:hover { opacity: 1; }
+}
+
+.modal-jugadores { max-width: 280px; padding: 1rem; }
+
+.jugadores-list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 0.5rem;
+  li { padding: 0.5rem 0.75rem; border-radius: 8px; background: rgba(255,180,0,.06); border: 1px solid rgba(255,180,0,.12); color: #ddd; font-size: 0.88rem; }
+}
+
+// ── Action buttons ─────────────────────────────────────
+.actions-cell { display: flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+
+.btn-comenzar {
+  background: rgba(52,211,153,.15); color: #34d399; border: 1px solid rgba(52,211,153,.3);
+  border-radius: 7px; padding: 0.3rem 0.75rem; font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; transition: all .2s;
+  &:hover:not(:disabled) { background: rgba(52,211,153,.3); }
+  &:disabled { opacity: .35; cursor: not-allowed; }
+}
+
+.btn-icon-delete {
+  background: transparent; border: 1px solid rgba(239,68,68,.25); color: #f87171;
+  border-radius: 7px; padding: 0.28rem 0.5rem; font-size: 0.85rem;
+  cursor: pointer; transition: all .2s; &:hover { background: rgba(239,68,68,.12); }
+}
+
+.btn-ir-juego {
+  background: rgba(52,211,153,.15); color: #34d399; border: 1px solid rgba(52,211,153,.3);
+  border-radius: 7px; padding: 0.3rem 0.75rem; font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; transition: all .2s; white-space: nowrap;
+  &:hover { background: rgba(52,211,153,.3); }
+}
+
+.btn-salirse {
+  background: rgba(239,68,68,.12); color: #f87171; border: 1px solid rgba(239,68,68,.3);
+  border-radius: 7px; padding: 0.3rem 0.75rem; font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; transition: all .2s; white-space: nowrap;
+  &:hover { background: rgba(239,68,68,.25); }
+}
+
+.btn-unirse {
+  background: rgba(139,92,246,.15); color: #a78bfa; border: 1px solid rgba(139,92,246,.3);
+  border-radius: 7px; padding: 0.3rem 0.75rem; font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; transition: all .2s; white-space: nowrap;
+  &:hover:not(:disabled) { background: rgba(139,92,246,.3); }
+  &:disabled { opacity: .35; cursor: not-allowed; }
+}
+
+// ── Footer (modo partida con logout) ──────────────────
+.footer-bar {
+  padding: 1rem 2rem;
+  border-top: 1px solid rgba(255,255,255,.06);
+  background: rgba(4,6,18,.82);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  .container { display: flex; align-items: center; justify-content: center; gap: 0.75rem; flex-wrap: wrap; }
+}
+
+.btn-footer {
+  padding: 0.6rem 1.4rem; border-radius: 10px; font-size: 0.88rem;
+  font-weight: 600; cursor: pointer; transition: all .2s; border: none;
+
+  &.btn-back,
+  &.btn-refresh {
+    background: linear-gradient(160deg, rgba(13,42,30,.7), rgba(8,14,35,.7));
+    color: #7ecfb0; border: 1px solid rgba(52,211,153,.2);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    &:hover { border-color: rgba(52,211,153,.4); color: #34d399; }
+  }
+
+  &.btn-crear {
+    background: #ff4757; color: #fff;
+    box-shadow: 0 4px 15px rgba(255,71,87,.35);
+    &:hover { box-shadow: 0 4px 20px rgba(255,71,87,.5); transform: translateY(-1px); }
+  }
+}
+
+// ── Modal ──────────────────────────────────────────────
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.7);
+  backdrop-filter: blur(4px); display: flex; align-items: center;
+  justify-content: center; z-index: 100; padding: 1rem;
+}
+
+.modal-panel {
+  background: linear-gradient(160deg, rgba(22,10,18,.98), rgba(12,10,26,.98));
+  border: 1px solid rgba(255,71,87,.22); border-top: 2px solid rgba(255,71,87,.55);
+  border-radius: 18px; padding: 2rem; width: 100%; max-width: 480px;
+  box-shadow: 0 25px 60px rgba(0,0,0,.65), 0 0 60px rgba(255,71,87,.07);
+
+  h3 {
+    font-size: 1.15rem; font-weight: 700; margin: 0 0 1.25rem;
+    display: flex; align-items: center; gap: 0.5rem;
+    &::before { content: '🎮'; font-size: 1.1rem; }
+  }
+}
+
+.modal-sub {
+  font-size: 0.85rem; color: #888; margin: 0 0 1.25rem;
+  strong { color: #ccc; }
+}
+
+.password-error { font-size: 0.82rem; color: #f87171; margin: -0.25rem 0 0.5rem; }
+
+.form-grid { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1rem; }
+
+.field {
+  label { display: block; color: #888; font-size: 0.8rem; margin-bottom: 0.35rem; }
+  input, select {
+    width: 100%; background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.1);
+    border-radius: 8px; padding: 0.65rem 0.9rem; color: #fff; font-size: 0.9rem;
+    outline: none; box-sizing: border-box; transition: border-color .2s;
+    &:focus { border-color: rgba(255,71,87,.7); box-shadow: 0 0 0 3px rgba(255,71,87,.1); }
+    option { background: #10142a; }
+    &::placeholder { color: #444; }
+  }
+}
+
+.field-check {
+  margin-bottom: 1rem;
+  label { display: flex; align-items: center; gap: 0.5rem; color: #888; font-size: 0.88rem; cursor: pointer; }
+  input[type='checkbox'] { width: 15px; height: 15px; accent-color: #a78bfa; cursor: pointer; }
+}
+
+.form-actions { display: flex; align-items: center; gap: 0.75rem; margin-top: 1.5rem; }
+
+.btn-crear-confirm {
+  flex: 1;
+  background: linear-gradient(135deg, #FF4757 0%, #E05C8A 100%);
+  color: #fff; border: none; border-radius: 10px;
+  padding: 0.75rem 1.5rem; font-size: 0.92rem; font-weight: 700;
+  cursor: pointer; transition: all .2s; box-shadow: 0 4px 20px rgba(255,71,87,.3);
+  &:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 26px rgba(255,71,87,.5); }
+  &:disabled { opacity: .4; cursor: not-allowed; }
+}
+
+.btn-cancel {
+  background: transparent; border: 1px solid rgba(255,255,255,.1); color: #666;
+  border-radius: 8px; padding: 0.7rem 1.1rem; font-size: 0.9rem;
+  cursor: pointer; transition: all .2s;
+  &:hover { border-color: rgba(255,255,255,.25); color: #aaa; }
+}

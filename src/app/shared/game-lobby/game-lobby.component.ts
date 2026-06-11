@@ -1,13 +1,24 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { filter, take } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
 import {
   SupabaseService, Partida, PartidaJugador, Producto, Profile, Notificacion
 } from '../../core/services/supabase.service';
-import { JugadoresChatComponent } from './jugadores-chat/jugadores-chat.component';
+import { ToastService } from '../../core/services/toast.service';
+import { JugadoresChatComponent } from '../jugadores-chat/jugadores-chat.component';
+
+export interface LobbyConfig {
+  productNombre: string;
+  channelPrefix: string;
+  showBrand: boolean;
+  showProductSelector: boolean;
+  finalizadasLabel: string;
+  showNavBack: boolean;
+}
 
 interface Jugador {
   nombre: string | null;
@@ -30,7 +41,7 @@ interface PartidaFinalizada {
 }
 
 @Component({
-  selector: 'app-nexateg',
+  selector: 'app-game-lobby',
   standalone: true,
   imports: [CommonModule, FormsModule, JugadoresChatComponent],
   template: `
@@ -53,12 +64,14 @@ interface PartidaFinalizada {
         </button>
       </div>
 
-      <!-- Page header -->
-      <div class="page-header">
+      <!-- Header: modo NexaTeg con brand -->
+      <div class="page-header" *ngIf="config.showBrand">
         <div class="container">
           <div class="page-brand">
             <img class="page-logo" src="assets/productos/favicon-nexateg.svg" alt="NexaTeg">
-            <h1 class="page-title"><span class="title-nexa">Nexa</span><span class="title-teg">Teg</span></h1>
+            <h1 class="page-title">
+              <span class="title-nexa">Nexa</span><span class="title-teg">Teg</span>
+            </h1>
           </div>
           <div class="page-actions">
             <button class="btn-footer btn-back" (click)="volver()">← Volver atrás</button>
@@ -68,231 +81,232 @@ interface PartidaFinalizada {
         </div>
       </div>
 
+      <!-- Header: modo simple (Partidas) -->
+      <header class="top-bar" *ngIf="!config.showBrand">
+        <div class="container">
+          <div class="title-block">
+            <h1>Partidas</h1>
+            <p>Gestión de partidas y suscriptores</p>
+          </div>
+        </div>
+      </header>
+
       <!-- Main -->
       <main class="content">
         <div class="container">
-        <div class="main-grid">
+          <div class="main-grid">
 
-          <!-- Fila 1: Partidas creadas | Disponibles | En juego | Finalizadas -->
-          <div class="panel panel-creadas">
-            <div class="panel-header">
-              <span class="panel-icon red">🎮</span>
-              <h3>Partidas creadas</h3>
-              <span class="count-badge red">{{ misPartidas.length }}</span>
+            <div class="panel panel-creadas">
+              <div class="panel-header">
+                <span class="panel-icon red">🎮</span>
+                <h3>Partidas creadas</h3>
+                <span class="count-badge red">{{ misPartidas.length }}</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Partida</th><th>Jugadores</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let p of misPartidas">
+                      <td>{{ p.nombre }}</td>
+                      <td class="num-cell">{{ p.jugadores_registrados }} / {{ p.limite_jugadores }}</td>
+                      <td class="actions-cell">
+                        <button
+                          class="btn-comenzar"
+                          (click)="comenzarPartida(p)"
+                          *ngIf="p.estado === 'Iniciada'"
+                          [disabled]="p.jugadores_registrados < p.limite_jugadores || comenzando"
+                          [title]="p.jugadores_registrados < p.limite_jugadores ? 'Faltan ' + (p.limite_jugadores - p.jugadores_registrados) + ' jugadores' : 'Iniciar partida'">
+                          {{ comenzando ? '...' : '✓ Comenzar' }}
+                        </button>
+                        <button
+                          class="btn-ir-juego"
+                          *ngIf="p.estado === 'En juego' && p.host_id === userId"
+                          (click)="irAJuego(p.id)">
+                          Ir a jugar →
+                        </button>
+                        <button class="btn-icon-delete" (click)="eliminarPartida(p.id)" title="Eliminar">🗑</button>
+                      </td>
+                    </tr>
+                    <tr *ngIf="misPartidas.length === 0">
+                      <td colspan="4" class="empty-row">No tenés partidas creadas</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Partida</th>
-                    <th>Jugadores</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngFor="let p of misPartidas">
-                    <td>{{ p.nombre }}</td>
-                    <td class="num-cell">{{ p.jugadores_registrados }} / {{ p.limite_jugadores }}</td>
-                    <td class="actions-cell">
-                      <button
-                        class="btn-comenzar"
-                        (click)="comenzarPartida(p)"
-                        *ngIf="p.estado === 'Iniciada'"
-                        [disabled]="p.jugadores_registrados < p.limite_jugadores || comenzando"
-                        [title]="p.jugadores_registrados < p.limite_jugadores ? 'Faltan ' + (p.limite_jugadores - p.jugadores_registrados) + ' jugadores' : 'Iniciar partida'">
-                        {{ comenzando ? '...' : '✓ Comenzar' }}
-                      </button>
-                      <button
-                        class="btn-ir-juego"
-                        *ngIf="p.estado === 'En juego' && p.host_id === userId"
-                        (click)="irAJuego(p.id)">
-                        Ir a jugar →
-                      </button>
-                      <button class="btn-icon-delete" (click)="eliminarPartida(p.id)" title="Eliminar">🗑</button>
-                    </td>
-                  </tr>
-                  <tr *ngIf="misPartidas.length === 0">
-                    <td colspan="4" class="empty-row">No tenés partidas creadas</td>
-                  </tr>
-                </tbody>
-              </table>
+
+            <div class="panel panel-disponibles" *ngIf="partidasDisponibles.length > 0">
+              <div class="panel-header">
+                <span class="panel-icon purple">🌐</span>
+                <h3>Disponibles</h3>
+                <span class="count-badge purple">{{ partidasDisponibles.length }}</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Partida</th><th>Jugadores</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let p of partidasDisponibles">
+                      <td>{{ p.nombre }}</td>
+                      <td class="num-cell">{{ p.jugadores_registrados }} / {{ p.limite_jugadores }}</td>
+                      <td>
+                        <button
+                          *ngIf="!misPartidasIds.has(p.id)"
+                          class="btn-unirse"
+                          (click)="unirse(p)"
+                          [disabled]="p.jugadores_registrados >= p.limite_jugadores">
+                          Unirse
+                        </button>
+                        <button
+                          *ngIf="misPartidasIds.has(p.id)"
+                          class="btn-salirse"
+                          (click)="salirse(p)">
+                          Salirse
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
+
+            <div class="panel panel-en-juego" *ngIf="partidasEnJuego.length > 0">
+              <div class="panel-header">
+                <span class="panel-icon green">⚡</span>
+                <h3>En juego</h3>
+                <span class="count-badge green">{{ partidasEnJuego.length }}</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Partida</th><th>Jugadores</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let p of partidasEnJuego">
+                      <td>{{ p.nombre }}</td>
+                      <td class="num-cell">{{ p.jugadores_registrados }} / {{ p.limite_jugadores }}</td>
+                      <td>
+                        <button
+                          class="btn-ir-juego"
+                          *ngIf="misPartidasIds.has(p.id)"
+                          (click)="irAJuego(p.id)">
+                          Volver →
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="panel panel-finalizadas" [style.grid-column]="'span ' + finalizadasSpan">
+              <div class="panel-header">
+                <span class="panel-icon gold">🏆</span>
+                <h3>{{ config.finalizadasLabel }}</h3>
+                <span class="count-badge gold">{{ partidasFinalizadas.length }}</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Ganador</th><th>Partida</th><th>Día</th><th>Jugadores</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let p of partidasFinalizadas">
+                      <td>
+                        <span class="ganador-tag" *ngIf="p.ganador_id">{{ ganadorNombre(p.ganador_id) }}</span>
+                        <span class="no-clave" *ngIf="!p.ganador_id">—</span>
+                      </td>
+                      <td>{{ p.nombre }}</td>
+                      <td class="date-cell">{{ formatDay(p.created_at) }}</td>
+                      <td class="jugadores-cell">
+                        <button class="btn-ver-jugadores" (click)="verJugadores(p.jugadores)">👥</button>
+                      </td>
+                    </tr>
+                    <tr *ngIf="partidasFinalizadas.length === 0">
+                      <td colspan="4" class="empty-row">No hay partidas finalizadas</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="bottom-panel-row" [style.--jug-height]="jugadoresHeight + 'px'">
+              <app-jugadores-chat
+                #jugRef
+                title="Jugadores"
+                icon="👥"
+                [showForm]="false"
+                [jugadores]="jugadores"
+                [userEmail]="userEmail"
+                [userId]="userId"
+                [loading]="loadingJugadores"
+                [channelName]="config.channelPrefix + '-chat'">
+              </app-jugadores-chat>
+
+              <app-jugadores-chat
+                title="Chat"
+                icon="💬"
+                [showForm]="true"
+                [chatMode]="true"
+                [jugadores]="jugadores"
+                [userEmail]="userEmail"
+                [userId]="userId"
+                [loading]="loadingJugadores"
+                [channelName]="config.channelPrefix + '-chat'">
+              </app-jugadores-chat>
+            </div>
+
           </div>
-
-          <div class="panel panel-disponibles" *ngIf="partidasDisponibles.length > 0">
-            <div class="panel-header">
-              <span class="panel-icon purple">🌐</span>
-              <h3>Disponibles</h3>
-              <span class="count-badge purple">{{ partidasDisponibles.length }}</span>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Partida</th>
-                    <th>Jugadores</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngFor="let p of partidasDisponibles">
-                    <td>{{ p.nombre }}</td>
-                    <td class="num-cell">{{ p.jugadores_registrados }} / {{ p.limite_jugadores }}</td>
-                    <td>
-                      <button
-                        *ngIf="!misPartidasIds.has(p.id)"
-                        class="btn-unirse"
-                        (click)="unirse(p)"
-                        [disabled]="p.jugadores_registrados >= p.limite_jugadores">
-                        Unirse
-                      </button>
-                      <button
-                        *ngIf="misPartidasIds.has(p.id)"
-                        class="btn-salirse"
-                        (click)="salirse(p)">
-                        Salirse
-                      </button>
-                    </td>
-                  </tr>
-                  <tr *ngIf="partidasDisponibles.length === 0">
-                    <td colspan="3" class="empty-row">No hay partidas disponibles</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="panel panel-en-juego" *ngIf="partidasEnJuego.length > 0">
-            <div class="panel-header">
-              <span class="panel-icon green">⚡</span>
-              <h3>En juego</h3>
-              <span class="count-badge green">{{ partidasEnJuego.length }}</span>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Partida</th>
-                    <th>Jugadores</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngFor="let p of partidasEnJuego">
-                    <td>{{ p.nombre }}</td>
-                    <td class="num-cell">{{ p.jugadores_registrados }} / {{ p.limite_jugadores }}</td>
-                    <td>
-                      <button
-                        class="btn-ir-juego"
-                        *ngIf="misPartidasIds.has(p.id)"
-                        (click)="irAJuego(p.id)">
-                        Volver →
-                      </button>
-                    </td>
-                  </tr>
-                  <tr *ngIf="partidasEnJuego.length === 0">
-                    <td colspan="3" class="empty-row">No hay partidas en curso</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="panel panel-finalizadas" [style.grid-column]="'span ' + finalizadasSpan">
-            <div class="panel-header">
-              <span class="panel-icon gold">🏆</span>
-              <h3>Ganadores</h3>
-              <span class="count-badge gold">{{ partidasFinalizadas.length }}</span>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Ganador</th>
-                    <th>Partida</th>
-                    <th>Día</th>
-                    <th>Jugadores</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngFor="let p of partidasFinalizadas">
-                    <td>
-                      <span class="ganador-tag" *ngIf="p.ganador_id">{{ ganadorNombre(p.ganador_id) }}</span>
-                      <span class="no-clave" *ngIf="!p.ganador_id">—</span>
-                    </td>
-                    <td>{{ p.nombre }}</td>
-                    <td class="date-cell">{{ formatDay(p.created_at) }}</td>
-                    <td class="jugadores-cell">
-                      <button class="btn-ver-jugadores" (click)="verJugadores(p.jugadores)">👥</button>
-                    </td>
-                  </tr>
-                  <tr *ngIf="partidasFinalizadas.length === 0">
-                    <td colspan="4" class="empty-row">No hay partidas finalizadas</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Jugadores (25%) -->
-          <app-nexateg-jugadores-chat
-            title="Jugadores"
-            icon="👥"
-            [showForm]="false"
-            [jugadores]="jugadores"
-            [userEmail]="userEmail"
-            [userId]="userId"
-            [loading]="loadingJugadores">
-          </app-nexateg-jugadores-chat>
-
-          <!-- Chat (75%) -->
-          <app-nexateg-jugadores-chat
-            title="Chat"
-            icon="💬"
-            [showForm]="true"
-            [chatMode]="true"
-            [jugadores]="jugadores"
-            [userEmail]="userEmail"
-            [userId]="userId"
-            [loading]="loadingJugadores">
-          </app-nexateg-jugadores-chat>
-
-        </div>
         </div>
       </main>
+
+      <!-- Footer: solo en modo partida (con logout) -->
+      <footer class="footer-bar" *ngIf="!config.showNavBack">
+        <div class="container">
+          <button class="btn-footer btn-back" (click)="logout()">← Cerrar sesión</button>
+          <button class="btn-footer btn-refresh" (click)="refresh()">↺ Refrescar</button>
+          <button class="btn-footer btn-crear" (click)="showCreateForm = true">+ Crear nueva partida</button>
+        </div>
+      </footer>
 
       <!-- Modal crear partida -->
       <div class="modal-overlay" *ngIf="showCreateForm" (click)="cancelarForm()">
         <div class="modal-panel" (click)="$event.stopPropagation()">
           <h3>Nueva partida</h3>
-
           <div class="form-grid">
             <div class="field">
               <label>Nombre</label>
               <input type="text" [(ngModel)]="form.nombre" placeholder="Nombre de la partida" />
+            </div>
+            <div class="field" *ngIf="config.showProductSelector">
+              <label>Producto</label>
+              <select [(ngModel)]="form.producto_id">
+                <option value="">Seleccioná...</option>
+                <option *ngFor="let p of productos" [value]="p.id">{{ p.nombre }}</option>
+              </select>
             </div>
             <div class="field">
               <label>Límite de jugadores (2–6)</label>
               <input type="number" [(ngModel)]="form.limite_jugadores" min="2" max="6" />
             </div>
           </div>
-
           <div class="field-check">
             <label>
               <input type="checkbox" [(ngModel)]="form.requiere_contrasena" />
               Requiere contraseña
             </label>
           </div>
-
           <div class="field" *ngIf="form.requiere_contrasena">
             <label>Contraseña</label>
             <input type="text" [(ngModel)]="form.contrasena" placeholder="Clave de acceso" />
           </div>
-
           <div class="form-actions">
             <button class="btn-cancel" (click)="cancelarForm()">Cancelar</button>
             <button class="btn-crear-confirm" (click)="guardarPartida()"
-              [disabled]="formLoading || !form.nombre">
+              [disabled]="formLoading || !form.nombre || (config.showProductSelector && !form.producto_id)">
               {{ formLoading ? 'Creando...' : '+ Crear partida' }}
             </button>
           </div>
@@ -315,7 +329,8 @@ interface PartidaFinalizada {
           <p class="modal-sub">Ingresá la clave para unirte a <strong>{{ partidaParaUnirse?.nombre }}</strong></p>
           <div class="field">
             <label>Contraseña</label>
-            <input type="password" [(ngModel)]="passwordInput" placeholder="••••••••" (keydown.enter)="confirmarUnirse()" autofocus />
+            <input type="password" [(ngModel)]="passwordInput" placeholder="••••••••"
+                   (keydown.enter)="confirmarUnirse()" autofocus />
           </div>
           <p class="password-error" *ngIf="passwordError">{{ passwordError }}</p>
           <div class="form-actions">
@@ -327,9 +342,11 @@ interface PartidaFinalizada {
 
     </div>
   `,
-  styleUrl: './nexateg.component.scss'
+  styleUrl: './game-lobby.component.scss'
 })
-export class NexaTegComponent implements OnInit, OnDestroy {
+export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
+  config!: LobbyConfig;
+
   userEmail = '';
   userId = '';
 
@@ -341,7 +358,7 @@ export class NexaTegComponent implements OnInit, OnDestroy {
 
   profiles: Profile[] = [];
   productos: Producto[] = [];
-  private nexaTegProductId = '';
+  private autoProductoId = '';
 
   misPartidasIds: Set<string> = new Set();
   partidasFinalizadas: PartidaFinalizada[] = [];
@@ -373,30 +390,50 @@ export class NexaTegComponent implements OnInit, OnDestroy {
   private channelPartida: RealtimeChannel | null = null;
   private channelNotif: RealtimeChannel | null = null;
 
+  @ViewChild('jugRef', { read: ElementRef }) jugRef!: ElementRef<HTMLElement>;
+  jugadoresHeight = 0;
+  private resizeObs?: ResizeObserver;
+
   constructor(
     private auth: AuthService,
     private supabaseService: SupabaseService,
     private router: Router,
-    private location: Location
+    private location: Location,
+    private route: ActivatedRoute,
+    private toast: ToastService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
-    this.auth.currentUser$.subscribe(user => {
-      if (user) {
-        this.userEmail = user.email ?? '';
-        this.userId = user.id;
-        this.supabaseService.updateOnlineStatus(user.id, true);
-        this.loadAll();
-        this.subscribeRealtime();
-        this.limpiarNotificacionesViejas();
-      }
+    this.config = this.route.snapshot.data as LobbyConfig;
+
+    this.auth.currentUser$.pipe(
+      filter(user => !!user),
+      take(1)
+    ).subscribe(async user => {
+      this.userEmail = user!.email ?? '';
+      this.userId = user!.id;
+      await this.supabaseService.updateOnlineStatus(user!.id, true);
+      this.loadAll();
+      this.subscribeRealtime();
+      this.limpiarNotificacionesViejas();
     });
   }
 
+  ngAfterViewInit() {
+    this.resizeObs = new ResizeObserver(entries => {
+      const h = Math.round(entries[0]?.contentRect.height ?? 0);
+      if (h !== this.jugadoresHeight) {
+        this.jugadoresHeight = h;
+        this.cdr.detectChanges();
+      }
+    });
+    if (this.jugRef) this.resizeObs.observe(this.jugRef.nativeElement);
+  }
+
   ngOnDestroy() {
-    if (this.userId) {
-      this.supabaseService.updateOnlineStatus(this.userId, false);
-    }
+    this.resizeObs?.disconnect();
+    if (this.userId) this.supabaseService.updateOnlineStatus(this.userId, false);
     this.channelUsuario?.unsubscribe();
     this.channelSuscripcion?.unsubscribe();
     this.channelPartida?.unsubscribe();
@@ -433,18 +470,37 @@ export class NexaTegComponent implements OnInit, OnDestroy {
     ]);
   }
 
-  async loadPartidasFinalizadas() {
-    const { data: partidas } = await this.supabaseService.getPartidasFinalizadas();
-    if (!partidas || partidas.length === 0) {
-      this.partidasFinalizadas = [];
-      return;
+  async loadJugadores() {
+    this.loadingJugadores = true;
+    const { data, error } = await this.supabaseService.getUsuariosPorProducto(this.config.productNombre);
+    if (error) this.toast.show('Error al cargar jugadores.', 'error');
+    this.jugadores = (data as Jugador[]) ?? [];
+    this.loadingJugadores = false;
+  }
+
+  async loadPartidas() {
+    this.loadingPartidas = true;
+    const { data, error } = await this.supabaseService.getPartidas();
+    if (error) this.toast.show('Error al cargar partidas.', 'error');
+    this.partidas = (data as Partida[]) ?? [];
+    this.loadingPartidas = false;
+  }
+
+  async loadProductos() {
+    const { data } = await this.supabaseService.getProductos();
+    this.productos = (data as Producto[]) ?? [];
+    if (!this.config.showProductSelector) {
+      const match = this.productos.find(p => p.nombre === this.config.productNombre);
+      if (match) {
+        this.autoProductoId = match.id;
+        this.form.producto_id = match.id;
+      }
     }
-    const ids = (partidas as any[]).map(p => p.id);
-    const { data: jugadores } = await this.supabaseService.getJugadoresDe(ids);
-    this.partidasFinalizadas = (partidas as any[]).map(p => ({
-      ...p,
-      jugadores: ((jugadores as any[]) ?? []).filter(j => j.partida_id === p.id)
-    }));
+  }
+
+  async loadProfiles() {
+    const { data } = await this.supabaseService.getAllProfiles();
+    this.profiles = data ?? [];
   }
 
   async loadMisPartidasIds() {
@@ -455,40 +511,22 @@ export class NexaTegComponent implements OnInit, OnDestroy {
     this.misPartidasIds = new Set((data ?? []).map((r: any) => r.partida_id));
   }
 
-  async loadJugadores() {
-    this.loadingJugadores = true;
-    const { data, error } = await this.supabaseService.getUsuariosPorProducto('NexaTeg');
-    if (error) console.error('Error jugadores:', error.message);
-    this.jugadores = (data as Jugador[]) ?? [];
-    this.loadingJugadores = false;
-  }
-
-  async loadPartidas() {
-    this.loadingPartidas = true;
-    const { data, error } = await this.supabaseService.getPartidas();
-    if (error) console.error('Error partidas:', error.message);
-    this.partidas = (data as Partida[]) ?? [];
-    this.loadingPartidas = false;
-  }
-
-  async loadProductos() {
-    const { data } = await this.supabaseService.getProductos();
-    this.productos = (data as Producto[]) ?? [];
-    const nexateg = this.productos.find(p => p.nombre === 'NexaTeg');
-    if (nexateg) {
-      this.nexaTegProductId = nexateg.id;
-      this.form.producto_id = nexateg.id;
-    }
-  }
-
-  async loadProfiles() {
-    const { data } = await this.supabaseService.getAllProfiles();
-    this.profiles = data ?? [];
+  async loadPartidasFinalizadas() {
+    const { data: partidas } = await this.supabaseService.getPartidasFinalizadas();
+    if (!partidas || partidas.length === 0) { this.partidasFinalizadas = []; return; }
+    const ids = (partidas as any[]).map(p => p.id);
+    const { data: jugadores } = await this.supabaseService.getJugadoresDe(ids);
+    this.partidasFinalizadas = (partidas as any[]).map(p => ({
+      ...p,
+      jugadores: ((jugadores as any[]) ?? []).filter(j => j.partida_id === p.id)
+    }));
   }
 
   subscribeRealtime() {
+    const p = this.config.channelPrefix;
+
     this.channelUsuario = this.supabaseService.client
-      .channel('nexateg-usuario-rt')
+      .channel(`${p}-usuario-rt`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'usuario' }, () => {
         this.loadJugadores();
         this.loadProfiles();
@@ -496,14 +534,14 @@ export class NexaTegComponent implements OnInit, OnDestroy {
       .subscribe();
 
     this.channelSuscripcion = this.supabaseService.client
-      .channel('nexateg-suscripcion-rt')
+      .channel(`${p}-suscripcion-rt`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'suscripcion' }, () => {
         this.loadJugadores();
       })
       .subscribe();
 
     this.channelPartida = this.supabaseService.client
-      .channel('nexateg-partida-rt')
+      .channel(`${p}-partida-rt`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'partida' }, () => {
         this.loadPartidas();
         this.loadPartidasFinalizadas();
@@ -511,12 +549,8 @@ export class NexaTegComponent implements OnInit, OnDestroy {
       .subscribe();
 
     this.channelNotif = this.supabaseService.client
-      .channel(`nexateg-notif-${this.userId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notificacion'
-      }, (payload) => {
+      .channel(`${p}-notif-${this.userId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notificacion' }, (payload) => {
         if (payload.new['usuario_id'] === this.userId && !payload.new['leida']) {
           this.notificacionActiva = payload.new as Notificacion;
         }
@@ -532,18 +566,24 @@ export class NexaTegComponent implements OnInit, OnDestroy {
       .eq('leida', false);
   }
 
-  refresh() { window.location.reload(); }
+  refresh() {
+    if (this.config.showBrand) {
+      window.location.reload();
+    } else {
+      this.loadAll();
+    }
+  }
 
   irAPartida() {
     if (!this.notificacionActiva?.partida_id) return;
     this.supabaseService.marcarLeida(this.notificacionActiva.id);
     const pid = this.notificacionActiva.partida_id;
     this.notificacionActiva = null;
-    this.router.navigate(['/mat-juego', pid]);
+    this.router.navigate(['/nexateg-juego', pid]);
   }
 
   irAJuego(partidaId: string) {
-    this.router.navigate(['/mat-juego', partidaId]);
+    this.router.navigate(['/nexateg-juego', partidaId]);
   }
 
   cerrarNotificacion() {
@@ -555,7 +595,13 @@ export class NexaTegComponent implements OnInit, OnDestroy {
 
   cancelarForm() {
     this.showCreateForm = false;
-    this.form = { nombre: '', producto_id: this.nexaTegProductId, limite_jugadores: 2, requiere_contrasena: false, contrasena: '' };
+    this.form = {
+      nombre: '',
+      producto_id: this.config.showProductSelector ? '' : this.autoProductoId,
+      limite_jugadores: 2,
+      requiere_contrasena: false,
+      contrasena: ''
+    };
   }
 
   async guardarPartida() {
@@ -589,23 +635,17 @@ export class NexaTegComponent implements OnInit, OnDestroy {
   async comenzarPartida(p: Partida) {
     if (p.jugadores_registrados < p.limite_jugadores || this.comenzando) return;
     this.comenzando = true;
-
     const { data: jugadores } = await this.supabaseService.getPartidaJugadores(p.id);
     const pjs = (jugadores as unknown as PartidaJugador[]) ?? [];
-
     if (pjs.length === 0) { this.comenzando = false; return; }
-
     for (const j of pjs) {
       await this.supabaseService.crearNotificacion(
-        j.usuario_id,
-        p.id,
-        `¡La partida "${p.nombre}" comenzó! Hacé clic para jugar.`
+        j.usuario_id, p.id, `¡La partida "${p.nombre}" comenzó! Hacé clic para jugar.`
       );
     }
-
     await this.supabaseService.comenzarPartida(p.id);
     this.comenzando = false;
-    this.router.navigate(['/mat-juego', p.id]);
+    this.router.navigate(['/nexateg-juego', p.id]);
   }
 
   unirse(p: Partida) {
@@ -653,15 +693,10 @@ export class NexaTegComponent implements OnInit, OnDestroy {
     this.misPartidasIds.add(p.id);
   }
 
-  productoNombre(productoId: string): string {
-    return this.productos.find(p => p.id === productoId)?.nombre ?? '—';
-  }
-
   hostNombre(hostId: string): string {
     const p = this.profiles.find(p => p.id === hostId);
     if (!p) return '—';
-    const nombre = [p.nombre, p.apellido].filter(Boolean).join(' ');
-    return nombre || p.email;
+    return [p.nombre, p.apellido].filter(Boolean).join(' ') || p.email;
   }
 
   ganadorNombre(ganadorId: string | null): string {
@@ -676,28 +711,6 @@ export class NexaTegComponent implements OnInit, OnDestroy {
       return [u.nombre, u.apellido].filter(Boolean).join(' ') || u.email;
     });
     this.showJugadoresModal = true;
-  }
-
-  jugadoresNombresDePartida(jugadores: PartidaFinalizada['jugadores']): string {
-    return jugadores.map(j => {
-      const u = j.usuario;
-      if (!u) return '—';
-      const nombre = [u.nombre, u.apellido].filter(Boolean).join(' ');
-      return nombre || u.email;
-    }).join(', ');
-  }
-
-  estadoClass(estado: string): string {
-    if (estado === 'En juego') return 'online';
-    if (estado === 'Finalizada') return 'vencida';
-    return 'iniciada';
-  }
-
-  formatDate(dateStr: string | null): string {
-    if (!dateStr) return '—';
-    return new Intl.DateTimeFormat('es-AR', {
-      day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-    }).format(new Date(dateStr));
   }
 
   formatDay(dateStr: string | null): string {

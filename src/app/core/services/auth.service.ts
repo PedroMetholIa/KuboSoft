@@ -34,7 +34,7 @@ export class AuthService {
       await this.supabase.updateOnlineStatus(user.id, false);
     }
     await this.supabase.signOut();
-    this.router.navigate(['/auth/login']);
+    this.router.navigate(['/inicio']);
   }
 
   isLoggedIn(): boolean {

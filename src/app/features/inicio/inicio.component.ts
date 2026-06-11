@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SupabaseService } from '../../core/services/supabase.service';
-import { AuthService } from '../../core/services/auth.service';
+import { ToastService } from '../../core/services/toast.service';
 import { filter, take } from 'rxjs/operators';
 import { NavComponent } from '../../shared/nav/nav.component';
 
@@ -119,8 +119,9 @@ interface Categoria {
                   <label>Mensaje</label>
                   <textarea [(ngModel)]="form.mensaje" placeholder="Contanos brevemente qué necesitás..."></textarea>
                 </div>
-                <button class="btn-submit" [disabled]="formSubmitted" (click)="submitForm()">
-                  {{ formSubmitted ? '✓ Enviado — te contactamos pronto' : 'Enviar consulta →' }}
+                <p class="form-error" *ngIf="formError">{{ formError }}</p>
+                <button class="btn-submit" [disabled]="formSubmitted || formLoading" (click)="submitForm()">
+                  {{ formSubmitted ? '✓ Enviado — te contactamos pronto' : formLoading ? 'Enviando...' : 'Enviar consulta →' }}
                 </button>
               </div>
             </div>
@@ -147,14 +148,12 @@ export class InicioComponent implements OnInit {
   categorias: Categoria[] = [];
   loading = true;
   formSubmitted = false;
+  formLoading = false;
+  formError = '';
 
   form = { nombre: '', email: '', empresa: '', rubro: '', mensaje: '' };
 
-  constructor(
-    private router: Router,
-    private supabase: SupabaseService,
-    private auth: AuthService
-  ) {}
+  constructor(private supabase: SupabaseService, private toast: ToastService, private router: Router) {}
 
   ngOnInit() {
     this.supabase.currentUser$.pipe(
@@ -165,9 +164,7 @@ export class InicioComponent implements OnInit {
 
   async loadCategorias() {
     const { data, error } = await this.supabase.getCategorias();
-    if (error) {
-      console.error('[inicio] Error al cargar categorias:', error);
-    }
+    if (error) this.toast.show('Error al cargar los productos.', 'error');
     this.categorias = (data as Categoria[]) ?? [];
     this.loading = false;
   }
@@ -204,7 +201,20 @@ export class InicioComponent implements OnInit {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   }
 
-  submitForm() { this.formSubmitted = true; }
-  irAPartida() { this.router.navigate(['/partida']); }
-  logout()     { this.auth.signOut(); }
+  async submitForm() {
+    const { nombre, email, mensaje } = this.form;
+    if (!nombre.trim() || !email.trim() || !mensaje.trim()) {
+      this.formError = 'Nombre, email y mensaje son obligatorios.';
+      return;
+    }
+    this.formError = '';
+    this.formLoading = true;
+    const { error } = await this.supabase.insertContacto(this.form);
+    this.formLoading = false;
+    if (error) {
+      this.formError = 'Hubo un error al enviar. Intentá de nuevo.';
+      return;
+    }
+    this.formSubmitted = true;
+  }
 }

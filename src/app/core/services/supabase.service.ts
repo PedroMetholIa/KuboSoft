@@ -31,6 +31,11 @@ export interface Partida {
   requiere_contrasena: boolean;
   contrasena: string | null;
   turno_actual_usuario_id: string | null;
+  tropas_iniciales?: number | null;
+  fase_actual?: 'colocacion' | 'ataque' | 'reagrupacion' | null;
+  ronda_actual?: number;
+  orden_jugadores?: string[] | null;
+  jugador_actual_index?: number;
   created_at: string;
 }
 
@@ -41,8 +46,26 @@ export interface PartidaJugador {
   orden_turno: number;
   puntos: number;
   esta_dentro: boolean;
+  tropas_por_colocar?: number;
+  color?: string | null;
+  lider?: string | null;
   usuario?: { nombre: string | null; apellido: string | null; email: string } | null;
   created_at: string;
+}
+
+export interface TerritorioEstado {
+  id: string;
+  partida_id: string;
+  territorio_id: string;
+  usuario_id: string;
+  tropas: number;
+}
+
+export interface Lider {
+  nombre: string;
+  img_neutra: string | null;
+  img_amigable: string | null;
+  img_hostil: string | null;
 }
 
 export interface Turno {
@@ -83,7 +106,13 @@ export class SupabaseService {
   currentUser$: Observable<User | null | undefined> = this.currentUserSubject.asObservable();
 
   constructor() {
-    this.supabase = createClient(environment.supabase.url, environment.supabase.anonKey);
+    this.supabase = createClient(environment.supabase.url, environment.supabase.anonKey, {
+      global: {
+        headers: {
+          apikey: environment.supabase.anonKey,
+        },
+      },
+    });
 
     this.supabase.auth.getSession().then(({ data }) => {
       this.currentUserSubject.next(data.session?.user ?? null);
@@ -192,6 +221,23 @@ export class SupabaseService {
       .eq('usuario_id', usuarioId);
   }
 
+  marcarEstaDentroConColor(partidaId: string, usuarioId: string, color: string, lider?: string) {
+    const payload: Record<string, unknown> = { esta_dentro: true, color };
+    if (lider) payload['lider'] = lider;
+    return this.supabase.from('partida_jugador')
+      .update(payload)
+      .eq('partida_id', partidaId)
+      .eq('usuario_id', usuarioId);
+  }
+
+  setTropasIniciales(partidaId: string, tropas: number) {
+    return this.supabase.from('partida').update({ tropas_iniciales: tropas }).eq('id', partidaId);
+  }
+
+  getLideres() {
+    return this.supabase.from('lider').select('*').order('nombre');
+  }
+
   setTurnoActual(partidaId: string, usuarioId: string | null) {
     return this.supabase.from('partida')
       .update({ turno_actual_usuario_id: usuarioId }).eq('id', partidaId);
@@ -218,7 +264,7 @@ export class SupabaseService {
 
   getPartidaJugadores(partidaId: string) {
     return this.supabase.from('partida_jugador')
-      .select('id, usuario_id, orden_turno, puntos, esta_dentro, usuario!partida_jugador_usuario_id_fkey(nombre, apellido, email)')
+      .select('id, usuario_id, orden_turno, puntos, esta_dentro, tropas_por_colocar, color, lider, usuario(nombre, apellido, email)')
       .eq('partida_id', partidaId)
       .order('orden_turno');
   }
@@ -234,26 +280,51 @@ export class SupabaseService {
       .eq('usuario_id', usuarioId);
   }
 
-  // ── Turnos ────────────────────────────────────────────
-  crearTurno(data: { partida_id: string; usuario_id: string; numero_a: number; numero_b: number; respuesta_correcta: number }) {
-    return this.supabase.from('turno').insert(data).select().single();
+  // ── Territorios ───────────────────────────────────────
+  getTerritoriosEstado(partidaId: string) {
+    return this.supabase.from('territorio_estado')
+      .select('*')
+      .eq('partida_id', partidaId);
   }
 
-  getTurnoActual(partidaId: string) {
-    return this.supabase.from('turno').select('*')
-      .eq('partida_id', partidaId).is('respondido_en', null).maybeSingle();
+  initTerritorios(territorios: Omit<TerritorioEstado, 'id'>[]) {
+    return this.supabase.from('territorio_estado').insert(territorios);
   }
 
-  getTurnos(partidaId: string) {
-    return this.supabase.from('turno').select('*').eq('partida_id', partidaId).order('created_at');
+  updateTerritorioEstado(partidaId: string, territorioId: string, data: Partial<Pick<TerritorioEstado, 'usuario_id' | 'tropas'>>) {
+    return this.supabase.from('territorio_estado')
+      .update(data)
+      .eq('partida_id', partidaId)
+      .eq('territorio_id', territorioId);
   }
 
-  responderTurno(id: string, respuesta: number, esCorrecta: boolean) {
-    return this.supabase.from('turno').update({
-      respuesta_ingresada: respuesta,
-      es_correcto: esCorrecta,
-      respondido_en: new Date().toISOString()
-    }).eq('id', id);
+  // ── Fases ─────────────────────────────────────────────
+  iniciarFaseColocacion(partidaId: string, ordenJugadores: string[], ronda: number, indexInicio: number) {
+    return this.supabase.from('partida').update({
+      fase_actual: 'colocacion',
+      orden_jugadores: ordenJugadores,
+      jugador_actual_index: indexInicio,
+      ronda_actual: ronda,
+    }).eq('id', partidaId);
+  }
+
+  setFase(partidaId: string, fase: 'colocacion' | 'ataque' | 'reagrupacion', jugadorIndex?: number) {
+    const payload: Partial<Partida> = { fase_actual: fase };
+    if (jugadorIndex !== undefined) payload.jugador_actual_index = jugadorIndex;
+    return this.supabase.from('partida').update(payload).eq('id', partidaId);
+  }
+
+  avanzarJugador(partidaId: string, nuevoIndex: number) {
+    return this.supabase.from('partida')
+      .update({ jugador_actual_index: nuevoIndex })
+      .eq('id', partidaId);
+  }
+
+  setTropasPorColocar(partidaId: string, usuarioId: string, tropas: number) {
+    return this.supabase.from('partida_jugador')
+      .update({ tropas_por_colocar: tropas })
+      .eq('partida_id', partidaId)
+      .eq('usuario_id', usuarioId);
   }
 
   // ── Notificaciones ────────────────────────────────────
@@ -276,7 +347,7 @@ export class SupabaseService {
   getJugadoresDe(partidaIds: string[]) {
     if (partidaIds.length === 0) return Promise.resolve({ data: [], error: null });
     return this.supabase.from('partida_jugador')
-      .select('partida_id, usuario!partida_jugador_usuario_id_fkey(nombre, apellido, email)')
+      .select('partida_id, usuario(nombre, apellido, email)')
       .in('partida_id', partidaIds);
   }
 
@@ -320,5 +391,9 @@ export class SupabaseService {
         usuario!suscripcion_usuario_id_fkey(nombre, apellido, email),
         producto!suscripcion_producto_id_fkey(nombre, categoria)
       `).order('fecha_inicio', { ascending: false });
+  }
+
+  insertContacto(data: { nombre: string; email: string; empresa: string; rubro: string; mensaje: string }) {
+    return this.supabase.from('contacto').insert(data);
   }
 }
