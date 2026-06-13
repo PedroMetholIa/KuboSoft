@@ -1,5 +1,5 @@
--- =============================================================
--- NexaTeg – Funciones de servidor y políticas RLS
+﻿-- =============================================================
+-- KuboTeg – Funciones de servidor y políticas RLS
 -- Ejecutar en: Supabase Dashboard → SQL Editor
 -- =============================================================
 
@@ -258,22 +258,22 @@ $$;
 -- ── partida ──────────────────────────────────────────────────
 ALTER TABLE partida ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "nexateg_partida_select" ON partida;
-DROP POLICY IF EXISTS "nexateg_partida_insert" ON partida;
-DROP POLICY IF EXISTS "nexateg_partida_update" ON partida;
-DROP POLICY IF EXISTS "nexateg_partida_delete" ON partida;
+DROP POLICY IF EXISTS "kuboteg_partida_select" ON partida;
+DROP POLICY IF EXISTS "kuboteg_partida_insert" ON partida;
+DROP POLICY IF EXISTS "kuboteg_partida_update" ON partida;
+DROP POLICY IF EXISTS "kuboteg_partida_delete" ON partida;
 
 -- Cualquier usuario autenticado puede leer partidas
-CREATE POLICY "nexateg_partida_select"
+CREATE POLICY "kuboteg_partida_select"
 ON partida FOR SELECT TO authenticated USING (true);
 
 -- Solo el host puede crear
-CREATE POLICY "nexateg_partida_insert"
+CREATE POLICY "kuboteg_partida_insert"
 ON partida FOR INSERT TO authenticated
 WITH CHECK (host_id = auth.uid());
 
 -- Solo jugadores de la partida pueden actualizarla (gestión de turnos/fases)
-CREATE POLICY "nexateg_partida_update"
+CREATE POLICY "kuboteg_partida_update"
 ON partida FOR UPDATE TO authenticated
 USING (
   EXISTS (
@@ -285,7 +285,7 @@ USING (
 );
 
 -- Solo el host puede eliminar
-CREATE POLICY "nexateg_partida_delete"
+CREATE POLICY "kuboteg_partida_delete"
 ON partida FOR DELETE TO authenticated
 USING (host_id = auth.uid());
 
@@ -293,27 +293,27 @@ USING (host_id = auth.uid());
 -- ── partida_jugador ──────────────────────────────────────────
 ALTER TABLE partida_jugador ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "nexateg_pj_select" ON partida_jugador;
-DROP POLICY IF EXISTS "nexateg_pj_insert" ON partida_jugador;
-DROP POLICY IF EXISTS "nexateg_pj_update" ON partida_jugador;
-DROP POLICY IF EXISTS "nexateg_pj_delete" ON partida_jugador;
+DROP POLICY IF EXISTS "kuboteg_pj_select" ON partida_jugador;
+DROP POLICY IF EXISTS "kuboteg_pj_insert" ON partida_jugador;
+DROP POLICY IF EXISTS "kuboteg_pj_update" ON partida_jugador;
+DROP POLICY IF EXISTS "kuboteg_pj_delete" ON partida_jugador;
 
-CREATE POLICY "nexateg_pj_select"
+CREATE POLICY "kuboteg_pj_select"
 ON partida_jugador FOR SELECT TO authenticated
 USING (true);
 
 -- Cualquier autenticado puede inscribirse
-CREATE POLICY "nexateg_pj_insert"
+CREATE POLICY "kuboteg_pj_insert"
 ON partida_jugador FOR INSERT TO authenticated
 WITH CHECK (usuario_id = auth.uid());
 
 -- Cada jugador solo actualiza su propia fila
-CREATE POLICY "nexateg_pj_update"
+CREATE POLICY "kuboteg_pj_update"
 ON partida_jugador FOR UPDATE TO authenticated
 USING (usuario_id = auth.uid());
 
 -- Solo el propio jugador puede salir
-CREATE POLICY "nexateg_pj_delete"
+CREATE POLICY "kuboteg_pj_delete"
 ON partida_jugador FOR DELETE TO authenticated
 USING (
   usuario_id = auth.uid()
@@ -326,13 +326,13 @@ USING (
 -- ── territorio_estado ────────────────────────────────────────
 ALTER TABLE territorio_estado ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "nexateg_te_select" ON territorio_estado;
-DROP POLICY IF EXISTS "nexateg_te_insert" ON territorio_estado;
-DROP POLICY IF EXISTS "nexateg_te_update" ON territorio_estado;
-DROP POLICY IF EXISTS "nexateg_te_delete" ON territorio_estado;
+DROP POLICY IF EXISTS "kuboteg_te_select" ON territorio_estado;
+DROP POLICY IF EXISTS "kuboteg_te_insert" ON territorio_estado;
+DROP POLICY IF EXISTS "kuboteg_te_update" ON territorio_estado;
+DROP POLICY IF EXISTS "kuboteg_te_delete" ON territorio_estado;
 
 -- Todos los jugadores de la partida pueden leer los territorios
-CREATE POLICY "nexateg_te_select"
+CREATE POLICY "kuboteg_te_select"
 ON territorio_estado FOR SELECT TO authenticated
 USING (
   EXISTS (
@@ -343,7 +343,7 @@ USING (
 );
 
 -- Solo el host puede insertar (inicialización de territorios)
-CREATE POLICY "nexateg_te_insert"
+CREATE POLICY "kuboteg_te_insert"
 ON territorio_estado FOR INSERT TO authenticated
 WITH CHECK (
   EXISTS (
@@ -355,7 +355,7 @@ WITH CHECK (
 
 -- Un jugador solo puede hacer UPDATE directo a sus propios territorios
 -- (colocación de tropas y reagrupación). El combate va por RPC.
-CREATE POLICY "nexateg_te_update"
+CREATE POLICY "kuboteg_te_update"
 ON territorio_estado FOR UPDATE TO authenticated
 USING (
   usuario_id = auth.uid()

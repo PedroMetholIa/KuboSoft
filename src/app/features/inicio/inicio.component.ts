@@ -62,7 +62,7 @@ interface Categoria {
                   <div class="card-logo" *ngIf="cat.logo">
                     <img [src]="cat.logo" [alt]="cat.nombre" />
                   </div>
-                  <h3 class="cat-title">Nexa<span [style.color]="getCategoryColor(cat.nombre)">{{ getCategorySuffix(cat.nombre) }}</span></h3>
+                  <h3 class="cat-title">Kubo<span [style.color]="getCategoryColor(cat.nombre)">{{ getCategorySuffix(cat.nombre) }}</span></h3>
                 </div>
                 <p class="prod-desc">{{ cat.descripcion }}</p>
               </div>
@@ -132,10 +132,10 @@ interface Categoria {
       <!-- FOOTER -->
       <footer>
         <div class="footer-inner">
-          <p>© 2025 NexaBuild · Todos los derechos reservados</p>
+          <p>© 2025 KuboSoft · Todos los derechos reservados</p>
           <a class="footer-brand" href="#">
-            <img class="footer-logo-img" src="assets/favicon-nexabuild.svg" alt="NexaBuild">
-            <span class="footer-logo-text">Nexa<em>Build</em></span>
+            <img class="footer-logo-img" src="assets/kubosoft.png" alt="KuboSoft">
+            <span class="footer-logo-text">Kubo<em>Soft</em></span>
           </a>
         </div>
       </footer>
@@ -170,7 +170,7 @@ export class InicioComponent implements OnInit {
   }
 
   private readonly routeMap: Record<string, string> = {
-    'NexaJuegos': '/nexajuegos',
+    'KuboJuegos': '/kubojuegos',
   };
 
   hasRoute(nombre: string): boolean { return nombre in this.routeMap; }
@@ -181,12 +181,12 @@ export class InicioComponent implements OnInit {
   }
 
   private readonly colorMap: Record<string, string> = {
-    'NexaGestión':    '#10C878',
-    'NexaInventario': '#F5A623',
-    'NexaJuegos':     '#FF4757',
-    'NexaMétricas':   '#7C5CFC',
-    'NexaReservas':   '#E91E8C',
-    'NexaRRHH':       '#00BCD4',
+    'KuboGestión':    '#10C878',
+    'KuboInventario': '#F5A623',
+    'KuboJuegos':     '#FF4757',
+    'KuboMétricas':   '#7C5CFC',
+    'KuboReservas':   '#E91E8C',
+    'KuboRRHH':       '#00BCD4',
   };
 
   getCategoryColor(nombre: string): string {
@@ -194,7 +194,7 @@ export class InicioComponent implements OnInit {
   }
 
   getCategorySuffix(nombre: string): string {
-    return nombre.startsWith('Nexa') ? nombre.slice(4) : nombre;
+    return nombre.startsWith('Kubo') ? nombre.slice(4) : nombre;
   }
 
   scrollTo(id: string) {

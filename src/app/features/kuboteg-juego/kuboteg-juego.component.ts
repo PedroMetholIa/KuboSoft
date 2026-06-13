@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -22,6 +22,17 @@ interface ConquistaPendiente {
   tropasOrigenFinal: number;
 }
 
+interface ChatMensaje {
+  userId: string;
+  nombre: string;
+  texto: string;
+  ts: number;
+}
+
+interface RpcError {
+  error?: string;
+}
+
 interface CombateRpc {
   error?: string;
   dados_ataque?: number[];
@@ -34,11 +45,12 @@ interface CombateRpc {
 }
 
 @Component({
-  selector: 'app-nexateg-juego',
+  selector: 'app-kuboteg-juego',
   standalone: true,
   imports: [CommonModule, FormsModule, MapComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="nexateg-juego">
+    <div class="kuboteg-juego">
 
       <!-- Overlay: rotar dispositivo (mostrado en portrait mobile via CSS) -->
       <div class="rotate-overlay">
@@ -356,15 +368,67 @@ interface CombateRpc {
               </div>
               <button class="btn-back" (click)="volver()">← Salir</button>
             </div>
+
+            <!-- Chat -->
+            <div class="chat-panel">
+              <div class="chat-header">
+                <span class="chat-title">Chat</span>
+                <span class="chat-count" *ngIf="chatMensajes.length > 0">{{ chatMensajes.length }}</span>
+              </div>
+              <div class="chat-messages" #chatRef>
+                <div class="chat-empty" *ngIf="chatMensajes.length === 0">
+                  Sin mensajes aún
+                </div>
+                <div
+                  class="chat-msg"
+                  *ngFor="let m of chatMensajes"
+                  [class.chat-msg-mine]="m.userId === userId">
+                  <span class="chat-msg-nombre">{{ m.nombre }}</span>
+                  <span class="chat-msg-texto">{{ m.texto }}</span>
+                </div>
+              </div>
+              <div class="chat-input-row">
+                <input
+                  class="chat-input"
+                  [(ngModel)]="chatInput"
+                  placeholder="Mensaje..."
+                  maxlength="200"
+                  autocomplete="off"
+                  (keydown.enter)="enviarMensaje()"
+                />
+                <button class="chat-send-btn" type="button" (click)="enviarMensaje()">↑</button>
+              </div>
+            </div>
           </aside>
 
         </div>
       </ng-container>
     </div>
   `,
-  styleUrl: './nexateg-juego.component.scss'
+  styleUrl: './kuboteg-juego.component.scss'
 })
-export class NexaTegJuegoComponent implements OnInit, OnDestroy {
+export class KuboTegJuegoComponent implements OnInit, OnDestroy {
+  private static readonly CONTINENT_BONUSES = [
+    { id: 'north_america', bonus: 5 },
+    { id: 'south_america', bonus: 3 },
+    { id: 'europe',        bonus: 5 },
+    { id: 'africa',        bonus: 4 },
+    { id: 'asia',          bonus: 7 },
+    { id: 'oceania',       bonus: 2 },
+  ] as const;
+
+  private static readonly CONTINENT_TERRITORIES: Record<string, string[]> = (() => {
+    const ids = (cid: string) => TERRITORIES.filter(t => t.continent === cid).map(t => t.id);
+    return {
+      north_america: ids('north_america'),
+      south_america: ids('south_america'),
+      europe:        ids('europe'),
+      africa:        ids('africa'),
+      asia:          ids('asia'),
+      oceania:       ids('oceania'),
+    };
+  })();
+
   partida: Partida | null = null;
   jugadores: PartidaJugador[] = [];
   lideres: Lider[] = [];
@@ -394,6 +458,11 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
   liderPreseleccionado: string | null = null;
   jugadorColores: Record<string, string> = {};
   jugadorLideres: Record<string, string> = {};
+  coloresOcupados = new Set<string>();
+
+  private _territoriosOwnerMap: Record<string, string> = {};
+  private _tropasMap: Record<string, number> = {};
+  private _jugadorNombres: Record<string, string> = {};
 
   // ── Host config ───────────────────────────────────────
   tropasIniciales = 5;
@@ -408,17 +477,24 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
   conquistaPendiente: ConquistaPendiente | null = null;
   conquistaTropasAMover = 1;
 
+  // ── Chat ──────────────────────────────────────────────
+  chatMensajes: ChatMensaje[] = [];
+  chatInput = '';
+  @ViewChild('chatRef') private chatRef!: ElementRef<HTMLDivElement>;
+
   private partidaId = '';
   private channelPartida: RealtimeChannel | null = null;
   private channelPJ: RealtimeChannel | null = null;
   private channelTerritorio: RealtimeChannel | null = null;
-  private reloadJugadoresTimer: ReturnType<typeof setTimeout> | null = null;
+  private channelChat: RealtimeChannel | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private service: SupabaseService,
-    private toast: ToastService
+    private toast: ToastService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
@@ -432,10 +508,11 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    this.channelPartida?.unsubscribe();
-    this.channelPJ?.unsubscribe();
-    this.channelTerritorio?.unsubscribe();
-    if (this.reloadJugadoresTimer) clearTimeout(this.reloadJugadoresTimer);
+    if (this.channelPartida)    this.service.client.removeChannel(this.channelPartida);
+    if (this.channelPJ)         this.service.client.removeChannel(this.channelPJ);
+    if (this.channelTerritorio) this.service.client.removeChannel(this.channelTerritorio);
+    if (this.channelChat)       this.service.client.removeChannel(this.channelChat);
+    if (this.reconnectTimer)    clearTimeout(this.reconnectTimer);
   }
 
   // ── Computed ──────────────────────────────────────────
@@ -463,30 +540,9 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     return this.tropasPorColocarBase - placed;
   }
 
-  get territoriosOwnerMap(): Record<string, string> {
-    const map: Record<string, string> = {};
-    Object.values(this.territorios).forEach(t => { map[t.territorio_id] = t.usuario_id; });
-    return map;
-  }
-
-  get tropasMap(): Record<string, number> {
-    const map: Record<string, number> = {};
-    Object.values(this.territorios).forEach(t => {
-      map[t.territorio_id] = t.tropas + (this.tropasColocadasEstaFase[t.territorio_id] ?? 0);
-    });
-    return map;
-  }
-
-  get jugadorNombres(): Record<string, string> {
-    const map: Record<string, string> = {};
-    for (const j of this.jugadores) {
-      const u = j.usuario;
-      map[j.usuario_id] = u
-        ? ([u.nombre, u.apellido].filter(Boolean).join(' ') || u.email)
-        : j.usuario_id.slice(0, 8);
-    }
-    return map;
-  }
+  get territoriosOwnerMap(): Record<string, string> { return this._territoriosOwnerMap; }
+  get tropasMap(): Record<string, number>           { return this._tropasMap; }
+  get jugadorNombres(): Record<string, string>      { return this._jugadorNombres; }
 
   get territorioSeleccionado(): string | null {
     return this.territorioAtacanteId ?? this.territorioOrigenId;
@@ -582,7 +638,11 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
 
       this.buildJugadorColores();
       this.buildJugadorLideres();
+      this.rebuildOwnerMap();
+      this.rebuildTropasMap();
+      this.rebuildJugadorNombres();
       this.loading = false;
+      this.cdr.markForCheck();
 
       const miJugador = this.jugadores.find(j => j.usuario_id === this.userId);
       if (miJugador) {
@@ -604,61 +664,114 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     } catch {
       this.loading = false;
       this.loadError = true;
+      this.cdr.markForCheck();
     }
   }
 
   togglePanel() { this.panelAbierto = !this.panelAbierto; }
 
-  private scheduleReloadJugadores() {
-    if (this.reloadJugadoresTimer) clearTimeout(this.reloadJugadoresTimer);
-    this.reloadJugadoresTimer = setTimeout(() => this.reloadJugadores(), 400);
-  }
-
-  private async reloadJugadores() {
-    const { data } = await this.service.getPartidaJugadores(this.partidaId);
-    this.jugadores = (data as unknown as PartidaJugador[]) ?? [];
-    this.buildJugadorColores();
-    this.buildJugadorLideres();
-  }
-
   // ── Realtime ──────────────────────────────────────────
   subscribeRealtime() {
+    // Limpiar canales viejos antes de re-suscribirse
+    if (this.channelPartida)    { this.service.client.removeChannel(this.channelPartida);    this.channelPartida = null; }
+    if (this.channelPJ)         { this.service.client.removeChannel(this.channelPJ);         this.channelPJ = null; }
+    if (this.channelTerritorio) { this.service.client.removeChannel(this.channelTerritorio); this.channelTerritorio = null; }
+    if (this.channelChat)       { this.service.client.removeChannel(this.channelChat);       this.channelChat = null; }
+
+    this.channelChat = this.service.client
+      .channel(`kuboteg-chat-${this.partidaId}`)
+      .on('broadcast', { event: 'chat' }, ({ payload }) => {
+        const msg = payload as ChatMensaje;
+        if (msg.userId !== this.userId) {
+          this.chatMensajes = [...this.chatMensajes, msg];
+          this.scrollChat();
+          this.cdr.markForCheck();
+        }
+      })
+      .subscribe();
+
     this.channelPartida = this.service.client
-      .channel(`nexateg-partida-${this.partidaId}`)
+      .channel(`kuboteg-partida-${this.partidaId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'partida' }, (payload) => {
         if (payload.new['id'] === this.partidaId) {
           this.partida = payload.new as Partida;
+          this.cdr.markForCheck();
         }
       })
       .subscribe((status, err) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          this.toast.show('Conexión perdida. Reconectando...', 'error');
-          setTimeout(() => this.loadGameState(), 3000);
-        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') this.scheduleReconnect();
         if (err) console.error('[Realtime partida]', err);
       });
 
     this.channelPJ = this.service.client
-      .channel(`nexateg-pj-${this.partidaId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'partida_jugador' }, () => {
-        this.scheduleReloadJugadores();
+      .channel(`kuboteg-pj-${this.partidaId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'partida_jugador' }, (payload) => {
+        const updated = payload.new as PartidaJugador;
+        const idx = this.jugadores.findIndex(j => j.usuario_id === updated.usuario_id);
+        if (idx !== -1) {
+          const prev = this.jugadores[idx];
+          this.jugadores = [
+            ...this.jugadores.slice(0, idx),
+            { ...prev, ...updated, usuario: prev.usuario },
+            ...this.jugadores.slice(idx + 1),
+          ];
+          this.buildJugadorColores();
+          this.buildJugadorLideres();
+          this.rebuildJugadorNombres();
+          this.cdr.markForCheck();
+        }
       })
       .subscribe((status, err) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') this.scheduleReconnect();
         if (err) console.error('[Realtime partida_jugador]', err);
       });
 
     this.channelTerritorio = this.service.client
-      .channel(`nexateg-terr-${this.partidaId}`)
+      .channel(`kuboteg-terr-${this.partidaId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'territorio_estado' }, (payload) => {
-        const row = payload.new as any;
-        if (row['partida_id'] === this.partidaId) {
-          const t = row as TerritorioEstado;
+        const t = payload.new as TerritorioEstado;
+        if (t.partida_id === this.partidaId) {
           this.territorios = { ...this.territorios, [t.territorio_id]: t };
+          this.rebuildOwnerMap();
+          this.rebuildTropasMap();
+          this.cdr.markForCheck();
         }
       })
       .subscribe((status, err) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') this.scheduleReconnect();
         if (err) console.error('[Realtime territorio_estado]', err);
       });
+  }
+
+  private scheduleReconnect() {
+    // Los 3 canales fallan al mismo tiempo; el timer evita duplicados
+    if (this.reconnectTimer) return;
+    this.toast.show('Conexión perdida. Reconectando...', 'error');
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectTimer = null;
+      this.subscribeRealtime();
+      // Refrescar estado que pudo haber cambiado durante la desconexión
+      const [{ data: partida }, { data: jugadores }, { data: territorios }] = await Promise.all([
+        this.service.getPartidaById(this.partidaId),
+        this.service.getPartidaJugadores(this.partidaId),
+        this.service.getTerritoriosEstado(this.partidaId),
+      ]);
+      if (partida) this.partida = partida as Partida;
+      if (jugadores) {
+        this.jugadores = jugadores as unknown as PartidaJugador[];
+        this.buildJugadorColores();
+        this.buildJugadorLideres();
+        this.rebuildJugadorNombres();
+      }
+      if (territorios) {
+        this.territorios = {};
+        (territorios as TerritorioEstado[]).forEach(t => { this.territorios[t.territorio_id] = t; });
+      }
+      this.rebuildOwnerMap();
+      this.rebuildTropasMap();
+      this.toast.show('Conexión restaurada', 'success');
+      this.cdr.markForCheck();
+    }, 3000);
   }
 
   // ── Host: iniciar juego ───────────────────────────────
@@ -689,6 +802,7 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     if (errTerr) {
       this.toast.show('Error al inicializar territorios.', 'error');
       this.iniciandoJuego = false;
+      this.cdr.markForCheck();
       return;
     }
 
@@ -698,6 +812,7 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     if (resultadosTropas.some(r => r.error)) {
       this.toast.show('Error al asignar tropas a los jugadores.', 'error');
       this.iniciandoJuego = false;
+      this.cdr.markForCheck();
       return;
     }
 
@@ -705,10 +820,12 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     if (errFase) {
       this.toast.show('Error al iniciar la fase de colocación.', 'error');
       this.iniciandoJuego = false;
+      this.cdr.markForCheck();
       return;
     }
 
     this.iniciandoJuego = false;
+    this.cdr.markForCheck();
   }
 
   incrementarTropas() { if (this.tropasIniciales < 10) this.tropasIniciales++; }
@@ -742,12 +859,14 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     if (this.misTropasParaColocar <= 0) return;
     const current = this.tropasColocadasEstaFase[territorioId] ?? 0;
     this.tropasColocadasEstaFase = { ...this.tropasColocadasEstaFase, [territorioId]: current + 1 };
+    this.rebuildTropasMap();
   }
 
   quitarTropa(territorioId: string) {
     const added = this.tropasColocadasEstaFase[territorioId] ?? 0;
     if (added <= 0) return;
     this.tropasColocadasEstaFase = { ...this.tropasColocadasEstaFase, [territorioId]: added - 1 };
+    this.rebuildTropasMap();
   }
 
   async confirmarColocacion() {
@@ -763,6 +882,7 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     }
     await this.service.setTropasPorColocar(this.partidaId, this.userId, 0);
     this.tropasColocadasEstaFase = {};
+    this.rebuildTropasMap();
 
     const orden = this.partida.orden_jugadores!;
     const idx   = this.partida.jugador_actual_index!;
@@ -777,7 +897,7 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   // ── Ataque ────────────────────────────────────────────
-  handleAtaqueClick(territorioId: string) {
+  async handleAtaqueClick(territorioId: string) {
     if (this.conquistaPendiente) return;
     const estado = this.territorios[territorioId];
     if (!estado) return;
@@ -800,47 +920,47 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     const esEnemigo    = estado.usuario_id !== this.userId;
 
     if (esAdyacente && esEnemigo && !this.procesandoCombate) {
-      this.ejecutarAtaque(this.territorioAtacanteId, territorioId);
+      await this.ejecutarAtaque(this.territorioAtacanteId, territorioId);
     }
   }
 
   async ejecutarAtaque(origenId: string, destinoId: string) {
     this.procesandoCombate = true;
+    try {
+      const { data: rpcData, error } = await this.service.resolverCombate(this.partidaId, origenId, destinoId);
+      if (error) {
+        this.toast.show('Error en el servidor al resolver el combate.', 'error');
+        return;
+      }
 
-    const { data: rpcData, error } = await this.service.resolverCombate(this.partidaId, origenId, destinoId);
-    if (error) {
-      this.toast.show('Error en el servidor al resolver el combate.', 'error');
-      this.procesandoCombate = false;
-      return;
-    }
+      const res = rpcData as CombateRpc;
+      if (res.error) {
+        this.toast.show(res.error, 'error');
+        return;
+      }
 
-    const res = rpcData as CombateRpc;
-    if (res.error) {
-      this.toast.show(res.error, 'error');
-      this.procesandoCombate = false;
-      return;
-    }
-
-    const conquista = res.conquista ?? false;
-    this.resultadoCombate = {
-      dadosAtaque:   res.dados_ataque   ?? [],
-      dadosDefensa:  res.dados_defensa  ?? [],
-      bajasAtacante: res.bajas_atacante ?? 0,
-      bajasDefensor: res.bajas_defensor ?? 0,
-      conquista,
-    };
-
-    if (conquista) {
-      this.conquistaTropasAMover = 1;
-      this.conquistaPendiente = {
-        origenId,
-        destinoId,
-        tropasOrigenFinal: res.tropas_origen_final ?? 1,
+      const conquista = res.conquista ?? false;
+      this.resultadoCombate = {
+        dadosAtaque:   res.dados_ataque   ?? [],
+        dadosDefensa:  res.dados_defensa  ?? [],
+        bajasAtacante: res.bajas_atacante ?? 0,
+        bajasDefensor: res.bajas_defensor ?? 0,
+        conquista,
       };
-      this.territorioAtacanteId = null;
-    }
 
-    this.procesandoCombate = false;
+      if (conquista) {
+        this.conquistaTropasAMover = 1;
+        this.conquistaPendiente = {
+          origenId,
+          destinoId,
+          tropasOrigenFinal: res.tropas_origen_final ?? 1,
+        };
+        this.territorioAtacanteId = null;
+      }
+    } finally {
+      this.procesandoCombate = false;
+      this.cdr.markForCheck();
+    }
   }
 
   async confirmarMovimientoConquista() {
@@ -851,13 +971,14 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     const { data: rpcData, error } = await this.service.moverTropasConquista(
       this.partidaId, origenId, destinoId, aMover
     );
-    if (error || (rpcData as any)?.error) {
-      this.toast.show((rpcData as any)?.error ?? 'Error al mover tropas.', 'error');
+    if (error || (rpcData as RpcError)?.error) {
+      this.toast.show((rpcData as RpcError)?.error ?? 'Error al mover tropas.', 'error');
       return;
     }
 
     this.conquistaPendiente = null;
     this.resultadoCombate = null;
+    this.cdr.markForCheck();
   }
 
   async terminarAtaque() {
@@ -867,10 +988,11 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     this.resultadoCombate = null;
     await this.service.setFase(this.partidaId, 'reagrupacion', this.partida.jugador_actual_index!);
     this.procesandoTurno = false;
+    this.cdr.markForCheck();
   }
 
   // ── Reagrupación ──────────────────────────────────────
-  handleReagrupacionClick(territorioId: string) {
+  async handleReagrupacionClick(territorioId: string) {
     const estado = this.territorios[territorioId];
     if (!estado) return;
 
@@ -891,7 +1013,7 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     const esPropio     = estado.usuario_id === this.userId;
 
     if (esAdyacente && esPropio) {
-      this.ejecutarReagrupacion(this.territorioOrigenId, territorioId);
+      await this.ejecutarReagrupacion(this.territorioOrigenId, territorioId);
     }
   }
 
@@ -931,6 +1053,7 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
       }
     } finally {
       this.procesandoTurno = false;
+      this.cdr.markForCheck();
     }
   }
 
@@ -964,42 +1087,19 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     if (this.declarando) return;
     this.declarando = true;
     const { data: rpcData, error } = await this.service.declararGanador(this.partidaId);
-    if (error || (rpcData as any)?.error) {
-      this.toast.show((rpcData as any)?.error ?? 'No se pudo declarar ganador.', 'error');
+    if (error || (rpcData as RpcError)?.error) {
+      this.toast.show((rpcData as RpcError)?.error ?? 'No se pudo declarar ganador.', 'error');
     }
     this.declarando = false;
+    this.cdr.markForCheck();
   }
 
   // ── Helpers ───────────────────────────────────────────
-  calcularDadosAtaque(tropas: number): number {
-    if (tropas >= 4) return 3;
-    if (tropas === 3) return 2;
-    if (tropas === 2) return 1;
-    return 0;
-  }
-
-  calcularDadosDefensa(tropas: number): number {
-    if (tropas >= 3) return 3;
-    if (tropas === 2) return 2;
-    return 1;
-  }
-
-  tirarDados(cantidad: number): number[] {
-    return Array.from({ length: cantidad }, () => Math.floor(Math.random() * 6) + 1);
-  }
-
-  calcularBonusContinente(userId: string, misIds: string[]): number {
-    const continentes = [
-      { id: 'north_america', bonus: 5 },
-      { id: 'south_america', bonus: 3 },
-      { id: 'europe',        bonus: 5 },
-      { id: 'africa',        bonus: 4 },
-      { id: 'asia',          bonus: 7 },
-      { id: 'oceania',       bonus: 2 },
-    ];
-    return continentes.reduce((total, cont) => {
-      const terrs = TERRITORIES.filter(t => t.continent === cont.id).map(t => t.id);
-      return total + (terrs.every(tid => misIds.includes(tid)) ? cont.bonus : 0);
+  calcularBonusContinente(_userId: string, misIds: string[]): number {
+    const misSet = new Set(misIds);
+    return KuboTegJuegoComponent.CONTINENT_BONUSES.reduce((total, cont) => {
+      const terrs = KuboTegJuegoComponent.CONTINENT_TERRITORIES[cont.id];
+      return total + (terrs.every(tid => misSet.has(tid)) ? cont.bonus : 0);
     }, 0);
   }
 
@@ -1033,7 +1133,7 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   estaColorOcupado(hex: string): boolean {
-    return Object.entries(this.jugadorColores).some(([uid, c]) => uid !== this.userId && c === hex);
+    return this.coloresOcupados.has(hex);
   }
 
   preseleccionarColor(hex: string)  { this.colorPreseleccionado = hex; }
@@ -1051,15 +1151,44 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     await this.service.marcarEstaDentroConColor(this.partidaId, this.userId, this.colorPreseleccionado, this.liderPreseleccionado);
   }
 
-  private buildJugadorColores() {
+  private rebuildOwnerMap() {
+    const map: Record<string, string> = {};
+    Object.values(this.territorios).forEach(t => { map[t.territorio_id] = t.usuario_id; });
+    this._territoriosOwnerMap = map;
+  }
+
+  private rebuildTropasMap() {
+    const map: Record<string, number> = {};
+    Object.values(this.territorios).forEach(t => {
+      map[t.territorio_id] = t.tropas + (this.tropasColocadasEstaFase[t.territorio_id] ?? 0);
+    });
+    this._tropasMap = map;
+  }
+
+  private rebuildJugadorNombres() {
+    const map: Record<string, string> = {};
     for (const j of this.jugadores) {
-      if (j.color) this.jugadorColores[j.usuario_id] = j.color;
+      const u = j.usuario;
+      map[j.usuario_id] = u
+        ? ([u.nombre, u.apellido].filter(Boolean).join(' ') || u.email)
+        : j.usuario_id.slice(0, 8);
     }
-    // Solo usar localStorage si la BD no devolvió color para este jugador
+    this._jugadorNombres = map;
+  }
+
+  private buildJugadorColores() {
+    const ocupados = new Set<string>();
+    for (const j of this.jugadores) {
+      if (j.color) {
+        this.jugadorColores[j.usuario_id] = j.color;
+        if (j.usuario_id !== this.userId) ocupados.add(j.color);
+      }
+    }
     if (!this.jugadorColores[this.userId]) {
       const local = localStorage.getItem(`mat-color-${this.partidaId}-${this.userId}`);
       if (local) this.jugadorColores[this.userId] = local;
     }
+    this.coloresOcupados = ocupados;
   }
 
   private buildJugadorLideres() {
@@ -1103,8 +1232,40 @@ export class NexaTegJuegoComponent implements OnInit, OnDestroy {
     const existing = this.territorios[territorioId];
     if (existing) {
       this.territorios = { ...this.territorios, [territorioId]: { ...existing, ...data } };
+      this.rebuildOwnerMap();
+      this.rebuildTropasMap();
     }
   }
 
-  volver() { this.router.navigate(['/nexateg']); }
+  volver() { this.router.navigate(['/kuboteg']); }
+
+  // ── Chat ──────────────────────────────────────────────
+  get miNombre(): string {
+    return this.jugadorNombres[this.userId] || 'Yo';
+  }
+
+  async enviarMensaje() {
+    const texto = this.chatInput.trim();
+    if (!texto || !this.channelChat) return;
+
+    const msg: ChatMensaje = {
+      userId: this.userId,
+      nombre: this.miNombre,
+      texto,
+      ts: Date.now(),
+    };
+
+    this.chatMensajes = [...this.chatMensajes, msg];
+    this.chatInput = '';
+    this.scrollChat();
+
+    await this.channelChat.send({ type: 'broadcast', event: 'chat', payload: msg });
+  }
+
+  private scrollChat() {
+    setTimeout(() => {
+      const el = this.chatRef?.nativeElement;
+      if (el) el.scrollTop = el.scrollHeight;
+    }, 0);
+  }
 }

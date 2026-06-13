@@ -7,7 +7,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "NexaBuild22": {
+    "KuboSoft": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -43,7 +43,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/nexa-build22",
+            "outputPath": "dist/kubo-build22",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
@@ -95,10 +95,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "NexaBuild22:build:production"
+              "buildTarget": "KuboSoft:build:production"
             },
             "development": {
-              "buildTarget": "NexaBuild22:build:development"
+              "buildTarget": "KuboSoft:build:development"
             }
           },
           "defaultConfiguration": "development"

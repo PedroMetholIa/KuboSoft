@@ -10,9 +10,9 @@ export const routes: Routes = [
       import('./features/inicio/inicio.component').then(m => m.InicioComponent),
   },
   {
-    path: 'nexajuegos',
+    path: 'kubojuegos',
     loadComponent: () =>
-      import('./features/nexajuegos/nexajuegos.component').then(m => m.NexaJuegosComponent),
+      import('./features/kubojuegos/kubojuegos.component').then(m => m.KuboJuegosComponent),
   },
   {
     path: 'partida',
@@ -20,27 +20,27 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./shared/game-lobby/game-lobby.component').then(m => m.GameLobbyComponent),
     data: {
-      productNombre: 'NexaTeg', channelPrefix: 'partida',
+      productNombre: 'KuboTeg', channelPrefix: 'partida',
       showBrand: false, showProductSelector: true,
       finalizadasLabel: 'Finalizadas', showNavBack: false
     } satisfies LobbyConfig,
   },
   {
-    path: 'nexateg',
+    path: 'kuboteg',
     canActivate: [authGuard],
     loadComponent: () =>
       import('./shared/game-lobby/game-lobby.component').then(m => m.GameLobbyComponent),
     data: {
-      productNombre: 'NexaTeg', channelPrefix: 'nexateg',
+      productNombre: 'KuboTeg', channelPrefix: 'kuboteg',
       showBrand: true, showProductSelector: false,
       finalizadasLabel: 'Ganadores', showNavBack: true
     } satisfies LobbyConfig,
   },
   {
-    path: 'nexateg-juego/:id',
+    path: 'kuboteg-juego/:id',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/nexateg-juego/nexateg-juego.component').then(m => m.NexaTegJuegoComponent),
+      import('./features/kuboteg-juego/kuboteg-juego.component').then(m => m.KuboTegJuegoComponent),
   },
   { path: '**', redirectTo: 'inicio' },
 ];

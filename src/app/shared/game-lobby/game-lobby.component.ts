@@ -64,13 +64,13 @@ interface PartidaFinalizada {
         </button>
       </div>
 
-      <!-- Header: modo NexaTeg con brand -->
+      <!-- Header: modo KuboTeg con brand -->
       <div class="page-header" *ngIf="config.showBrand">
         <div class="container">
           <div class="page-brand">
-            <img class="page-logo" src="assets/productos/favicon-nexateg.svg" alt="NexaTeg">
+            <img class="page-logo" src="assets/productos/favicon-kuboteg.svg" alt="KuboTeg">
             <h1 class="page-title">
-              <span class="title-nexa">Nexa</span><span class="title-teg">Teg</span>
+              <span class="title-kubo">Kubo</span><span class="title-teg">Teg</span>
             </h1>
           </div>
           <div class="page-actions">
@@ -579,11 +579,11 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.supabaseService.marcarLeida(this.notificacionActiva.id);
     const pid = this.notificacionActiva.partida_id;
     this.notificacionActiva = null;
-    this.router.navigate(['/nexateg-juego', pid]);
+    this.router.navigate(['/kuboteg-juego', pid]);
   }
 
   irAJuego(partidaId: string) {
-    this.router.navigate(['/nexateg-juego', partidaId]);
+    this.router.navigate(['/kuboteg-juego', partidaId]);
   }
 
   cerrarNotificacion() {
@@ -645,7 +645,7 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     await this.supabaseService.comenzarPartida(p.id);
     this.comenzando = false;
-    this.router.navigate(['/nexateg-juego', p.id]);
+    this.router.navigate(['/kuboteg-juego', p.id]);
   }
 
   unirse(p: Partida) {

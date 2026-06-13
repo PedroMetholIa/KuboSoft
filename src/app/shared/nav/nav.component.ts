@@ -15,8 +15,8 @@ import { filter } from 'rxjs/operators';
     <nav class="platform-nav">
       <div class="nav-container">
         <a class="logo" [routerLink]="['/inicio']">
-          <img class="nav-logo-img" src="assets/favicon-nexabuild.svg" alt="NexaBuild">
-          <span class="logo-text">Nexa<em>Build</em></span>
+          <img class="nav-logo-img" src="assets/kubosoft.png" alt="KuboSoft">
+          <span class="logo-text">Kubo<em>Soft</em></span>
         </a>
 
         <div class="nav-actions" *ngIf="authChecked && isLoggedIn">
@@ -122,7 +122,7 @@ import { filter } from 'rxjs/operators';
     .logo {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 4px;
       text-decoration: none;
       cursor: pointer;
     }
@@ -144,7 +144,7 @@ import { filter } from 'rxjs/operators';
 
     .logo-text em {
       font-style: normal;
-      color: #7C5CFC;
+      color: #684fc9;
     }
 
     .nav-actions {
@@ -391,8 +391,8 @@ export class NavComponent implements OnInit, OnDestroy {
       if (user) {
         const { data } = await this.supabase.getProfileById(user.id);
         if (data) {
-          const d = data as any;
-          this.userName = [d.nombre, d.apellido].filter(Boolean).join(' ');
+          const p = data as { nombre: string | null; apellido: string | null };
+          this.userName = [p.nombre, p.apellido].filter(Boolean).join(' ');
         }
         this.activeModal = null;
       } else {

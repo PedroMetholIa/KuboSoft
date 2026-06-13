@@ -1,8 +1,8 @@
 export const environment = {
   production: false,
   supabase: {
-    url: 'https://zfvaetmrdrwwqsjvphwr.supabase.co',
-    anonKey: 'sb_publishable_pIfNeg93BtADuopKemglug_tJNo3AYt',
+    url: 'https://xevhphsmqzbovrbgpqee.supabase.co',
+    anonKey: 'sb_publishable_no90k1m4sxgKP-xJfZXr6g_1feJxRCe',
   },
 };
 

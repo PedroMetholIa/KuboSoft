@@ -15,13 +15,13 @@ interface Juego {
 type PopupType = 'not-published' | 'subscription' | null;
 
 @Component({
-  selector: 'app-nexajuegos',
+  selector: 'app-kubojuegos',
   standalone: true,
   imports: [RouterLink, NavComponent],
-  templateUrl: './nexajuegos.component.html',
-  styleUrl: './nexajuegos.component.css'
+  templateUrl: './kubojuegos.component.html',
+  styleUrl: './kubojuegos.component.css'
 })
-export class NexaJuegosComponent implements OnInit {
+export class KuboJuegosComponent implements OnInit {
   juegos: Juego[] = [];
   loading = true;
   submitted = signal(false);
@@ -47,14 +47,15 @@ export class NexaJuegosComponent implements OnInit {
 
   async loadJuegos() {
     const [productosRes, categoriaRes] = await Promise.all([
-      this.supabase.getProductosByCategoriaNombre('NexaJuegos'),
-      this.supabase.getCategoriaByNombre('NexaJuegos'),
+      this.supabase.getProductosByCategoriaNombre('KuboJuegos'),
+      this.supabase.getCategoriaByNombre('KuboJuegos'),
     ]);
     if (productosRes.error) this.toast.show('Error al cargar los juegos.', 'error');
     this.juegos = (productosRes.data as Juego[]) ?? [];
     if (categoriaRes.data) {
-      this.categoriaNombre = (categoriaRes.data as any).nombre;
-      this.categoriaLogo   = (categoriaRes.data as any).logo;
+      const cat = categoriaRes.data as { nombre: string; logo: string };
+      this.categoriaNombre = cat.nombre;
+      this.categoriaLogo   = cat.logo;
     }
     this.loading = false;
   }

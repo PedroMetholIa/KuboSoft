@@ -211,6 +211,11 @@ h2 {
   letter-spacing: -.2px;
 }
 
+.cat-title em {
+  font-style: normal;
+  color: #FF4757;
+}
+
 .prod-desc {
   font-size: 15px;
   color: var(--sub);

@@ -39,7 +39,7 @@ nav {
 
 .nav-container { display: flex; align-items: center; justify-content: space-between; }
 
-.logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+.logo { display: flex; align-items: center; gap: 4px; text-decoration: none; }
 
 .logo-text {
   font-size: 26px;
@@ -47,7 +47,7 @@ nav {
   letter-spacing: -.5px;
   color: var(--white);
   line-height: 1.4;
-  em { font-style: normal; color: #7C5CFC; }
+  em { font-style: normal; color: #684fc9; }
 }
 
 .nav-actions { display: flex; align-items: center; gap: 1.25rem; }
@@ -445,7 +445,7 @@ footer {
 .footer-brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   text-decoration: none;
 
   .footer-logo-img {
@@ -463,7 +463,7 @@ footer {
 
     em {
       font-style: normal;
-      color: #7C5CFC;
+      color: #684fc9;
     }
   }
 }
