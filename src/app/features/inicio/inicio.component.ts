@@ -62,7 +62,7 @@ interface Categoria {
                   <div class="card-logo" *ngIf="cat.logo">
                     <img [src]="cat.logo" [alt]="cat.nombre" />
                   </div>
-                  <h3 class="cat-title">Kubo<span [style.color]="getCategoryColor(cat.nombre)">{{ getCategorySuffix(cat.nombre) }}</span></h3>
+                  <h3 class="cat-title"><span [style.color]="getCategoryColor(cat.nombre)">{{ getCategorySuffix(cat.nombre) }}</span></h3>
                 </div>
                 <p class="prod-desc">{{ cat.descripcion }}</p>
               </div>
@@ -187,6 +187,7 @@ export class InicioComponent implements OnInit {
     'KuboMétricas':   '#7C5CFC',
     'KuboReservas':   '#E91E8C',
     'KuboRRHH':       '#00BCD4',
+    'KuboStock':      'rgb(237, 172, 39)',
   };
 
   getCategoryColor(nombre: string): string {

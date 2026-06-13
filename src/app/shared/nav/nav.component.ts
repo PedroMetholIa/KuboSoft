@@ -35,6 +35,10 @@ import { filter } from 'rxjs/operators';
     <div class="modal-overlay" *ngIf="activeModal === 'login'" (click)="closeModal()">
       <div class="modal-card" (click)="$event.stopPropagation()">
         <button class="modal-close" (click)="closeModal()">×</button>
+        <div class="modal-logo">
+          <img src="assets/kubosoft.png" alt="KuboSoft" />
+          <span class="modal-logo-text">Kubo<em>Soft</em></span>
+        </div>
         <h2 class="modal-title">Iniciar sesión</h2>
 
         <div class="alert alert-error" *ngIf="loginError">{{ loginError }}</div>
@@ -60,6 +64,10 @@ import { filter } from 'rxjs/operators';
     <div class="modal-overlay" *ngIf="activeModal === 'register'" (click)="closeModal()">
       <div class="modal-card" (click)="$event.stopPropagation()">
         <button class="modal-close" (click)="closeModal()">×</button>
+        <div class="modal-logo">
+          <img src="assets/kubosoft.png" alt="KuboSoft" />
+          <span class="modal-logo-text">Kubo<em>Soft</em></span>
+        </div>
         <h2 class="modal-title">Crear cuenta</h2>
 
         <div class="alert alert-success" *ngIf="regSuccess">{{ regSuccess }}</div>
@@ -240,6 +248,34 @@ import { filter } from 'rxjs/operators';
 
     .modal-close:hover {
       color: #6B7280;
+    }
+
+    .modal-logo {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      margin-bottom: 1.25rem;
+    }
+
+    .modal-logo img {
+      width: 100px;
+      height: 100px;
+      object-fit: contain;
+    }
+
+    .modal-logo-text {
+      font-size: 38px;
+      font-weight: 700;
+      letter-spacing: -.5px;
+      color: #1A1A2E;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .modal-logo-text em {
+      font-style: normal;
+      color: #684fc9;
     }
 
     .modal-title {

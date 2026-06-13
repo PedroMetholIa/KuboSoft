@@ -28,7 +28,7 @@
             @if (categoriaLogo) {
               <img class="section-logo-img" [src]="categoriaLogo" [alt]="categoriaNombre">
             }
-            <span class="section-brand-text">Kubo<em class="accent">{{ categoriaNombre.slice(4) }}</em></span>
+            <span class="section-brand-text"><em class="accent">{{ categoriaNombre.slice(4) }}</em></span>
           </div>
         }
       </div>
@@ -40,7 +40,7 @@
               <div class="card-logo">
                 <img [src]="getImgPath(j.nombre)" [alt]="j.nombre">
               </div>
-              <h3 class="cat-title">Kubo<em class="accent">{{ j.nombre.slice(4) }}</em></h3>
+              <h3 class="cat-title"><em class="accent">{{ j.nombre.slice(4).toUpperCase() }}</em></h3>
             </div>
             <p class="prod-desc">{{ j.descripcion }}</p>
           </div>

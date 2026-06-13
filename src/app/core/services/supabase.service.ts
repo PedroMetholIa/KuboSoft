@@ -280,9 +280,33 @@ export class SupabaseService {
       .eq('usuario_id', usuarioId);
   }
 
-  // ── RPCs de juego (lógica server-side) ───────────────
+  // ── RPCs de juego ─────────────────────────────────────
+  // Usa fetch directo con el token explícito para evitar race conditions
+  // del GoTrueClient al obtener el header de Authorization internamente.
+  private async _rpc(fn: string, params: Record<string, unknown>) {
+    const { data: { session } } = await this.supabase.auth.getSession();
+    if (!session) return { data: null, error: { message: 'Sesión expirada. Recargá la página.' } };
+
+    const res = await fetch(`${environment.supabase.url}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': environment.supabase.anonKey,
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(params),
+    });
+
+    const body = await res.json().catch(() => null);
+    if (!res.ok) {
+      console.error(`[RPC ${fn}] HTTP ${res.status}`, body);
+      return { data: null, error: body ?? { message: `HTTP ${res.status}` } };
+    }
+    return { data: body, error: null };
+  }
+
   resolverCombate(partidaId: string, origenId: string, destinoId: string) {
-    return this.supabase.rpc('resolver_combate', {
+    return this._rpc('resolver_combate', {
       p_partida_id: partidaId,
       p_origen_id:  origenId,
       p_destino_id: destinoId,
@@ -290,7 +314,7 @@ export class SupabaseService {
   }
 
   moverTropasConquista(partidaId: string, origenId: string, destinoId: string, tropas: number) {
-    return this.supabase.rpc('mover_tropas_conquista', {
+    return this._rpc('mover_tropas_conquista', {
       p_partida_id: partidaId,
       p_origen_id:  origenId,
       p_destino_id: destinoId,
@@ -299,7 +323,7 @@ export class SupabaseService {
   }
 
   declararGanador(partidaId: string) {
-    return this.supabase.rpc('declarar_ganador', { p_partida_id: partidaId });
+    return this._rpc('declarar_ganador', { p_partida_id: partidaId });
   }
 
   // ── Territorios ───────────────────────────────────────

@@ -301,18 +301,59 @@ interface CombateRpc {
             <!-- FASE: Reagrupación - mi turno -->
             <div class="phase-panel" *ngIf="fase === 'reagrupacion' && esMiTurno">
               <div class="phase-title">🔄 Reagrupación</div>
-              <p class="phase-hint" *ngIf="!territorioOrigenId">
-                Seleccioná un territorio tuyo para mover tropas (opcional)
-              </p>
-              <p class="phase-hint" *ngIf="territorioOrigenId">
-                <strong>{{ nombreTerritorio(territorioOrigenId) }}</strong> —
-                elegí un territorio propio adyacente
-              </p>
-              <button class="btn-phase-action btn-skip"
-                [disabled]="procesandoTurno"
-                (click)="saltarReagrupacion()">
-                {{ procesandoTurno ? 'Procesando...' : 'Saltar →' }}
-              </button>
+
+              <!-- Sin origen: pedir que elija -->
+              <ng-container *ngIf="!territorioOrigenId && !reagrupacionDestinoId">
+                <p class="phase-hint">
+                  Seleccioná un territorio tuyo para mover tropas (opcional)
+                </p>
+                <button class="btn-phase-action btn-skip"
+                  [disabled]="procesandoTurno"
+                  (click)="saltarReagrupacion()">
+                  {{ procesandoTurno ? 'Procesando...' : 'Saltar →' }}
+                </button>
+              </ng-container>
+
+              <!-- Origen elegido, esperando destino -->
+              <ng-container *ngIf="territorioOrigenId && !reagrupacionDestinoId">
+                <p class="phase-hint">
+                  <strong>{{ nombreTerritorio(territorioOrigenId) }}</strong> —
+                  elegí un territorio propio adyacente
+                </p>
+                <button class="btn-phase-action btn-skip"
+                  [disabled]="procesandoTurno"
+                  (click)="saltarReagrupacion()">
+                  Saltar →
+                </button>
+              </ng-container>
+
+              <!-- Origen y destino elegidos: seleccionar cantidad -->
+              <ng-container *ngIf="territorioOrigenId && reagrupacionDestinoId">
+                <p class="phase-hint conquista-hint">
+                  Mover tropas de <strong>{{ nombreTerritorio(territorioOrigenId) }}</strong>
+                  a <strong>{{ nombreTerritorio(reagrupacionDestinoId) }}</strong>
+                </p>
+                <div class="tropas-control">
+                  <button class="btn-tropas"
+                    [disabled]="reagrupacionTropasAMover <= 1"
+                    (click)="reagrupacionTropasAMover = reagrupacionTropasAMover - 1">−</button>
+                  <span class="tropas-valor">{{ reagrupacionTropasAMover }}</span>
+                  <button class="btn-tropas"
+                    [disabled]="reagrupacionTropasAMover >= maxTropasReagrupacion"
+                    (click)="reagrupacionTropasAMover = reagrupacionTropasAMover + 1">+</button>
+                </div>
+                <p class="tropas-rango">Mín: 1 &nbsp;·&nbsp; Máx: {{ maxTropasReagrupacion }}</p>
+                <button class="btn-phase-action"
+                  [disabled]="procesandoTurno"
+                  (click)="confirmarReagrupacion()">
+                  {{ procesandoTurno ? 'Procesando...' : 'Confirmar →' }}
+                </button>
+                <button class="btn-phase-action btn-skip"
+                  [disabled]="procesandoTurno"
+                  (click)="cancelarReagrupacion()">
+                  Cancelar
+                </button>
+              </ng-container>
             </div>
 
             <!-- FASE: Reagrupación - turno ajeno -->
@@ -476,6 +517,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   territorioOrigenId: string | null = null;
   conquistaPendiente: ConquistaPendiente | null = null;
   conquistaTropasAMover = 1;
+  reagrupacionDestinoId: string | null = null;
+  reagrupacionTropasAMover = 1;
 
   // ── Chat ──────────────────────────────────────────────
   chatMensajes: ChatMensaje[] = [];
@@ -556,7 +599,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         return e && e.usuario_id !== this.userId;
       });
     }
-    if (this.fase === 'reagrupacion' && this.esMiTurno && this.territorioOrigenId) {
+    if (this.fase === 'reagrupacion' && this.esMiTurno && this.territorioOrigenId && !this.reagrupacionDestinoId) {
       const terr = TERRITORIES.find(t => t.id === this.territorioOrigenId);
       return (terr?.neighbors ?? []).filter(nid => {
         const e = this.territorios[nid];
@@ -582,6 +625,11 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   get maxTropasMovibles(): number {
     if (!this.conquistaPendiente) return 1;
     return Math.min(3, this.conquistaPendiente.tropasOrigenFinal - 1);
+  }
+
+  get maxTropasReagrupacion(): number {
+    if (!this.territorioOrigenId) return 1;
+    return (this.territorios[this.territorioOrigenId]?.tropas ?? 2) - 1;
   }
 
   get lideresOcupados(): Set<string> {
@@ -842,8 +890,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   onMapDeseleccionar() {
-    this.territorioAtacanteId = null;
-    this.territorioOrigenId = null;
+    this.territorioAtacanteId  = null;
+    this.territorioOrigenId    = null;
+    this.reagrupacionDestinoId = null;
   }
 
   onMapTerritoryRightClick(territorioId: string) {
@@ -993,12 +1042,14 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   // ── Reagrupación ──────────────────────────────────────
   async handleReagrupacionClick(territorioId: string) {
+    if (this.reagrupacionDestinoId) return;
     const estado = this.territorios[territorioId];
     if (!estado) return;
 
     if (!this.territorioOrigenId) {
       if (estado.usuario_id === this.userId && estado.tropas > 1) {
         this.territorioOrigenId = territorioId;
+        this.reagrupacionTropasAMover = 1;
       }
       return;
     }
@@ -1008,31 +1059,46 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const origenTerr   = TERRITORIES.find(t => t.id === this.territorioOrigenId);
-    const esAdyacente  = origenTerr?.neighbors.includes(territorioId) ?? false;
-    const esPropio     = estado.usuario_id === this.userId;
+    const origenTerr  = TERRITORIES.find(t => t.id === this.territorioOrigenId);
+    const esAdyacente = origenTerr?.neighbors.includes(territorioId) ?? false;
+    const esPropio    = estado.usuario_id === this.userId;
 
     if (esAdyacente && esPropio) {
-      await this.ejecutarReagrupacion(this.territorioOrigenId, territorioId);
+      this.reagrupacionDestinoId    = territorioId;
+      this.reagrupacionTropasAMover = 1;
+      this.cdr.markForCheck();
     }
   }
 
-  async ejecutarReagrupacion(origenId: string, destinoId: string) {
+  async confirmarReagrupacion() {
+    if (!this.territorioOrigenId || !this.reagrupacionDestinoId) return;
+    const aMover = Math.max(1, Math.min(this.reagrupacionTropasAMover, this.maxTropasReagrupacion));
+    await this.ejecutarReagrupacion(this.territorioOrigenId, this.reagrupacionDestinoId, aMover);
+  }
+
+  cancelarReagrupacion() {
+    this.reagrupacionDestinoId    = null;
+    this.reagrupacionTropasAMover = 1;
+    this.cdr.markForCheck();
+  }
+
+  async ejecutarReagrupacion(origenId: string, destinoId: string, aMover: number) {
     const origen  = this.territorios[origenId];
     const destino = this.territorios[destinoId];
     if (!origen || !destino) return;
 
-    const aMover = origen.tropas - 1;
-    await this.updateTerritorio(origenId,  { tropas: 1 });
+    await this.updateTerritorio(origenId,  { tropas: origen.tropas - aMover });
     await this.updateTerritorio(destinoId, { tropas: destino.tropas + aMover });
 
-    this.territorioOrigenId = null;
+    this.territorioOrigenId    = null;
+    this.reagrupacionDestinoId = null;
     await this.avanzarTurno();
   }
 
   async saltarReagrupacion() {
     if (this.procesandoTurno) return;
-    this.territorioOrigenId = null;
+    this.territorioOrigenId    = null;
+    this.reagrupacionDestinoId = null;
     await this.avanzarTurno();
   }
 

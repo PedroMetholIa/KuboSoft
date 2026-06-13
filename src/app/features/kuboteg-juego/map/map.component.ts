@@ -1,4 +1,4 @@
-import { Component, OnInit, AfterViewInit, ElementRef, Input, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, AfterViewInit, ElementRef, Input, Output, EventEmitter, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Territory, Continent } from './territory.model';
 import { TERRITORIES } from './territories.data';
@@ -9,6 +9,7 @@ import { TERRITORIES } from './territories.data';
   imports: [CommonModule],
   templateUrl: './map.component.html',
   styleUrls: ['./map.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MapComponent implements OnInit, AfterViewInit {
   @Input() territoriosOwner: Record<string, string> = {};
@@ -16,8 +17,11 @@ export class MapComponent implements OnInit, AfterViewInit {
   @Input() currentUserId: string = '';
   @Input() tropas: Record<string, number> = {};
   @Input() territorioSeleccionado: string | null = null;
-  @Input() territoriosDestacados: string[] = [];
   @Input() jugadorNombres: Record<string, string> = {};
+
+  @Input() set territoriosDestacados(val: string[]) {
+    this._destacadosSet = new Set(val);
+  }
 
   @Output() territorioClick = new EventEmitter<string>();
   @Output() territorioRightClick = new EventEmitter<string>();
@@ -29,6 +33,8 @@ export class MapComponent implements OnInit, AfterViewInit {
   tooltipX = 0;
   tooltipY = 0;
 
+  private _destacadosSet = new Set<string>();
+
   readonly continentLegend = [
     { id: 'north_america', label: 'América del Norte', color: '#D9B34D' },
     { id: 'south_america', label: 'América del Sur',   color: '#D94059' },
@@ -38,7 +44,7 @@ export class MapComponent implements OnInit, AfterViewInit {
     { id: 'oceania',       label: 'Oceanía',            color: '#8C40D1' },
   ];
 
-  constructor(private el: ElementRef) {}
+  constructor(private el: ElementRef, private cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
     this.territories = TERRITORIES.map(t => ({ ...t }));
@@ -69,10 +75,12 @@ export class MapComponent implements OnInit, AfterViewInit {
   onTerritoryHover(territory: Territory, event: MouseEvent): void {
     this.tooltip = territory;
     this.updateTooltipPosition(event);
+    this.cdr.markForCheck();
   }
 
   onTerritoryLeave(): void {
     this.tooltip = null;
+    this.cdr.markForCheck();
   }
 
   getTropas(id: string): number {
@@ -90,7 +98,7 @@ export class MapComponent implements OnInit, AfterViewInit {
   }
 
   isHighlighted(t: Territory): boolean {
-    return this.territoriosDestacados.includes(t.id);
+    return this._destacadosSet.has(t.id);
   }
 
   getTerritoryFill(t: Territory): string {
@@ -101,27 +109,13 @@ export class MapComponent implements OnInit, AfterViewInit {
     if (this.isHighlighted(t)) {
       const ownerId = this.territoriosOwner[t.id];
       if (ownerId && this.jugadorColores[ownerId]) {
-        return this.hexToRgba(this.jugadorColores[ownerId], this.fillAlpha(this.jugadorColores[ownerId], 0.82));
+        return this.hexToRgba(this.jugadorColores[ownerId], 0.82);
       }
       return this.lightenColor('#6B7280', 40);
     }
     const color = this.getOwnerColor(t);
-    if (color) return this.hexToRgba(this.lightenColor(color, 14), this.fillAlpha(color, 0.96));
+    if (color) return this.hexToRgba(this.lightenColor(color, 14), 0.96);
     return '#6B7280';
-  }
-
-  getWhiteOverlay(t: Territory): string {
-    const color = this.getOwnerColor(t);
-    if (!color) return 'transparent';
-    const [r, g, b] = this.parseRgb(color);
-    return (r > 170 && g > 170 && b > 170) ? 'rgba(255,255,255,0.18)' : 'transparent';
-  }
-
-  private fillAlpha(color: string, defaultAlpha: number): number {
-    const [r, g, b] = this.parseRgb(color);
-    if (r > 170 && g > 170 && b > 170) return 0.88;
-    if (r < 60  && g < 60  && b < 60)  return 0.72;
-    return defaultAlpha;
   }
 
   getTerritoryStroke(t: Territory): string {
@@ -139,23 +133,6 @@ export class MapComponent implements OnInit, AfterViewInit {
     return 1.3;
   }
 
-  getTerritoryFilter(t: Territory): string {
-    const color = this.getOwnerColor(t);
-    if (this.isSelected(t) && color) {
-      const s = this.hexToRgba(color, 0.80);
-      const d = this.hexToRgba(color, 0.55);
-      const e = this.hexToRgba(color, 0.20);
-      return `drop-shadow(0 0 9px ${s}) drop-shadow(0 0 26px ${d}) drop-shadow(0 0 48px ${e})`;
-    }
-    if (color) {
-      const s = this.hexToRgba(color, 0.72);
-      const d = this.hexToRgba(color, 0.40);
-      const e = this.hexToRgba(color, 0.14);
-      return `drop-shadow(0 0 8px ${s}) drop-shadow(0 0 22px ${d}) drop-shadow(0 0 42px ${e})`;
-    }
-    return 'drop-shadow(0 0 2px rgba(103,232,249,0.15))';
-  }
-
   getBadgeFill(id: string): string {
     const ownerId = this.territoriosOwner[id];
     if (!ownerId || !this.jugadorColores[ownerId]) return '#09152a';
@@ -167,38 +144,6 @@ export class MapComponent implements OnInit, AfterViewInit {
     if (!ownerId || !this.jugadorColores[ownerId]) return 'rgba(165,205,255,0.80)';
     const [r, g, b] = this.parseRgb(this.jugadorColores[ownerId]);
     return `rgba(${Math.min(255, r + 95)},${Math.min(255, g + 95)},${Math.min(255, b + 95)},0.82)`;
-  }
-
-  getBadgeHighlight(id: string): string {
-    const ownerId = this.territoriosOwner[id];
-    if (!ownerId || !this.jugadorColores[ownerId]) return 'rgba(255,255,255,0.09)';
-    const [r, g, b] = this.parseRgb(this.jugadorColores[ownerId]);
-    return `rgba(${Math.min(255, r + 85)},${Math.min(255, g + 85)},${Math.min(255, b + 85)},0.20)`;
-  }
-
-  getHaloColor(t: Territory): string {
-    return this.getOwnerColor(t) ?? 'transparent';
-  }
-
-  getHaloOpacity(t: Territory): number {
-    return this.getOwnerColor(t) ? 0.68 : 0;
-  }
-
-  private getOwnerColor(t: Territory): string | null {
-    const ownerId = this.territoriosOwner[t.id];
-    return (ownerId && this.jugadorColores[ownerId]) ? this.jugadorColores[ownerId] : null;
-  }
-
-  private parseRgb(color: string): [number, number, number] {
-    const m = color.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
-    if (m) return [+m[1], +m[2], +m[3]];
-    const n = parseInt(color.replace('#', ''), 16);
-    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  }
-
-  private hexToRgba(color: string, alpha: number): string {
-    const [r, g, b] = this.parseRgb(color);
-    return `rgba(${r},${g},${b},${alpha})`;
   }
 
   continentLabel(continent: Continent): string {
@@ -213,6 +158,11 @@ export class MapComponent implements OnInit, AfterViewInit {
     return map[continent];
   }
 
+  private getOwnerColor(t: Territory): string | null {
+    const ownerId = this.territoriosOwner[t.id];
+    return (ownerId && this.jugadorColores[ownerId]) ? this.jugadorColores[ownerId] : null;
+  }
+
   private updateTooltipPosition(event: MouseEvent): void {
     const el = (event.target as Element).closest('.map-wrapper');
     if (el) {
@@ -220,6 +170,18 @@ export class MapComponent implements OnInit, AfterViewInit {
       this.tooltipX = event.clientX - rect.left + 12;
       this.tooltipY = event.clientY - rect.top - 10;
     }
+  }
+
+  private parseRgb(color: string): [number, number, number] {
+    const m = color.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+    if (m) return [+m[1], +m[2], +m[3]];
+    const n = parseInt(color.replace('#', ''), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+
+  private hexToRgba(color: string, alpha: number): string {
+    const [r, g, b] = this.parseRgb(color);
+    return `rgba(${r},${g},${b},${alpha})`;
   }
 
   private darkenDesaturate(color: string, darkenFactor: number, desaturateAmount: number): string {
