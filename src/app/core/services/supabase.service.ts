@@ -19,6 +19,31 @@ export interface Producto {
   nombre: string;
 }
 
+export interface UltimoCombate {
+  dadosAtaque: number[];
+  dadosDefensa: number[];
+  bajasAtacante: number;
+  bajasDefensor: number;
+  conquista: boolean;
+  atacanteNombre: string;
+  defensorNombre: string;
+  origenNombre: string;
+  destinoNombre: string;
+  colorAtacante: string;
+  colorDefensor: string;
+  liderAtacanteImg: string;
+  liderDefensorImg: string;
+  ts: number;
+}
+
+export interface UltimaConquista {
+  territorioNombre: string;
+  atacanteNombre: string;
+  defensorNombre: string;
+  colorAtacante: string;
+  ts: number;
+}
+
 export interface Partida {
   id: string;
   nombre: string;
@@ -29,13 +54,15 @@ export interface Partida {
   estado: 'Iniciada' | 'En juego' | 'Finalizada';
   ganador_id: string | null;
   requiere_contrasena: boolean;
-  contrasena: string | null;
+  contrasena?: string | null;
   turno_actual_usuario_id: string | null;
   tropas_iniciales?: number | null;
   fase_actual?: 'colocacion' | 'ataque' | 'reagrupacion' | null;
   ronda_actual?: number;
   orden_jugadores?: string[] | null;
   jugador_actual_index?: number;
+  ultimo_combate?: UltimoCombate | null;
+  ultima_conquista?: UltimaConquista | null;
   created_at: string;
 }
 
@@ -146,7 +173,8 @@ export class SupabaseService {
   getAllProfiles() {
     return this.supabase.from('usuario').select('*')
       .order('is_online', { ascending: false })
-      .order('last_seen', { ascending: false, nullsFirst: false });
+      .order('last_seen', { ascending: false, nullsFirst: false })
+      .then(r => ({ ...r, data: r.data as Profile[] | null }));
   }
 
   updateOnlineStatus(userId: string, isOnline: boolean) {
@@ -190,8 +218,25 @@ export class SupabaseService {
     return this.supabase.from('partida').select('*').order('created_at', { ascending: false });
   }
 
+  getMisPartidasIds(userId: string) {
+    return this.supabase.from('partida_jugador')
+      .select('partida_id')
+      .eq('usuario_id', userId)
+      .then(r => ({ ...r, data: r.data as Array<{ partida_id: string }> | null }));
+  }
+
+  verificarContrasena(partidaId: string, password: string) {
+    return this.supabase.from('partida')
+      .select('id')
+      .eq('id', partidaId)
+      .eq('contrasena', password)
+      .maybeSingle()
+      .then(r => ({ match: !!r.data, error: r.error }));
+  }
+
   getPartidaById(id: string) {
-    return this.supabase.from('partida').select('*').eq('id', id).single();
+    return this.supabase.from('partida').select('*').eq('id', id).single()
+      .then(r => ({ ...r, data: r.data as unknown as Partida | null }));
   }
 
   getProductos() {
@@ -221,6 +266,14 @@ export class SupabaseService {
       .eq('usuario_id', usuarioId);
   }
 
+  reservarColor(partidaId: string, usuarioId: string, color: string | null) {
+    return this.supabase.from('partida_jugador')
+      .update({ color })
+      .eq('partida_id', partidaId)
+      .eq('usuario_id', usuarioId);
+  }
+
+
   marcarEstaDentroConColor(partidaId: string, usuarioId: string, color: string, lider?: string) {
     const payload: Record<string, unknown> = { esta_dentro: true, color };
     if (lider) payload['lider'] = lider;
@@ -235,7 +288,8 @@ export class SupabaseService {
   }
 
   getLideres() {
-    return this.supabase.from('lider').select('*').order('nombre');
+    return this.supabase.from('lider').select('*').order('nombre')
+      .then(r => ({ ...r, data: r.data as unknown as Lider[] | null }));
   }
 
   setTurnoActual(partidaId: string, usuarioId: string | null) {
@@ -266,7 +320,8 @@ export class SupabaseService {
     return this.supabase.from('partida_jugador')
       .select('id, usuario_id, orden_turno, puntos, esta_dentro, tropas_por_colocar, color, lider, usuario(nombre, apellido, email)')
       .eq('partida_id', partidaId)
-      .order('orden_turno');
+      .order('orden_turno')
+      .then(r => ({ ...r, data: r.data as unknown as PartidaJugador[] | null }));
   }
 
   updatePartidaJugadorPuntos(id: string, puntos: number) {
@@ -330,7 +385,8 @@ export class SupabaseService {
   getTerritoriosEstado(partidaId: string) {
     return this.supabase.from('territorio_estado')
       .select('*')
-      .eq('partida_id', partidaId);
+      .eq('partida_id', partidaId)
+      .then(r => ({ ...r, data: r.data as unknown as TerritorioEstado[] | null }));
   }
 
   initTerritorios(territorios: Omit<TerritorioEstado, 'id'>[]) {
@@ -387,14 +443,17 @@ export class SupabaseService {
     return this.supabase.from('partida')
       .select('id, nombre, created_at, ganador_id')
       .eq('estado', 'Finalizada')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .then(r => ({ ...r, data: r.data as Array<Pick<Partida, 'id' | 'nombre' | 'created_at' | 'ganador_id'>> | null }));
   }
 
   getJugadoresDe(partidaIds: string[]) {
-    if (partidaIds.length === 0) return Promise.resolve({ data: [], error: null });
+    type JugadorDePartida = { partida_id: string; usuario: { nombre: string | null; apellido: string | null; email: string } | null };
+    if (partidaIds.length === 0) return Promise.resolve({ data: [] as JugadorDePartida[], error: null });
     return this.supabase.from('partida_jugador')
       .select('partida_id, usuario(nombre, apellido, email)')
-      .in('partida_id', partidaIds);
+      .in('partida_id', partidaIds)
+      .then(r => ({ ...r, data: r.data as JugadorDePartida[] | null }));
   }
 
   // ── Categorias ────────────────────────────────────────

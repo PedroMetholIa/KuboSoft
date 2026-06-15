@@ -47,21 +47,21 @@ interface PartidaFinalizada {
   template: `
     <div class="partida">
 
-      <!-- Notification banner -->
-      <div class="notif-banner" *ngIf="notificacionActiva">
-        <div class="notif-icon-wrap">
-          <span class="notif-icon">🎮</span>
+      <!-- Notification popup modal -->
+      <div class="notif-overlay" *ngIf="notificacionActiva">
+        <div class="notif-modal">
+          <button class="notif-close-btn" (click)="cerrarNotificacion()">
+            <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
+              <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <div class="notif-logo-wrap">
+            <img src="assets/productos/favicon-kuboteg.svg" alt="KuboTeg" class="notif-logo">
+          </div>
+          <div class="notif-title">¡Partida iniciada!</div>
+          <p class="notif-msg">{{ notifMsgFormatted }}</p>
+          <button class="btn-ir" (click)="irAPartida()">Ir a jugar →</button>
         </div>
-        <div class="notif-body">
-          <span class="notif-label">¡Partida iniciada!</span>
-          <p class="notif-msg">{{ notificacionActiva.mensaje }}</p>
-        </div>
-        <button class="btn-ir" (click)="irAPartida()">Ir a jugar →</button>
-        <button class="btn-notif-close" (click)="cerrarNotificacion()">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-        </button>
       </div>
 
       <!-- Header: modo KuboTeg con brand -->
@@ -289,8 +289,12 @@ interface PartidaFinalizada {
               </select>
             </div>
             <div class="field">
-              <label>Límite de jugadores (2–6)</label>
-              <input type="number" [(ngModel)]="form.limite_jugadores" min="2" max="6" />
+              <label>Límite de jugadores (2–8)</label>
+              <div class="num-stepper">
+                <button type="button" class="step-btn" [disabled]="form.limite_jugadores <= 2" (click)="form.limite_jugadores = form.limite_jugadores - 1">−</button>
+                <span class="step-value">{{ form.limite_jugadores }}</span>
+                <button type="button" class="step-btn" [disabled]="form.limite_jugadores >= 8" (click)="form.limite_jugadores = form.limite_jugadores + 1">+</button>
+              </div>
             </div>
           </div>
           <div class="field-check">
@@ -376,6 +380,10 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   jugadoresModal: string[] = [];
 
   notificacionActiva: Notificacion | null = null;
+
+  get notifMsgFormatted(): string {
+    return (this.notificacionActiva?.mensaje ?? '').replace('! Hacé', '!\nHacé');
+  }
 
   form = {
     nombre: '',
@@ -504,21 +512,18 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   async loadMisPartidasIds() {
-    const { data } = await this.supabaseService.client
-      .from('partida_jugador')
-      .select('partida_id')
-      .eq('usuario_id', this.userId);
-    this.misPartidasIds = new Set((data ?? []).map((r: any) => r.partida_id));
+    const { data } = await this.supabaseService.getMisPartidasIds(this.userId);
+    this.misPartidasIds = new Set((data ?? []).map(r => r.partida_id));
   }
 
   async loadPartidasFinalizadas() {
     const { data: partidas } = await this.supabaseService.getPartidasFinalizadas();
     if (!partidas || partidas.length === 0) { this.partidasFinalizadas = []; return; }
-    const ids = (partidas as any[]).map(p => p.id);
+    const ids = partidas.map(p => p.id);
     const { data: jugadores } = await this.supabaseService.getJugadoresDe(ids);
-    this.partidasFinalizadas = (partidas as any[]).map(p => ({
+    this.partidasFinalizadas = partidas.map(p => ({
       ...p,
-      jugadores: ((jugadores as any[]) ?? []).filter(j => j.partida_id === p.id)
+      jugadores: (jugadores ?? []).filter(j => j.partida_id === p.id)
     }));
   }
 
@@ -542,9 +547,16 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.channelPartida = this.supabaseService.client
       .channel(`${p}-partida-rt`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'partida' }, () => {
-        this.loadPartidas();
-        this.loadPartidasFinalizadas();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'partida' }, (payload) => {
+        this.partidas = [payload.new as Partida, ...this.partidas];
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'partida' }, (payload) => {
+        const updated = payload.new as Partida;
+        this.partidas = this.partidas.map(p => p.id === updated.id ? updated : p);
+        if (updated.estado === 'Finalizada') this.loadPartidasFinalizadas();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'partida' }, (payload) => {
+        this.partidas = this.partidas.filter(p => p.id !== (payload.old as { id: string }).id);
       })
       .subscribe();
 
@@ -606,7 +618,7 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
   async guardarPartida() {
     if (!this.form.nombre || !this.form.producto_id) return;
-    this.form.limite_jugadores = Math.min(6, Math.max(2, this.form.limite_jugadores));
+    this.form.limite_jugadores = Math.min(8, Math.max(2, this.form.limite_jugadores));
     this.formLoading = true;
     const { data: nuevaPartida } = await this.supabaseService.createPartida({
       nombre: this.form.nombre,
@@ -636,7 +648,7 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     if (p.jugadores_registrados < p.limite_jugadores || this.comenzando) return;
     this.comenzando = true;
     const { data: jugadores } = await this.supabaseService.getPartidaJugadores(p.id);
-    const pjs = (jugadores as unknown as PartidaJugador[]) ?? [];
+    const pjs = jugadores ?? [];
     if (pjs.length === 0) { this.comenzando = false; return; }
     for (const j of pjs) {
       await this.supabaseService.crearNotificacion(
@@ -662,7 +674,10 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
   async confirmarUnirse() {
     if (!this.partidaParaUnirse) return;
-    if (this.passwordInput !== this.partidaParaUnirse.contrasena) {
+    const { match, error } = await this.supabaseService.verificarContrasena(
+      this.partidaParaUnirse.id, this.passwordInput
+    );
+    if (error || !match) {
       this.passwordError = 'Contraseña incorrecta';
       return;
     }
@@ -687,7 +702,7 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private async ejecutarUnirse(p: Partida) {
     const { data: currentPlayers } = await this.supabaseService.getPartidaJugadores(p.id);
-    const orden = ((currentPlayers as unknown as PartidaJugador[]) ?? []).length;
+    const orden = (currentPlayers ?? []).length;
     await this.supabaseService.insertPartidaJugador(p.id, this.userId, orden);
     await this.supabaseService.unirsePartida(p.id, p.jugadores_registrados);
     this.misPartidasIds.add(p.id);

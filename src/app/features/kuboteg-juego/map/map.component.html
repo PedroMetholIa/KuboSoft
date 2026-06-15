@@ -8,11 +8,25 @@
         <stop offset="58%"  stop-color="#0e1c35"/>
         <stop offset="100%" stop-color="#060b19"/>
       </radialGradient>
+
+      <!-- Expande la silueta continental, extrae solo el borde exterior, colorea cyan y difumina -->
+      <filter id="coastal-glow" x="-12%" y="-12%" width="124%" height="124%">
+        <feMorphology operator="dilate" radius="8" result="expanded"/>
+        <feComposite in="expanded" in2="SourceGraphic" operator="out" result="outline"/>
+        <feFlood flood-color="#4dd8ff" result="color"/>
+        <feComposite in="color" in2="outline" operator="in" result="colored"/>
+        <feGaussianBlur in="colored" stdDeviation="10"/>
+      </filter>
     </defs>
 
     <image href="assets/KuboTeg/FondoOceano.png" x="0" y="50" width="1100" height="550" preserveAspectRatio="xMidYMid slice"/>
 
     <g id="map-content">
+
+      <!-- Halo costero: silueta continental unificada con glow cyan -->
+      <g id="coastal-glow-layer" pointer-events="none" filter="url(#coastal-glow)" opacity="0.5">
+        <path *ngFor="let t of territories" [attr.d]="t.svgPath" fill="white" stroke="none"/>
+      </g>
 
       <!-- Territorios: fill + stroke en un solo pase -->
       <g id="territories">

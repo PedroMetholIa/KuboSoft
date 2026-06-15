@@ -1,4 +1,4 @@
-<app-nav></app-nav>
+<app-nav [logoSrc]="categoriaLogo"></app-nav>
 
 <div class="hero-wrap">
   <div class="hero">
@@ -28,7 +28,6 @@
             @if (categoriaLogo) {
               <img class="section-logo-img" [src]="categoriaLogo" [alt]="categoriaNombre">
             }
-            <span class="section-brand-text"><em class="accent">{{ categoriaNombre.slice(4) }}</em></span>
           </div>
         }
       </div>
@@ -139,10 +138,10 @@
 
 <footer class="nj-footer">
   <div class="footer-inner">
-    <p>© 2025 KuboBuild · Todos los derechos reservados</p>
+    <p>© 2025 KuboSoft · Todos los derechos reservados</p>
     <a class="footer-brand" href="#">
-      <img class="footer-logo-img" src="assets/favicon-kubobuild.svg" alt="KuboBuild">
-      <span class="footer-logo-text">Kubo<em>Build</em></span>
+      <img class="footer-logo-img" [src]="categoriaLogo || 'assets/kubosoft.png'" [alt]="categoriaNombre || 'KuboSoft'">
+      <span class="footer-logo-text">Kubo<em>Soft</em></span>
     </a>
   </div>
 </footer>

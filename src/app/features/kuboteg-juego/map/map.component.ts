@@ -51,16 +51,16 @@ export class MapComponent implements OnInit, AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    this.centerGroup('#territories');
-  }
-
-  private centerGroup(selector: string): void {
-    const g = this.el.nativeElement.querySelector(selector) as SVGGElement;
-    if (!g) return;
-    const b = g.getBBox();
-    const dx = 550 - (b.x + b.width / 2);
-    const dy = 325 - (b.y + b.height / 2);
-    g.setAttribute('transform', `translate(${dx.toFixed(1)},${dy.toFixed(1)})`);
+    const base = this.el.nativeElement.querySelector('#territories') as SVGGElement;
+    if (!base) return;
+    const b = base.getBBox();
+    const dx = +(550 - (b.x + b.width / 2)).toFixed(1);
+    const dy = +(325 - (b.y + b.height / 2)).toFixed(1);
+    const transform = `translate(${dx},${dy})`;
+    ['#territories', '#coastal-glow-layer'].forEach(sel => {
+      const g = this.el.nativeElement.querySelector(sel) as SVGGElement;
+      if (g) g.setAttribute('transform', transform);
+    });
   }
 
   onTerritoryClick(territory: Territory): void {

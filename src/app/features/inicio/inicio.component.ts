@@ -184,7 +184,7 @@ export class InicioComponent implements OnInit {
     'KuboGestión':    '#10C878',
     'KuboInventario': '#F5A623',
     'KuboJuegos':     '#FF4757',
-    'KuboMétricas':   '#7C5CFC',
+    'KuboMétricas':   '#001dd0',
     'KuboReservas':   '#E91E8C',
     'KuboRRHH':       '#00BCD4',
     'KuboStock':      'rgb(237, 172, 39)',
