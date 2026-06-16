@@ -9,6 +9,8 @@ import { MapComponent } from './map/map.component';
 import { NotificacionesComponent, NotifItem } from './notificaciones/notificaciones.component';
 import { CombatePanelComponent } from './combate-panel/combate-panel.component';
 import { KubotegChatComponent, ChatMensaje } from './chat/chat.component';
+import { PartidaInfoComponent } from './partida-info/partida-info.component';
+import { MenuJugadorComponent } from './menu-jugador/menu-jugador.component';
 import { TERRITORIES } from './map/territories.data';
 
 interface ConquistaPendiente {
@@ -38,7 +40,7 @@ interface CombateRpc {
 @Component({
   selector: 'app-kuboteg-juego',
   standalone: true,
-  imports: [CommonModule, FormsModule, MapComponent, NotificacionesComponent, CombatePanelComponent, KubotegChatComponent],
+  imports: [CommonModule, FormsModule, MapComponent, NotificacionesComponent, CombatePanelComponent, KubotegChatComponent, PartidaInfoComponent, MenuJugadorComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="kuboteg-juego">
@@ -148,18 +150,18 @@ interface CombateRpc {
           <span class="header-brand">Kubo<span style="color:#FF4757">TEG</span></span>
         </div>
         <div class="game-header-center">
-          <span class="header-game-name">{{ partida.nombre }}</span>
-          <span class="header-sep">·</span>
-          <span class="estado-tag" [ngClass]="partida.estado === 'En juego' ? 'live' : 'done'">
-            {{ partida.estado }}
-          </span>
-          <ng-container *ngIf="partida.ronda_actual">
-            <span class="header-sep">·</span>
-            <span class="header-ronda">Ronda {{ partida.ronda_actual }}</span>
-          </ng-container>
+          <app-partida-info
+            [nombre]="partida.nombre"
+            [estado]="partida.estado"
+            [rondaActual]="partida.ronda_actual ?? null"
+            [tiempoPartida]="tiempoPartida"
+            [jugadorNombre]="jugadorActualNombre"
+            [jugadorColor]="jugadorColores[jugadorActualId] || ''"
+            [esMiTurno]="esMiTurno"
+            [fase]="fase"
+          />
         </div>
         <div class="game-header-right">
-          <button class="music-btn" [class.muted]="musicaMuteada" (click)="toggleMusica()" [title]="musicaMuteada ? 'Activar música' : 'Silenciar música'">♪</button>
           <button class="btn-back" (click)="volver()">← Salir</button>
         </div>
       </header>
@@ -189,33 +191,86 @@ interface CombateRpc {
               </div>
             </div>
 
-            <h3 class="score-title">Jugadores</h3>
-            <div class="score-list">
-              <ng-container *ngFor="let j of jugadoresEnOrden; let i = index">
-              <div
-                class="score-item"
-                *ngIf="i > 0"
-                [class.active]="j.usuario_id === jugadorActualId && !!fase"
-                [class.me]="j.usuario_id === userId"
-                [class.fuera]="!j.esta_dentro">
-                <span class="pos">{{ i + 1 }}</span>
-                <img *ngIf="getLiderImgByUserId(j.usuario_id)"
-                     [src]="getLiderImgByUserId(j.usuario_id)"
-                     class="score-lider-img"
-                     [style.border-color]="jugadorColores[j.usuario_id]"
-                     alt="">
-                <div class="player-info">
-                  <span class="player-name">{{ nombreJugador(j) }}</span>
-                  <span class="player-lider" *ngIf="jugadorLideres[j.usuario_id]" [style.color]="jugadorColores[j.usuario_id]">{{ jugadorLideres[j.usuario_id] }}</span>
-                </div>
-                <span class="dentro-dot" [class.dentro]="j.esta_dentro">
-                  {{ j.esta_dentro ? '●' : '○' }}
-                </span>
-              </div>
-              </ng-container>
-            </div>
+            <app-menu-jugador [panelActivo]="panelActivo">
+              <ng-container [ngSwitch]="panelActivo">
 
-            <p class="waiting-legend" *ngIf="!todosAdentro">● dentro &nbsp; ○ esperando</p>
+                <!-- Jugadores -->
+                <ng-container *ngSwitchCase="'jugadores'">
+                  <div class="score-list">
+                    <ng-container *ngFor="let j of jugadoresEnOrden; let i = index">
+                      <div
+                        class="score-item"
+                        *ngIf="i > 0"
+                        [class.active]="j.usuario_id === jugadorActualId && !!fase"
+                        [class.me]="j.usuario_id === userId"
+                        [class.fuera]="!j.esta_dentro">
+                        <span class="pos">{{ i + 1 }}</span>
+                        <img *ngIf="getLiderImgByUserId(j.usuario_id)"
+                             [src]="getLiderImgByUserId(j.usuario_id)"
+                             class="score-lider-img"
+                             [style.border-color]="jugadorColores[j.usuario_id]"
+                             alt="">
+                        <div class="player-info">
+                          <span class="player-name">{{ nombreJugador(j) }}</span>
+                          <span class="player-lider" *ngIf="jugadorLideres[j.usuario_id]" [style.color]="jugadorColores[j.usuario_id]">{{ jugadorLideres[j.usuario_id] }}</span>
+                        </div>
+                        <span class="dentro-dot" [class.dentro]="j.esta_dentro">
+                          {{ j.esta_dentro ? '●' : '○' }}
+                        </span>
+                      </div>
+                    </ng-container>
+                  </div>
+                  <p class="waiting-legend" *ngIf="!todosAdentro">● dentro &nbsp; ○ esperando</p>
+                </ng-container>
+
+                <!-- Otros paneles (placeholder por ahora) -->
+                <!-- Inicio: desglose de tropas -->
+                <ng-container *ngSwitchCase="'inicio'">
+                  <div class="tr-section" *ngIf="resumenTropas.cantTerritorios > 0; else sinTerritorios">
+
+                    <div class="tr-row">
+                      <span class="tr-label">Territorios</span>
+                      <span class="tr-valor">{{ resumenTropas.cantTerritorios }}</span>
+                    </div>
+                    <div class="tr-row tr-base">
+                      <span class="tr-label">Tropas base</span>
+                      <span class="tr-valor">+{{ resumenTropas.tropasBase }}</span>
+                    </div>
+
+                    <ng-container *ngIf="resumenTropas.bonusContinentes > 0">
+                      <div class="tr-sep"></div>
+
+                      <ng-container *ngFor="let c of resumenTropas.continentes">
+                        <div class="tr-cont-row tr-controlado" *ngIf="c.controlado">
+                          <span class="tr-cont-nombre">{{ c.nombre }}</span>
+                          <span class="tr-cont-bonus">+{{ c.bonus }}</span>
+                        </div>
+                      </ng-container>
+
+                      <div class="tr-sep"></div>
+                    </ng-container>
+
+                    <div class="tr-total">
+                      <span>Próxima ronda</span>
+                      <strong>{{ resumenTropas.total }}</strong>
+                    </div>
+
+                  </div>
+                  <ng-template #sinTerritorios>
+                    <div class="mj-placeholder">Sin territorios aún</div>
+                  </ng-template>
+                </ng-container>
+                <div *ngSwitchCase="'notificaciones'" class="mj-placeholder">Notificaciones</div>
+                <div *ngSwitchCase="'informacion'" class="mj-placeholder">Información</div>
+                <div *ngSwitchCase="'tratado'" class="mj-placeholder">Tratado</div>
+                <div *ngSwitchCase="'chat'" class="mj-placeholder">Chat</div>
+                <div *ngSwitchCase="'diploma'" class="mj-placeholder">Diploma</div>
+                <div *ngSwitchCase="'musica'" class="mj-placeholder">Música</div>
+                <div *ngSwitchCase="'configuracion'" class="mj-placeholder">Configuración</div>
+
+              </ng-container>
+            </app-menu-jugador>
+
             <div class="panel-divider"></div>
 
             <!-- Finalizada -->
@@ -269,53 +324,94 @@ interface CombateRpc {
           <!-- Barra de herramientas vertical -->
           <nav class="toolbar-vertical">
 
-            <button class="tb-btn" title="Inicio">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                <polyline points="9 22 9 12 15 12 15 22"/>
-              </svg>
-            </button>
+            <div class="tb-group-top">
+              <button class="tb-btn tb-music-btn"
+                [class.muted]="musicaMuteada"
+                [class.tb-active]="panelActivo === 'musica'"
+                (click)="toggleMusica(); setPanelActivo('musica')"
+                [attr.data-tooltip]="musicaMuteada ? 'Activar música' : 'Silenciar música'">♪</button>
+              <button class="tb-btn"
+                [class.tb-active]="panelActivo === 'configuracion'"
+                (click)="setPanelActivo('configuracion')"
+                data-tooltip="Configuración">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+              </button>
+            </div>
 
-            <button class="tb-btn" title="Notificaciones">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-            </button>
+            <div class="tb-group-bottom">
+              <button class="tb-btn"
+                [class.tb-active]="panelActivo === 'jugadores'"
+                (click)="setPanelActivo('jugadores')"
+                data-tooltip="Jugadores">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </button>
+              <button class="tb-btn"
+                [class.tb-active]="panelActivo === 'inicio'"
+                (click)="setPanelActivo('inicio')"
+                data-tooltip="Inicio">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                  <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+              </button>
 
-            <button class="tb-btn" title="Información">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="16" x2="12" y2="12"/>
-                <line x1="12" y1="8" x2="12.01" y2="8"/>
-              </svg>
-            </button>
+              <button class="tb-btn"
+                [class.tb-active]="panelActivo === 'notificaciones'"
+                (click)="setPanelActivo('notificaciones')"
+                data-tooltip="Notificaciones">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+              </button>
 
-            <button class="tb-btn" title="Tratado">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              </svg>
-            </button>
+              <button class="tb-btn"
+                [class.tb-active]="panelActivo === 'informacion'"
+                (click)="setPanelActivo('informacion')"
+                data-tooltip="Información">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+              </button>
 
-            <button class="tb-btn" title="Chat">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-              </svg>
-            </button>
+              <button class="tb-btn"
+                [class.tb-active]="panelActivo === 'tratado'"
+                (click)="setPanelActivo('tratado')"
+                data-tooltip="Tratado">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+              </button>
 
-            <button class="tb-btn" title="Diploma">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="8" r="6"/>
-                <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
-              </svg>
-            </button>
+              <button class="tb-btn"
+                [class.tb-active]="panelActivo === 'chat'"
+                (click)="setPanelActivo('chat')"
+                data-tooltip="Chat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </button>
 
-            <button class="tb-btn" title="Configuración">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-              </svg>
-            </button>
+              <button class="tb-btn"
+                [class.tb-active]="panelActivo === 'diploma'"
+                (click)="setPanelActivo('diploma')"
+                data-tooltip="Diploma">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="8" r="6"/>
+                  <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+                </svg>
+              </button>
+            </div>
 
           </nav>
 
@@ -359,11 +455,27 @@ interface CombateRpc {
               <!-- FASE: Colocación - mi turno -->
               <div class="phase-panel" *ngIf="fase === 'colocacion' && esMiTurno">
                 <div class="phase-title">📦 Fase de Colocación</div>
-                <p class="phase-sub">Tropas por colocar: <strong>{{ misTropasParaColocar }}</strong></p>
-                <p class="phase-hint" *ngIf="misTropasParaColocar > 0">Hacé clic en uno de tus territorios para colocar una tropa. Clic derecho para quitar.</p>
-                <button class="btn-phase-action" *ngIf="misTropasParaColocar === 0" (click)="confirmarColocacion()">
-                  Confirmar colocación →
-                </button>
+
+                <!-- Sub-fase: tropas de continente -->
+                <ng-container *ngIf="subFaseColocacion === 'continentes' && continenteActualColocacion; let cont">
+                  <p class="phase-sub">
+                    Continente <strong>{{ continenteColocacionIdx + 1 }}</strong> de <strong>{{ continentesColocacion.length }}</strong>
+                  </p>
+                  <p class="phase-sub"><strong>{{ cont.nombre }}</strong> — +{{ cont.bonus }}</p>
+                  <p class="phase-sub">
+                    Tropas a colocar: <strong>{{ cont.bonus - cont.colocadas }}</strong>
+                  </p>
+                  <p class="phase-hint">Solo podés colocar en territorios de este continente</p>
+                </ng-container>
+
+                <!-- Sub-fase: tropas base -->
+                <ng-container *ngIf="subFaseColocacion === 'base'">
+                  <p class="phase-sub">Tropas por colocar: <strong>{{ misTropasParaColocar }}</strong></p>
+                  <p class="phase-hint" *ngIf="misTropasParaColocar > 0">Hacé clic en uno de tus territorios para colocar una tropa. Clic derecho para quitar.</p>
+                  <button class="btn-phase-action" *ngIf="misTropasParaColocar === 0" (click)="confirmarColocacion()">
+                    Confirmar colocación →
+                  </button>
+                </ng-container>
               </div>
 
               <!-- FASE: Colocación - turno ajeno -->
@@ -375,31 +487,13 @@ interface CombateRpc {
               <!-- FASE: Ataque - mi turno -->
               <div class="phase-panel" *ngIf="fase === 'ataque' && esMiTurno">
                 <div class="phase-title">⚔️ Fase de Ataque</div>
-
-                <ng-container *ngIf="conquistaPendiente">
-                  <p class="phase-hint conquista-hint">
-                    ¡Conquistado! Movés tropas a <strong>{{ nombreTerritorio(conquistaPendiente.destinoId) }}</strong>
-                  </p>
-                  <div class="tropas-control">
-                    <button class="btn-tropas" [disabled]="conquistaTropasAMover <= 1"
-                      (click)="conquistaTropasAMover = conquistaTropasAMover - 1">−</button>
-                    <span class="tropas-valor">{{ conquistaTropasAMover }}</span>
-                    <button class="btn-tropas" [disabled]="conquistaTropasAMover >= maxTropasMovibles"
-                      (click)="conquistaTropasAMover = conquistaTropasAMover + 1">+</button>
-                  </div>
-                  <p class="tropas-rango">Mín: 1 &nbsp;·&nbsp; Máx: {{ maxTropasMovibles }}</p>
-                  <button class="btn-phase-action" (click)="confirmarMovimientoConquista()">Mover tropas →</button>
-                </ng-container>
-
-                <ng-container *ngIf="!conquistaPendiente">
-                  <p class="phase-hint" *ngIf="territorioAtacanteId">
-                    <strong>{{ nombreTerritorio(territorioAtacanteId) }}</strong> — elegí un enemigo adyacente
-                  </p>
-                  <button class="btn-phase-action btn-end-attack"
-                    [disabled]="procesandoTurno" (click)="terminarAtaque()">
-                    {{ procesandoTurno ? 'Procesando...' : 'Finalizar turno →' }}
-                  </button>
-                </ng-container>
+                <p class="phase-hint" *ngIf="territorioAtacanteId && !conquistaPendiente">
+                  <strong>{{ nombreTerritorio(territorioAtacanteId) }}</strong> — elegí un enemigo adyacente
+                </p>
+                <button class="btn-phase-action btn-end-attack"
+                  [disabled]="procesandoTurno || !!conquistaPendiente" (click)="terminarAtaque()">
+                  {{ procesandoTurno ? 'Procesando...' : 'Finalizar turno →' }}
+                </button>
               </div>
 
               <!-- FASE: Ataque - turno ajeno -->
@@ -412,7 +506,7 @@ interface CombateRpc {
               <div class="phase-panel" *ngIf="fase === 'reagrupacion' && esMiTurno">
                 <div class="phase-title">🔄 Reagrupación</div>
 
-                <ng-container *ngIf="!territorioOrigenId && !reagrupacionDestinoId">
+                <ng-container *ngIf="!territorioOrigenId">
                   <button class="btn-phase-action btn-skip" [disabled]="procesandoTurno" (click)="saltarReagrupacion()">
                     {{ procesandoTurno ? 'Procesando...' : 'Finalizar reagrupación →' }}
                   </button>
@@ -423,25 +517,6 @@ interface CombateRpc {
                     <strong>{{ nombreTerritorio(territorioOrigenId) }}</strong> — elegí un territorio propio adyacente
                   </p>
                   <button class="btn-phase-action btn-skip" [disabled]="procesandoTurno" (click)="saltarReagrupacion()">Finalizar reagrupación →</button>
-                </ng-container>
-
-                <ng-container *ngIf="territorioOrigenId && reagrupacionDestinoId">
-                  <p class="phase-hint conquista-hint">
-                    Mover de <strong>{{ nombreTerritorio(territorioOrigenId) }}</strong>
-                    a <strong>{{ nombreTerritorio(reagrupacionDestinoId) }}</strong>
-                  </p>
-                  <div class="tropas-control">
-                    <button class="btn-tropas" [disabled]="reagrupacionTropasAMover <= 1"
-                      (click)="reagrupacionTropasAMover = reagrupacionTropasAMover - 1">−</button>
-                    <span class="tropas-valor">{{ reagrupacionTropasAMover }}</span>
-                    <button class="btn-tropas" [disabled]="reagrupacionTropasAMover >= maxTropasReagrupacion"
-                      (click)="reagrupacionTropasAMover = reagrupacionTropasAMover + 1">+</button>
-                  </div>
-                  <p class="tropas-rango">Mín: 1 &nbsp;·&nbsp; Máx: {{ maxTropasReagrupacion }}</p>
-                  <button class="btn-phase-action" [disabled]="procesandoTurno" (click)="confirmarReagrupacion()">
-                    {{ procesandoTurno ? 'Procesando...' : 'Confirmar →' }}
-                  </button>
-                  <button class="btn-phase-action btn-skip" [disabled]="procesandoTurno" (click)="cancelarReagrupacion()">Cancelar</button>
                 </ng-container>
               </div>
 
@@ -464,6 +539,67 @@ interface CombateRpc {
               (sendMessage)="onChatSend($event)">
             </app-kuboteg-chat>
           </aside>
+
+          <!-- Popup: mover tropas en reagrupación -->
+          <div class="conquista-popup-overlay" *ngIf="fase === 'reagrupacion' && esMiTurno && territorioOrigenId && reagrupacionDestinoId">
+            <div class="conquista-popup">
+              <div class="conquista-popup-header">
+                <span class="conquista-popup-icon">🔄</span>
+                <div>
+                  <div class="conquista-popup-title">Reagrupación de tropas</div>
+                  <div class="conquista-popup-sub">
+                    De <strong>{{ nombreTerritorio(territorioOrigenId!) }}</strong>
+                    a <strong>{{ nombreTerritorio(reagrupacionDestinoId) }}</strong>
+                  </div>
+                </div>
+              </div>
+              <div class="conquista-popup-body">
+                <div class="tropas-control">
+                  <button class="btn-tropas" [disabled]="reagrupacionTropasAMover <= 1"
+                    (click)="reagrupacionTropasAMover = reagrupacionTropasAMover - 1">−</button>
+                  <span class="tropas-valor">{{ reagrupacionTropasAMover }}</span>
+                  <button class="btn-tropas" [disabled]="reagrupacionTropasAMover >= maxTropasReagrupacion"
+                    (click)="reagrupacionTropasAMover = reagrupacionTropasAMover + 1">+</button>
+                </div>
+                <p class="tropas-rango">Mín: 1 &nbsp;·&nbsp; Máx: {{ maxTropasReagrupacion }}</p>
+              </div>
+              <button class="conquista-popup-btn" [disabled]="procesandoTurno" (click)="confirmarReagrupacion()">
+                {{ procesandoTurno ? 'Procesando...' : 'Confirmar →' }}
+              </button>
+              <button class="conquista-popup-btn-cancel" [disabled]="procesandoTurno" (click)="cancelarReagrupacion()">Cancelar</button>
+            </div>
+          </div>
+
+          <!-- Popup: mover tropas tras conquista -->
+          <div class="conquista-popup-overlay" *ngIf="conquistaPendiente">
+            <div class="conquista-popup">
+              <div class="conquista-popup-header">
+                <span class="conquista-popup-icon">🏴</span>
+                <div>
+                  <div class="conquista-popup-title">¡Territorio conquistado!</div>
+                  <div class="conquista-popup-sub">
+                    Movés tropas a <strong>{{ nombreTerritorio(conquistaPendiente.destinoId) }}</strong>
+                    <span class="conquista-popup-defensor" [style.color]="conquistaPendiente.defensorColor">
+                      (de {{ conquistaPendiente.defensorNombre }})
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="conquista-popup-body">
+                <div class="tropas-control">
+                  <button class="btn-tropas" [disabled]="conquistaTropasAMover <= 1"
+                    (click)="conquistaTropasAMover = conquistaTropasAMover - 1">−</button>
+                  <span class="tropas-valor">{{ conquistaTropasAMover }}</span>
+                  <button class="btn-tropas" [disabled]="conquistaTropasAMover >= maxTropasMovibles"
+                    (click)="conquistaTropasAMover = conquistaTropasAMover + 1">+</button>
+                </div>
+                <p class="tropas-rango">Mín: 1 &nbsp;·&nbsp; Máx: {{ maxTropasMovibles }}</p>
+              </div>
+              <button class="conquista-popup-btn" (click)="confirmarMovimientoConquista()">
+                Mover tropas →
+              </button>
+            </div>
+          </div>
 
         </div>
       </ng-container>
@@ -555,7 +691,13 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   private ordenGenerado: string[] = [];
 
   // ── Phase state ───────────────────────────────────────
-  tropasColocadasEstaFase: Record<string, number> = {};
+  tropasColocadasContinentes: Record<string, number> = {};
+  tropasColocadasBase: Record<string, number> = {};
+  subFaseColocacion: 'continentes' | 'base' = 'base';
+  continentesColocacion: Array<{
+    id: string; nombre: string; bonus: number; colocadas: number; territoriosPermitidos: string[];
+  }> = [];
+  continenteColocacionIdx = 0;
   territorioAtacanteId: string | null = null;
   procesandoCombate = false;
   popupCombate: UltimoCombate | null = null;
@@ -570,9 +712,14 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   conquistaTropasAMover = 1;
   reagrupacionDestinoId: string | null = null;
   reagrupacionTropasAMover = 1;
+  reagrupacionLimites: Record<string, number> = {};
+  reagrupacionMovidos: Record<string, number> = {};
+  panelActivo = 'jugadores';
   musicaMuteada = false;
+  tiempoPartida = '00:00:00';
   private audio!: HTMLAudioElement;
   private sfxPool = new Map<string, HTMLAudioElement>();
+  private timerInterval: ReturnType<typeof setInterval> | null = null;
 
   // ── Chat ──────────────────────────────────────────────
   chatMensajes: ChatMensaje[] = [];
@@ -619,6 +766,27 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     if (this.channelChat)       this.service.client.removeChannel(this.channelChat);
     if (this.channelEventos)    this.service.client.removeChannel(this.channelEventos);
     if (this.reconnectTimer)    clearTimeout(this.reconnectTimer);
+    if (this.timerInterval)     clearInterval(this.timerInterval);
+  }
+
+  private iniciarTimer() {
+    if (this.timerInterval) return;
+    const inicio = new Date(this.partida!.created_at).getTime();
+    const tick = () => {
+      const diff = Math.floor((Date.now() - inicio) / 1000);
+      const h = Math.floor(diff / 3600);
+      const m = Math.floor((diff % 3600) / 60);
+      const s = diff % 60;
+      this.tiempoPartida = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      this.cdr.markForCheck();
+    };
+    tick();
+    this.timerInterval = setInterval(tick, 1000);
+  }
+
+  setPanelActivo(panel: string) {
+    this.panelActivo = panel;
+    this.cdr.markForCheck();
   }
 
   toggleMusica() {
@@ -659,9 +827,19 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     return this.jugadores.find(j => j.usuario_id === this.userId)?.tropas_por_colocar ?? 0;
   }
 
+  get continenteActualColocacion() {
+    return this.continentesColocacion[this.continenteColocacionIdx] ?? null;
+  }
+
   get misTropasParaColocar(): number {
-    const placed = Object.values(this.tropasColocadasEstaFase).reduce((a, b) => a + b, 0);
-    return this.tropasPorColocarBase - placed;
+    if (this.subFaseColocacion === 'continentes') {
+      const cont = this.continenteActualColocacion;
+      return cont ? cont.bonus - cont.colocadas : 0;
+    }
+    const totalBonus = this.continentesColocacion.reduce((s, c) => s + c.bonus, 0);
+    const tropasBase = Math.max(0, this.tropasPorColocarBase - totalBonus);
+    const colocadas = Object.values(this.tropasColocadasBase).reduce((a, b) => a + b, 0);
+    return tropasBase - colocadas;
   }
 
   get territorioSeleccionado(): string | null {
@@ -669,6 +847,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   get territoriosDestacados(): string[] {
+    if (this.fase === 'colocacion' && this.esMiTurno && this.subFaseColocacion === 'continentes') {
+      return this.continenteActualColocacion?.territoriosPermitidos ?? [];
+    }
     if (this.fase === 'ataque' && this.esMiTurno && this.territorioAtacanteId) {
       const terr = TERRITORIES.find(t => t.id === this.territorioAtacanteId);
       return (terr?.neighbors ?? []).filter(nid => {
@@ -715,7 +896,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   get maxTropasReagrupacion(): number {
     if (!this.territorioOrigenId) return 1;
-    return (this.territorios[this.territorioOrigenId]?.tropas ?? 2) - 1;
+    const limite  = this.reagrupacionLimites[this.territorioOrigenId] ?? 0;
+    const movidos = this.reagrupacionMovidos[this.territorioOrigenId] ?? 0;
+    return Math.max(0, limite - movidos);
   }
 
   get lideresOcupados(): Set<string> {
@@ -797,7 +980,10 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       this.rebuildTropasMap();
       this.rebuildJugadorNombres();
       this.loading = false;
-      if (this.partida?.estado === 'En juego') this.iniciarMusica();
+      if (this.partida?.estado === 'En juego') { this.iniciarMusica(); this.iniciarTimer(); }
+      if (this.partida?.fase_actual === 'colocacion' && this.esMiTurno) {
+        this.iniciarSubFaseColocacion();
+      }
       this.cdr.markForCheck();
 
       await this.checkAutoDistribuir();
@@ -882,8 +1068,18 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
           const newPartida = payload.new as Partida;
           if (newPartida.estado === 'En juego' && this.partida?.estado !== 'En juego') {
             this.iniciarMusica();
+            this.iniciarTimer();
           }
+          const prevFase = this.fase;
+          const prevJugadorIdx = this.partida?.jugador_actual_index;
           this.partida = newPartida;
+          if (this.fase === 'colocacion' && this.esMiTurno &&
+              (prevFase !== 'colocacion' || prevJugadorIdx !== newPartida.jugador_actual_index)) {
+            this.iniciarSubFaseColocacion();
+          }
+          if (this.fase === 'reagrupacion' && prevFase !== 'reagrupacion' && this.esMiTurno) {
+            this.iniciarFaseReagrupacion();
+          }
           this.cdr.markForCheck();
         }
       })
@@ -1066,34 +1262,80 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   colocarTropa(territorioId: string) {
     const estado = this.territorios[territorioId];
     if (!estado || estado.usuario_id !== this.userId) return;
-    if (this.misTropasParaColocar <= 0) return;
-    const current = this.tropasColocadasEstaFase[territorioId] ?? 0;
-    this.tropasColocadasEstaFase = { ...this.tropasColocadasEstaFase, [territorioId]: current + 1 };
-    this.rebuildTropasMap();
-    this.playSfx('assets/KuboTeg/sonidos/colocar-ficha.mp3');
+
+    if (this.subFaseColocacion === 'continentes') {
+      const cont = this.continentesColocacion[this.continenteColocacionIdx];
+      if (!cont || !cont.territoriosPermitidos.includes(territorioId)) return;
+      if (cont.colocadas >= cont.bonus) return;
+
+      this.tropasColocadasContinentes = {
+        ...this.tropasColocadasContinentes,
+        [territorioId]: (this.tropasColocadasContinentes[territorioId] ?? 0) + 1,
+      };
+      cont.colocadas++;
+      this.rebuildTropasMap();
+      this.playSfx('assets/KuboTeg/sonidos/colocar-ficha.mp3');
+
+      if (cont.colocadas >= cont.bonus) {
+        this.continenteColocacionIdx++;
+        if (this.continenteColocacionIdx >= this.continentesColocacion.length) {
+          this.subFaseColocacion = 'base';
+        }
+      }
+      this.cdr.markForCheck();
+    } else {
+      if (this.misTropasParaColocar <= 0) return;
+      this.tropasColocadasBase = {
+        ...this.tropasColocadasBase,
+        [territorioId]: (this.tropasColocadasBase[territorioId] ?? 0) + 1,
+      };
+      this.rebuildTropasMap();
+      this.playSfx('assets/KuboTeg/sonidos/colocar-ficha.mp3');
+      this.cdr.markForCheck();
+    }
   }
 
   quitarTropa(territorioId: string) {
-    const added = this.tropasColocadasEstaFase[territorioId] ?? 0;
-    if (added <= 0) return;
-    this.tropasColocadasEstaFase = { ...this.tropasColocadasEstaFase, [territorioId]: added - 1 };
-    this.rebuildTropasMap();
-    this.playSfx('assets/KuboTeg/sonidos/quitar-ficha.mp3');
+    if (this.subFaseColocacion === 'continentes') {
+      const cont = this.continentesColocacion[this.continenteColocacionIdx];
+      if (!cont || !cont.territoriosPermitidos.includes(territorioId)) return;
+      const added = this.tropasColocadasContinentes[territorioId] ?? 0;
+      if (added <= 0 || cont.colocadas <= 0) return;
+      this.tropasColocadasContinentes = { ...this.tropasColocadasContinentes, [territorioId]: added - 1 };
+      cont.colocadas--;
+      this.rebuildTropasMap();
+      this.playSfx('assets/KuboTeg/sonidos/quitar-ficha.mp3');
+      this.cdr.markForCheck();
+    } else {
+      const added = this.tropasColocadasBase[territorioId] ?? 0;
+      if (added <= 0) return;
+      this.tropasColocadasBase = { ...this.tropasColocadasBase, [territorioId]: added - 1 };
+      this.rebuildTropasMap();
+      this.playSfx('assets/KuboTeg/sonidos/quitar-ficha.mp3');
+      this.cdr.markForCheck();
+    }
   }
 
   async confirmarColocacion() {
-    if (this.misTropasParaColocar !== 0 || !this.partida) return;
+    if (this.subFaseColocacion !== 'base' || this.misTropasParaColocar !== 0 || !this.partida) return;
 
-    for (const [tid, added] of Object.entries(this.tropasColocadasEstaFase)) {
-      if (added > 0) {
-        const estado = this.territorios[tid];
-        if (estado) {
-          await this.updateTerritorio(tid, { tropas: estado.tropas + added });
-        }
-      }
+    const allPlaced: Record<string, number> = {};
+    for (const [tid, n] of Object.entries(this.tropasColocadasContinentes)) {
+      if (n > 0) allPlaced[tid] = (allPlaced[tid] ?? 0) + n;
     }
+    for (const [tid, n] of Object.entries(this.tropasColocadasBase)) {
+      if (n > 0) allPlaced[tid] = (allPlaced[tid] ?? 0) + n;
+    }
+    for (const [tid, added] of Object.entries(allPlaced)) {
+      const estado = this.territorios[tid];
+      if (estado) await this.updateTerritorio(tid, { tropas: estado.tropas + added });
+    }
+
     await this.service.setTropasPorColocar(this.partidaId, this.userId, 0);
-    this.tropasColocadasEstaFase = {};
+    this.tropasColocadasContinentes = {};
+    this.tropasColocadasBase = {};
+    this.continentesColocacion = [];
+    this.subFaseColocacion = 'base';
     this.rebuildTropasMap();
 
     const orden      = this.partida.orden_jugadores!;
@@ -1195,6 +1437,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
           defensorColor:  this.jugadorColores[defensorId] ?? '#fff',
         };
         this.territorioAtacanteId = null;
+        if (this.maxTropasMovibles === 1) {
+          await this.confirmarMovimientoConquista();
+        }
       }
     } finally {
       this.procesandoCombate = false;
@@ -1235,19 +1480,71 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     if (!this.partida || this.conquistaPendiente || this.procesandoTurno) return;
     this.procesandoTurno = true;
     this.territorioAtacanteId = null;
+    this.iniciarFaseReagrupacion();
     await this.service.setFase(this.partidaId, 'reagrupacion', this.partida.jugador_actual_index!);
     this.procesandoTurno = false;
     this.cdr.markForCheck();
   }
 
+  // ── Inicio de sub-fase de colocación ─────────────────
+  iniciarSubFaseColocacion() {
+    this.tropasColocadasContinentes = {};
+    this.tropasColocadasBase = {};
+    this.continenteColocacionIdx = 0;
+
+    // Ronda 1: solo tropas iniciales, sin bonus de continente
+    if ((this.partida?.ronda_actual ?? 1) <= 1) {
+      this.subFaseColocacion = 'base';
+      this.continentesColocacion = [];
+      this.cdr.markForCheck();
+      return;
+    }
+
+    const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
+    const conquistados = KuboTegJuegoComponent.CONTINENT_BONUSES.filter(cb =>
+      CONT[cb.id].every(tid => this.territorios[tid]?.usuario_id === this.userId)
+    );
+
+    if (conquistados.length === 0) {
+      this.subFaseColocacion = 'base';
+      this.continentesColocacion = [];
+      this.cdr.markForCheck();
+      return;
+    }
+
+    this.continentesColocacion = conquistados.map(cb => ({
+      id:                   cb.id,
+      nombre:               this.getNombreContinente(cb.id),
+      bonus:                cb.bonus,
+      colocadas:            0,
+      territoriosPermitidos: [...CONT[cb.id]],
+    }));
+    this.subFaseColocacion = 'continentes';
+    this.cdr.markForCheck();
+  }
+
   // ── Reagrupación ──────────────────────────────────────
+  iniciarFaseReagrupacion() {
+    this.reagrupacionLimites = {};
+    this.reagrupacionMovidos = {};
+    for (const [id, estado] of Object.entries(this.territorios)) {
+      if (estado.usuario_id === this.userId) {
+        this.reagrupacionLimites[id] = Math.max(0, estado.tropas - 1);
+        this.reagrupacionMovidos[id] = 0;
+      }
+    }
+  }
+
   async handleReagrupacionClick(territorioId: string) {
     if (this.reagrupacionDestinoId) return;
     const estado = this.territorios[territorioId];
     if (!estado) return;
 
+    const limiteDisponible = (id: string) =>
+      (this.reagrupacionLimites[id] ?? 0) - (this.reagrupacionMovidos[id] ?? 0);
+
     if (!this.territorioOrigenId) {
-      if (estado.usuario_id === this.userId && estado.tropas > 1) {
+      if (estado.usuario_id === this.userId && limiteDisponible(territorioId) > 0) {
         this.territorioOrigenId = territorioId;
         this.reagrupacionTropasAMover = 1;
       }
@@ -1267,7 +1564,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       this.reagrupacionDestinoId    = territorioId;
       this.reagrupacionTropasAMover = 1;
       this.cdr.markForCheck();
-    } else if (esPropio && estado.tropas > 1) {
+    } else if (esPropio && limiteDisponible(territorioId) > 0) {
       this.territorioOrigenId       = territorioId;
       this.reagrupacionTropasAMover = 1;
       this.cdr.markForCheck();
@@ -1294,15 +1591,20 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     await this.updateTerritorio(origenId,  { tropas: origen.tropas - aMover });
     await this.updateTerritorio(destinoId, { tropas: destino.tropas + aMover });
 
+    this.reagrupacionMovidos[origenId] = (this.reagrupacionMovidos[origenId] ?? 0) + aMover;
+
     this.territorioOrigenId    = null;
     this.reagrupacionDestinoId = null;
-    await this.avanzarTurno();
+    this.reagrupacionTropasAMover = 1;
+    this.cdr.markForCheck();
   }
 
   async saltarReagrupacion() {
     if (this.procesandoTurno) return;
     this.territorioOrigenId    = null;
     this.reagrupacionDestinoId = null;
+    this.reagrupacionLimites   = {};
+    this.reagrupacionMovidos   = {};
     await this.avanzarTurno();
   }
 
@@ -1335,8 +1637,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
     for (const j of this.jugadores) {
       const misTerritorios = Object.values(this.territorios).filter(t => t.usuario_id === j.usuario_id);
-      const tropasBase     = Math.max(3, Math.floor(misTerritorios.length / 3));
-      const bonus          = this.calcularBonusContinente(j.usuario_id);
+      const divisor    = newRonda >= 2 ? 2 : 3;
+      const tropasBase = Math.max(3, Math.floor(misTerritorios.length / divisor));
+      const bonus      = this.calcularBonusContinente(j.usuario_id);
       await this.service.setTropasPorColocar(this.partidaId, j.usuario_id, tropasBase + bonus);
     }
 
@@ -1520,8 +1823,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   private rebuildTropasMap() {
     const map: Record<string, number> = {};
     Object.values(this.territorios).forEach(t => {
-      const staged = this.tropasColocadasEstaFase[t.territorio_id] ?? 0;
-      map[t.territorio_id] = t.tropas + staged;
+      const cont = this.tropasColocadasContinentes[t.territorio_id] ?? 0;
+      const base = this.tropasColocadasBase[t.territorio_id] ?? 0;
+      map[t.territorio_id] = t.tropas + cont + base;
     });
     this._tropasMap = map;
   }
@@ -1659,7 +1963,33 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     }
   }
 
-  private getNombreContinente(id: string): string {
+  get resumenTropas() {
+    const misTerritorios = Object.values(this.territorios).filter(t => t.usuario_id === this.userId);
+    const cantTerritorios = misTerritorios.length;
+    const divisor = (this.partida?.ronda_actual ?? 1) >= 2 ? 2 : 3;
+    const tropasBase = cantTerritorios > 0 ? Math.max(3, Math.floor(cantTerritorios / divisor)) : 0;
+
+    const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
+    const continentes = KuboTegJuegoComponent.CONTINENT_BONUSES.map(cb => {
+      const terrsTotal = CONT[cb.id];
+      const misTerr = terrsTotal.filter(tid => this.territorios[tid]?.usuario_id === this.userId).length;
+      return {
+        nombre:     this.getNombreContinente(cb.id),
+        bonus:      cb.bonus,
+        controlado: misTerr === terrsTotal.length,
+        misTerr,
+        totalTerr:  terrsTotal.length,
+      };
+    });
+
+    const bonusContinentes = continentes
+      .filter(c => c.controlado)
+      .reduce((sum, c) => sum + c.bonus, 0);
+
+    return { cantTerritorios, tropasBase, continentes, bonusContinentes, total: tropasBase + bonusContinentes };
+  }
+
+  getNombreContinente(id: string): string {
     const nombres: Record<string, string> = {
       north_america: 'Norteamérica',
       south_america: 'Sudamérica',

@@ -51,25 +51,6 @@
   &:hover { color: #fff; border-color: rgba(255,255,255,.25); }
 }
 
-.estado-tag {
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 0.2rem 0.65rem;
-  border-radius: 20px;
-  letter-spacing: 0.04em;
-  width: fit-content;
-
-  &.live {
-    background: rgba(52, 211, 153, 0.15);
-    color: #34d399;
-    border: 1px solid rgba(52, 211, 153, 0.3);
-  }
-  &.done {
-    background: rgba(239, 68, 68, 0.12);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.25);
-  }
-}
 
 // ── Header ─────────────────────────────────────────────
 .game-header {
@@ -107,37 +88,17 @@
 }
 
 .game-header-center {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
   flex: 1;
+  display: flex;
   justify-content: center;
   min-width: 0;
 }
 
-.header-game-name {
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: #cbd5e1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 200px;
-}
-
-.header-sep {
-  color: rgba(255,255,255,.2);
-  font-size: 0.8rem;
-}
-
-.header-ronda {
-  font-size: 0.78rem;
-  color: #64748b;
-  white-space: nowrap;
-}
-
 .game-header-right {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 // ── Footer ─────────────────────────────────────────────
@@ -180,19 +141,6 @@
   text-transform: uppercase;
 }
 
-.music-btn {
-  background: none;
-  border: none;
-  color: rgba(255,255,255,.5);
-  font-size: 1rem;
-  cursor: pointer;
-  padding: 0 0.5rem 0 0;
-  line-height: 1;
-  transition: color 0.2s, opacity 0.2s;
-
-  &:hover { color: rgba(255,255,255,.9); }
-  &.muted { opacity: 0.25; }
-}
 
 // ── Acciones (aside derecho) ───────────────────────────
 .acciones-panel {
@@ -210,6 +158,108 @@
   flex: 1;
   position: relative;
   min-height: 0;
+}
+
+// ── Popup conquista: mover tropas ──────────────────────
+.conquista-popup-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.conquista-popup {
+  pointer-events: all;
+  background: #111827;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  border-radius: 14px;
+  padding: 1.5rem 1.75rem;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(167,139,250,0.1);
+  animation: popup-in 0.18s ease-out;
+}
+
+@keyframes popup-in {
+  from { opacity: 0; transform: scale(0.93) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.conquista-popup-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.conquista-popup-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.conquista-popup-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-bottom: 0.25rem;
+}
+
+.conquista-popup-sub {
+  font-size: 0.82rem;
+  color: #94a3b8;
+  line-height: 1.4;
+
+  strong { color: #e2e8f0; }
+}
+
+.conquista-popup-defensor {
+  font-size: 0.78rem;
+  margin-left: 0.3rem;
+}
+
+.conquista-popup-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.conquista-popup-btn {
+  width: 100%;
+  padding: 0.65rem;
+  background: #a78bfa;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: #8b5cf6; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.conquista-popup-btn-cancel {
+  width: 100%;
+  padding: 0.55rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: rgba(255,255,255,0.1); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 // ── Rotate overlay (portrait mobile) ───────────────────
@@ -344,10 +394,23 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: 0.75rem 0;
-  gap: 0.2rem;
   z-index: 10;
+}
+
+.tb-group-top,
+.tb-group-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.tb-music-btn {
+  font-size: 1.1rem;
+  line-height: 1;
+  &.muted { opacity: 0.25; }
 }
 
 .tb-btn {
@@ -364,6 +427,7 @@
   cursor: pointer;
   transition: background 0.15s;
   flex-shrink: 0;
+  position: relative;
 
   svg {
     width: 22px;
@@ -374,6 +438,121 @@
   &:hover {
     background: rgba(255,255,255,.12);
   }
+
+  &.tb-active {
+    background: rgba(167, 139, 250, 0.18);
+    color: #c4b5fd;
+  }
+
+  &::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%) translateX(-5px);
+    background: #100c24;
+    color: #c4b5fd;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 5px 11px;
+    border-radius: 6px;
+    border: 1px solid rgba(167, 139, 250, 0.22);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    z-index: 200;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: calc(100% + 6px);
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-right: 6px solid #100c24;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+    z-index: 200;
+  }
+
+  &:hover::before {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+
+  &:hover::after {
+    opacity: 1;
+  }
+}
+
+.mj-placeholder {
+  font-size: 0.82rem;
+  color: #475569;
+  font-style: italic;
+}
+
+// ── Desglose de tropas (panel Inicio) ──────────────────
+.tr-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tr-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+
+  .tr-label { color: #94a3b8; }
+  .tr-valor { color: #e2e8f0; font-weight: 600; }
+
+  &.tr-base .tr-valor { color: #34d399; }
+}
+
+.tr-sep {
+  height: 1px;
+  background: rgba(255,255,255,0.07);
+  margin: 0.2rem 0;
+}
+
+.tr-cont-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  padding: 0.12rem 0;
+  color: #475569;
+
+  .tr-cont-nombre   { flex: 1; }
+  .tr-cont-progreso { font-variant-numeric: tabular-nums; min-width: 2.5rem; text-align: right; }
+  .tr-cont-bonus    { min-width: 2rem; text-align: right; font-weight: 600; color: transparent; }
+
+  &.tr-controlado {
+    color: #cbd5e1;
+
+    .tr-cont-bonus { color: #34d399; }
+  }
+}
+
+.tr-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  padding-top: 0.1rem;
+
+  span   { color: #94a3b8; }
+  strong { color: #34d399; font-size: 1rem; }
 }
 
 // ── Líder del turno ────────────────────────────────────
