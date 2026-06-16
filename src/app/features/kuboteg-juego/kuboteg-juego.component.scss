@@ -500,6 +500,59 @@
   font-style: italic;
 }
 
+// ── Objetivo secreto ────────────────────────────────────
+.obj-box {
+  background: rgba(167, 139, 250, 0.06);
+  border: 1px solid rgba(167, 139, 250, 0.18);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.7rem;
+}
+
+.obj-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #a78bfa;
+  margin-bottom: 0.45rem;
+}
+
+.obj-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: #64748b;
+  padding: 0.12rem 0;
+
+  &.obj-done { color: #34d399; }
+
+  &.obj-alt { color: #94a3b8; }
+}
+
+.obj-mark {
+  font-size: 0.72rem;
+  width: 1rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.obj-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.obj-prog {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+
 // ── Desglose de tropas (panel Inicio) ──────────────────
 .tr-section {
   display: flex;
@@ -841,45 +894,60 @@
   50%       { transform: translateY(-6px); }
 }
 
-// ── Game over ──────────────────────────────────────────
-.game-over {
+// ── Popup fin de partida ───────────────────────────────
+.fin-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fin-popup {
+  background: #0f0c1e;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding: 2.5rem 3rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
   text-align: center;
-  max-width: 400px;
-  width: 100%;
-
-  .trophy {
-    font-size: 4rem;
-    animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  }
-
-  h2 {
-    font-size: 1.6rem;
-    font-weight: 800;
-    margin: 0;
-  }
-
-  .winner-text {
-    color: #aaa;
-    font-size: 1rem;
-    margin: 0;
-    strong { color: #34d399; }
-  }
+  min-width: 280px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  animation: fin-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-@keyframes pop {
-  from { transform: scale(0.5); opacity: 0; }
-  to   { transform: scale(1);   opacity: 1; }
+.fin-icon {
+  font-size: 4rem;
+  line-height: 1;
 }
 
+.fin-titulo {
+  font-size: 2rem;
+  font-weight: 900;
+  margin: 0;
+  letter-spacing: -0.02em;
 
-.btn-volver {
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.12);
-  color: #aaa;
+  &--ganador { color: #fbbf24; }
+  &--perdedor { color: #64748b; }
+}
+
+.fin-sub {
+  color: #94a3b8;
+  font-size: 0.95rem;
+  margin: 0;
+  strong { color: #e2e8f0; }
+}
+
+.fin-btn {
+  margin-top: 0.5rem;
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.14);
+  color: #94a3b8;
   border-radius: 10px;
   padding: 0.75rem 1.75rem;
   font-size: 0.9rem;
@@ -887,6 +955,11 @@
   cursor: pointer;
   transition: all 0.2s;
   &:hover { color: #fff; border-color: rgba(255,255,255,.3); }
+}
+
+@keyframes fin-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
 }
 
 // ── Step indicator ────────────────────────────────────

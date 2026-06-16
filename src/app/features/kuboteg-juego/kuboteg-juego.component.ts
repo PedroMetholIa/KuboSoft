@@ -13,12 +13,17 @@ import { PartidaInfoComponent } from './partida-info/partida-info.component';
 import { MenuJugadorComponent } from './menu-jugador/menu-jugador.component';
 import { TERRITORIES } from './map/territories.data';
 
+type ObjetivoSecreto =
+  | { tipo: 'continentes'; ids: [string, string] }
+  | { tipo: 'destruir'; color: string };
+
 interface ConquistaPendiente {
   origenId: string;
   destinoId: string;
   tropasOrigenFinal: number;
   defensorNombre: string;
   defensorColor: string;
+  defensorId: string;
 }
 
 interface RpcError {
@@ -226,6 +231,33 @@ interface CombateRpc {
                 <!-- Otros paneles (placeholder por ahora) -->
                 <!-- Inicio: desglose de tropas -->
                 <ng-container *ngSwitchCase="'inicio'">
+
+                  <!-- Objetivo secreto -->
+                  <div class="obj-box" *ngIf="miObjetivo">
+                    <div class="obj-label">Objetivo secreto</div>
+                    <ng-container *ngIf="objetivoContinentes as ids">
+                      <div class="obj-item" [class.obj-done]="objetivoContinenteA">
+                        <span class="obj-mark">{{ objetivoContinenteA ? '✓' : '○' }}</span>
+                        <span>{{ getNombreContinente(ids[0]) }}</span>
+                      </div>
+                      <div class="obj-item" [class.obj-done]="objetivoContinenteB">
+                        <span class="obj-mark">{{ objetivoContinenteB ? '✓' : '○' }}</span>
+                        <span>{{ getNombreContinente(ids[1]) }}</span>
+                      </div>
+                    </ng-container>
+                    <ng-container *ngIf="objetivoColor">
+                      <div class="obj-item" *ngIf="objetivoDestruyeActivo">
+                        <span class="obj-color-dot" [style.background]="objetivoColor!"></span>
+                        <span>Destruir a {{ objetivoTargetNombre }}</span>
+                      </div>
+                      <div class="obj-item obj-alt" *ngIf="!objetivoDestruyeActivo">
+                        <span class="obj-mark">○</span>
+                        <span>Conquistar 24 territorios</span>
+                        <span class="obj-prog">{{ objetivoTerritoriosActuales }}/24</span>
+                      </div>
+                    </ng-container>
+                  </div>
+
                   <div class="tr-section" *ngIf="resumenTropas.cantTerritorios > 0; else sinTerritorios">
 
                     <div class="tr-row">
@@ -273,14 +305,6 @@ interface CombateRpc {
 
             <div class="panel-divider"></div>
 
-            <!-- Finalizada -->
-            <div class="game-over" *ngIf="partida.estado === 'Finalizada'">
-              <div class="trophy">🏆</div>
-              <h2>Partida finalizada</h2>
-              <p class="winner-text" *ngIf="ganador">Ganó <strong>{{ nombreJugador(ganador) }}</strong></p>
-              <p class="winner-text" *ngIf="!ganador">Empate</p>
-              <button class="btn-volver" (click)="volver()">← Volver al inicio</button>
-            </div>
 
             <!-- Sala de espera -->
             <div class="sala-espera" *ngIf="partida.estado === 'En juego' && !todosAdentro">
@@ -622,6 +646,25 @@ interface CombateRpc {
       </footer>
 
     </div>
+
+    <!-- Popup fin de partida -->
+    <div class="fin-overlay" *ngIf="partida?.estado === 'Finalizada'">
+      <div class="fin-popup">
+        <ng-container *ngIf="esGanador">
+          <div class="fin-icon">🏆</div>
+          <h2 class="fin-titulo fin-titulo--ganador">¡Victoria!</h2>
+          <p class="fin-sub">Completaste tu objetivo secreto</p>
+        </ng-container>
+        <ng-container *ngIf="!esGanador">
+          <div class="fin-icon">💀</div>
+          <h2 class="fin-titulo fin-titulo--perdedor">Derrota</h2>
+          <p class="fin-sub" *ngIf="ganador">
+            Ganó <strong [style.color]="jugadorColores[ganador.usuario_id]">{{ nombreJugador(ganador) }}</strong>
+          </p>
+        </ng-container>
+        <button class="fin-btn" (click)="volver()">← Volver al inicio</button>
+      </div>
+    </div>
   `,
   styleUrl: './kuboteg-juego.component.scss'
 })
@@ -710,6 +753,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   territorioOrigenId: string | null = null;
   conquistaPendiente: ConquistaPendiente | null = null;
   conquistaTropasAMover = 1;
+  miObjetivo: ObjetivoSecreto | null = null;
   reagrupacionDestinoId: string | null = null;
   reagrupacionTropasAMover = 1;
   reagrupacionLimites: Record<string, number> = {};
@@ -771,6 +815,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   private iniciarTimer() {
     if (this.timerInterval) return;
+      if (!this.partida?.created_at) return; // ← agregá esta línea
     const inicio = new Date(this.partida!.created_at).getTime();
     const tick = () => {
       const diff = Math.floor((Date.now() - inicio) / 1000);
@@ -945,6 +990,10 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     return this.jugadores.find(j => j.usuario_id === this.partida!.ganador_id) ?? null;
   }
 
+  get esGanador(): boolean {
+    return !!this.partida?.ganador_id && this.partida.ganador_id === this.userId;
+  }
+
   // ── Load ──────────────────────────────────────────────
   async loadGameState() {
     this.loading = true;
@@ -969,6 +1018,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       this.partida   = partida;
       this.jugadores = jugadores ?? [];
       this.lideres   = lideres ?? [];
+      const miJ = this.jugadores.find(j => j.usuario_id === this.userId);
+      if (miJ?.objetivo) this.miObjetivo = miJ.objetivo as ObjetivoSecreto;
 
       const terrArray = territorios ?? [];
       this.territorios = {};
@@ -1070,6 +1121,14 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
             this.iniciarMusica();
             this.iniciarTimer();
           }
+          if (newPartida.estado === 'Finalizada' && this.partida?.estado !== 'Finalizada') {
+            this.audio.pause();
+            if (newPartida.ganador_id === this.userId) {
+              this.playSfx('assets/KuboTeg/sonidos/ganador.mp3');
+            } else {
+              this.playSfx('assets/KuboTeg/sonidos/perdedor.mp3');
+            }
+          }
           const prevFase = this.fase;
           const prevJugadorIdx = this.partida?.jugador_actual_index;
           this.partida = newPartida;
@@ -1100,6 +1159,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
             { ...prev, ...updated, usuario: prev.usuario },
             ...this.jugadores.slice(idx + 1),
           ];
+          if (updated.usuario_id === this.userId && updated.objetivo) {
+            this.miObjetivo = updated.objetivo as ObjetivoSecreto;
+          }
           this.buildJugadorColores();
           this.buildJugadorLideres();
           this.rebuildJugadorNombres();
@@ -1220,6 +1282,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     for (const j of this.jugadores) {
       await this.service.setTropasPorColocar(this.partidaId, j.usuario_id, this.tropasIniciales);
     }
+
+    await this.generarYAsignarObjetivos();
 
     const { error: errFase } = await this.service.iniciarFaseColocacion(this.partidaId, orden, 1, 0);
     if (errFase) {
@@ -1435,6 +1499,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
           tropasOrigenFinal: res.tropas_origen_final ?? 1,
           defensorNombre: defensorJ ? this.nombreJugador(defensorJ) : '?',
           defensorColor:  this.jugadorColores[defensorId] ?? '#fff',
+          defensorId,
         };
         this.territorioAtacanteId = null;
         if (this.maxTropasMovibles === 1) {
@@ -1449,7 +1514,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   async confirmarMovimientoConquista() {
     if (!this.conquistaPendiente) return;
-    const { origenId, destinoId, defensorNombre, defensorColor } = this.conquistaPendiente;
+    const { origenId, destinoId, defensorNombre, defensorColor, defensorId } = this.conquistaPendiente;
     const aMover = Math.max(1, Math.min(this.conquistaTropasAMover, this.maxTropasMovibles));
 
     const { data: rpcData, error } = await this.service.moverTropasConquista(
@@ -1459,6 +1524,13 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       this.toast.show((rpcData as RpcError)?.error ?? 'Error al mover tropas.', 'error');
       return;
     }
+
+    const defensorQuedan = defensorId
+      ? Object.values(this.territorios).filter(
+          t => t.usuario_id === defensorId && t.territorio_id !== destinoId
+        ).length
+      : 1;
+    const eliminadoId = defensorQuedan === 0 ? defensorId : null;
 
     const conquistaData: UltimaConquista = {
       territorioNombre: this.nombreTerritorio(destinoId),
@@ -1474,6 +1546,10 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
     this.conquistaPendiente = null;
     this.cdr.markForCheck();
+
+    if (this.verificarVictoriaObjetivo(destinoId, eliminadoId)) {
+      await this.declararGanadorPorObjetivo();
+    }
   }
 
   async terminarAtaque() {
@@ -2034,6 +2110,111 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   private reproducirSonidoCombate() {
     const n = Math.floor(Math.random() * 7) + 1;
     this.playSfx(`assets/KuboTeg/sonidos/combate${n}.mp3`);
+  }
+
+  // ── Objetivos secretos ────────────────────────────────
+
+  private async generarYAsignarObjetivos() {
+    const CONTS = ['north_america', 'south_america', 'europe', 'africa', 'asia', 'oceania'];
+    const pool: ObjetivoSecreto[] = [];
+
+    for (let i = 0; i < CONTS.length; i++) {
+      for (let j = i + 1; j < CONTS.length; j++) {
+        pool.push({ tipo: 'continentes', ids: [CONTS[i], CONTS[j]] as [string, string] });
+      }
+    }
+    for (const j of this.jugadores) {
+      if (j.color) pool.push({ tipo: 'destruir', color: j.color });
+    }
+
+    const shuffled = this.randomShuffle([...pool]);
+
+    for (const jugador of this.jugadores) {
+      const idx = shuffled.findIndex(obj =>
+        !(obj.tipo === 'destruir' && (obj as { tipo: 'destruir'; color: string }).color === jugador.color)
+      );
+      if (idx === -1) continue;
+      const [obj] = shuffled.splice(idx, 1);
+      await this.service.setObjetivo(this.partidaId, jugador.usuario_id, obj);
+      if (jugador.usuario_id === this.userId) this.miObjetivo = obj;
+    }
+  }
+
+  private verificarVictoriaObjetivo(conquistadoId: string, eliminadoId: string | null): boolean {
+    if (!this.miObjetivo) return false;
+
+    const esMio = (tid: string) =>
+      tid === conquistadoId || this.territorios[tid]?.usuario_id === this.userId;
+
+    if (this.miObjetivo.tipo === 'continentes') {
+      const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
+      return this.miObjetivo.ids.every(cid => CONT[cid].every(tid => esMio(tid)));
+    }
+
+    if (this.miObjetivo.tipo === 'destruir') {
+      const color = this.miObjetivo.color;
+      const targetJ = this.jugadores.find(j => j.color === color);
+      if (!targetJ) {
+        return Object.values(this.territorios).filter(t => esMio(t.territorio_id)).length >= 24;
+      }
+      const targetQuedan = Object.values(this.territorios).filter(
+        t => t.usuario_id === targetJ.usuario_id && t.territorio_id !== conquistadoId
+      ).length;
+      if (targetQuedan === 0) {
+        if (eliminadoId === targetJ.usuario_id) return true;
+        return Object.values(this.territorios).filter(t => esMio(t.territorio_id)).length >= 24;
+      }
+    }
+
+    return false;
+  }
+
+  private async declararGanadorPorObjetivo() {
+    const { data, error } = await this.service.declararGanadorObjetivo(this.partidaId);
+    if (error || (data as RpcError)?.error) {
+      this.toast.show((data as RpcError)?.error ?? 'Error al declarar ganador.', 'error');
+    }
+  }
+
+  get objetivoContinentes(): [string, string] | null {
+    return this.miObjetivo?.tipo === 'continentes' ? this.miObjetivo.ids : null;
+  }
+
+  get objetivoColor(): string | null {
+    return this.miObjetivo?.tipo === 'destruir' ? this.miObjetivo.color : null;
+  }
+
+  get objetivoTargetJugador(): PartidaJugador | null {
+    const color = this.objetivoColor;
+    return color ? (this.jugadores.find(j => j.color === color) ?? null) : null;
+  }
+
+  get objetivoTargetNombre(): string {
+    const j = this.objetivoTargetJugador;
+    return j ? this.nombreJugador(j) : '?';
+  }
+
+  get objetivoDestruyeActivo(): boolean {
+    const j = this.objetivoTargetJugador;
+    return !!j && Object.values(this.territorios).some(t => t.usuario_id === j.usuario_id);
+  }
+
+  get objetivoContinenteA(): boolean {
+    const ids = this.objetivoContinentes;
+    if (!ids) return false;
+    const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
+    return CONT[ids[0]]?.every(tid => this.territorios[tid]?.usuario_id === this.userId) ?? false;
+  }
+
+  get objetivoContinenteB(): boolean {
+    const ids = this.objetivoContinentes;
+    if (!ids) return false;
+    const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
+    return CONT[ids[1]]?.every(tid => this.territorios[tid]?.usuario_id === this.userId) ?? false;
+  }
+
+  get objetivoTerritoriosActuales(): number {
+    return Object.values(this.territorios).filter(t => t.usuario_id === this.userId).length;
   }
 
 }

@@ -49,12 +49,4 @@ export class PartidaInfoComponent {
   @Input() esMiTurno = false;
   @Input() fase: string | null = null;
 
-  get faseLabel(): string {
-    switch (this.fase) {
-      case 'colocacion':   return 'Colocación';
-      case 'ataque':       return 'Ataque';
-      case 'reagrupacion': return 'Reagrupación';
-      default:             return '';
-    }
-  }
 }
