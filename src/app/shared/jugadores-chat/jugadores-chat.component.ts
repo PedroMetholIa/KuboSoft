@@ -1,5 +1,4 @@
 import { Component, Input, OnChanges, OnDestroy, SimpleChanges, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { SupabaseService } from '../../core/services/supabase.service';
@@ -30,51 +29,68 @@ const CHAT_COLORS = [
 @Component({
   selector: 'app-jugadores-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   template: `
     <div class="panel jc-panel">
       <div class="jc-header">
         <span class="jc-icon">{{ icon }}</span>
         <h3 class="jc-title">{{ title }}</h3>
-        <span class="jc-badge" *ngIf="!chatMode">{{ onlineCount }}</span>
+        @if (!chatMode) {
+          <span class="jc-badge">{{ onlineCount }}</span>
+        }
       </div>
 
-      <div class="jc-list" *ngIf="!chatMode">
-        <div class="jc-item" *ngFor="let j of jugadores"
-             [class.jc-me]="j.email === userEmail"
-             [class.jc-offline]="!j.is_online">
-          <div class="jc-data">
-            <span class="jc-nombre">{{ nombreCompleto(j) }}</span>
-            <span class="jc-email">{{ j.email }}</span>
-            <span class="jc-last">{{ formatDate(j.last_seen) }}</span>
+      @if (!chatMode) {
+        <div class="jc-list">
+          @for (j of jugadores; track j.email) {
+            <div class="jc-item"
+                 [class.jc-me]="j.email === userEmail"
+                 [class.jc-offline]="!j.is_online">
+              <div class="jc-data">
+                <span class="jc-nombre">{{ nombreCompleto(j) }}</span>
+                <span class="jc-email">{{ j.email }}</span>
+                <span class="jc-last">{{ formatDate(j.last_seen) }}</span>
+              </div>
+            </div>
+          }
+          @if (loading) {
+            <p class="jc-empty">Cargando...</p>
+          } @else if (jugadores.length === 0) {
+            <p class="jc-empty">Sin jugadores suscritos</p>
+          }
+        </div>
+      }
+
+      @if (chatMode) {
+        <div class="jc-chat-list" #chatList>
+          @for (m of chatMessages; track m.time) {
+            <div class="jc-chat-row">
+              <span class="jc-chat-name" [style.color]="m.color">{{ m.nombre }}</span>
+              <span class="jc-chat-msg">{{ m.mensaje }}</span>
+            </div>
+          }
+          @if (!loading && chatMessages.length === 0) {
+            <p class="jc-empty">Sin mensajes aún</p>
+          }
+        </div>
+      }
+
+      @if (showForm) {
+        <div class="jc-form">
+          <div class="jc-input-row">
+            <textarea
+              [(ngModel)]="mensajeInput"
+              placeholder="Escribí tu mensaje (máx. 300 caracteres)"
+              maxlength="300"
+              rows="1"
+              (keydown.enter)="$event.preventDefault(); guardarMensaje()"
+            ></textarea>
+            <button (click)="guardarMensaje()" [disabled]="saving || !mensajeInput.trim()">
+              {{ saving ? '...' : 'Enviar' }}
+            </button>
           </div>
         </div>
-        <p class="jc-empty" *ngIf="loading">Cargando...</p>
-        <p class="jc-empty" *ngIf="!loading && jugadores.length === 0">Sin jugadores suscritos</p>
-      </div>
-
-      <div class="jc-chat-list" *ngIf="chatMode" #chatList>
-        <div class="jc-chat-row" *ngFor="let m of chatMessages">
-          <span class="jc-chat-name" [style.color]="m.color">{{ m.nombre }}</span>
-          <span class="jc-chat-msg">{{ m.mensaje }}</span>
-        </div>
-        <p class="jc-empty" *ngIf="!loading && chatMessages.length === 0">Sin mensajes aún</p>
-      </div>
-
-      <div class="jc-form" *ngIf="showForm">
-        <div class="jc-input-row">
-          <textarea
-            [(ngModel)]="mensajeInput"
-            placeholder="Escribí tu mensaje (máx. 300 caracteres)"
-            maxlength="300"
-            rows="1"
-            (keydown.enter)="$event.preventDefault(); guardarMensaje()"
-          ></textarea>
-          <button (click)="guardarMensaje()" [disabled]="saving || !mensajeInput.trim()">
-            {{ saving ? '...' : 'Enviar' }}
-          </button>
-        </div>
-      </div>
+      }
     </div>
   `,
   styleUrl: './jugadores-chat.component.scss'

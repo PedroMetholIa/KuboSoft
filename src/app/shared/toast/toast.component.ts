@@ -1,21 +1,19 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { ToastService, Toast } from '../../core/services/toast.service';
 
 @Component({
   selector: 'app-toast',
   standalone: true,
-  imports: [CommonModule],
   template: `
     <div class="toast-container">
-      <div
-        class="toast"
-        [class]="'toast toast--' + t.type"
-        *ngFor="let t of (toast.toasts$ | async)">
-        <span class="toast-icon">{{ iconFor(t.type) }}</span>
-        <span class="toast-msg">{{ t.message }}</span>
-        <button class="toast-close" (click)="toast.dismiss(t.id)">×</button>
-      </div>
+      @for (t of toasts(); track t.id) {
+        <div [class]="'toast toast--' + t.type">
+          <span class="toast-icon">{{ iconFor(t.type) }}</span>
+          <span class="toast-msg">{{ t.message }}</span>
+          <button class="toast-close" (click)="toast.dismiss(t.id)">×</button>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -90,7 +88,8 @@ import { ToastService, Toast } from '../../core/services/toast.service';
   `]
 })
 export class ToastComponent {
-  constructor(public toast: ToastService) {}
+  readonly toast = inject(ToastService);
+  protected toasts = toSignal(this.toast.toasts$, { initialValue: [] as Toast[] });
 
   iconFor(type: Toast['type']): string {
     if (type === 'error')   return '✕';

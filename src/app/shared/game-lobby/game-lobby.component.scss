@@ -106,7 +106,7 @@
   padding: 5rem 0 0.75rem;
 
   .container { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 1rem; }
-  .page-brand { display: flex; align-items: center; gap: 1.1rem; }
+  .page-brand { display: flex; align-items: center; gap: 0.5rem; }
   .page-logo {
     width: 72px; height: 72px; object-fit: contain;
     filter: drop-shadow(0 6px 28px rgba(255,71,87,.45)); flex-shrink: 0;
@@ -413,6 +413,24 @@ table {
     font-size: 1rem;
     font-weight: 600;
     user-select: none;
+  }
+}
+
+.form-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+
+  .field-narrow {
+    flex: 1;
+    min-width: 0;
+    .num-stepper { width: 100%; }
+  }
+
+  .field-check-inline {
+    flex: 1;
+    margin-bottom: 0;
+    padding-bottom: 0.55rem;
   }
 }
 

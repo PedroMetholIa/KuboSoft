@@ -1,5 +1,4 @@
 import { Component, Input, Output, EventEmitter, OnChanges, OnDestroy, SimpleChanges, ChangeDetectorRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { UltimoCombate } from '../../../core/services/supabase.service';
 
 const DOT_PATTERNS: Record<number, number[]> = {
@@ -21,47 +20,59 @@ interface DieState {
 @Component({
   selector: 'app-combate-panel',
   standalone: true,
-  imports: [CommonModule],
   template: `
-    <div class="combate-panel" *ngIf="combate">
+    @if (combate) {
+      <div class="combate-panel">
 
-      <!-- Atacante -->
-      <div class="cp-player">
-        <img *ngIf="combate.liderAtacanteImg" class="cp-lider-img" [src]="combate.liderAtacanteImg" [style.border-color]="combate.colorAtacante" alt="">
-        <div class="cp-player-info">
-          <span class="cp-terr">{{ combate.atacanteNombre }}</span>
-          <span class="cp-nombre">{{ combate.origenNombre }}</span>
+        <div class="cp-player">
+          @if (combate.liderAtacanteImg) {
+            <img class="cp-lider-img" [src]="combate.liderAtacanteImg" [style.border-color]="combate.colorAtacante" alt="">
+          }
+          <div class="cp-player-info">
+            <span class="cp-terr">{{ combate.atacanteNombre }}</span>
+            <span class="cp-nombre">{{ combate.origenNombre }}</span>
+          </div>
         </div>
-      </div>
 
-      <div class="cp-dados-grupo">
-        <div class="cp-dado dado-ataque" *ngFor="let die of attackDice">
-          <span *ngFor="let c of cells" class="pip" [class.visible]="isDotVisible(die.value, c)"></span>
+        <div class="cp-dados-grupo">
+          @for (die of attackDice; track $index) {
+            <div class="cp-dado dado-ataque">
+              @for (c of cells; track c) {
+                <span class="pip" [class.visible]="isDotVisible(die.value, c)"></span>
+              }
+            </div>
+          }
         </div>
-      </div>
 
-      <span class="cp-vs">⚔️</span>
+        <span class="cp-vs">⚔️</span>
 
-      <div class="cp-dados-grupo">
-        <div class="cp-dado dado-defensa" *ngFor="let die of defenseDice">
-          <span *ngFor="let c of cells" class="pip" [class.visible]="isDotVisible(die.value, c)"></span>
+        <div class="cp-dados-grupo">
+          @for (die of defenseDice; track $index) {
+            <div class="cp-dado dado-defensa">
+              @for (c of cells; track c) {
+                <span class="pip" [class.visible]="isDotVisible(die.value, c)"></span>
+              }
+            </div>
+          }
         </div>
-      </div>
 
-      <!-- Defensor -->
-      <div class="cp-player">
-        <div class="cp-player-info cp-player-info--right">
-          <span class="cp-terr">{{ combate.defensorNombre }}</span>
-          <span class="cp-nombre">{{ combate.destinoNombre }}</span>
+        <div class="cp-player">
+          <div class="cp-player-info cp-player-info--right">
+            <span class="cp-terr">{{ combate.defensorNombre }}</span>
+            <span class="cp-nombre">{{ combate.destinoNombre }}</span>
+          </div>
+          @if (combate.liderDefensorImg) {
+            <img class="cp-lider-img" [src]="combate.liderDefensorImg" [style.border-color]="combate.colorDefensor" alt="">
+          }
         </div>
-        <img *ngIf="combate.liderDefensorImg" class="cp-lider-img" [src]="combate.liderDefensorImg" [style.border-color]="combate.colorDefensor" alt="">
-      </div>
 
-      <!-- Continuar atacando -->
-      <button *ngIf="mostrarContinuar" class="cp-btn-continuar" (click)="continuarAtacando.emit()">
-        Continuar atacando →
-      </button>
-    </div>
+        @if (mostrarContinuar) {
+          <button class="cp-btn-continuar" (click)="continuarAtacando.emit()">
+            Continuar atacando →
+          </button>
+        }
+      </div>
+    }
   `,
   styleUrl: './combate-panel.component.scss'
 })
@@ -99,7 +110,6 @@ export class CombatePanelComponent implements OnChanges, OnDestroy {
     this.attackDice  = combate.dadosAtaque.map(v  => ({ value: this.randomFace(), finalValue: v }));
     this.defenseDice = combate.dadosDefensa.map(v => ({ value: this.randomFace(), finalValue: v }));
 
-    // Stagger: cada dado para en un momento distinto dentro de 200–500ms
     const allDice = [...this.attackDice, ...this.defenseDice];
     allDice.forEach((die) => {
       const stopAt = 200 + Math.random() * 300;
@@ -124,7 +134,6 @@ export class CombatePanelComponent implements OnChanges, OnDestroy {
       die.value = this.randomFace();
       this.cdr.markForCheck();
 
-      // Intervalo crece de 50ms → 120ms a medida que se acerca al final
       const progress  = elapsed / stopAt;
       const nextDelay = 50 + progress * 70;
       this.timers.push(setTimeout(cycle, nextDelay));

@@ -1,5 +1,4 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SupabaseService } from '../../core/services/supabase.service';
@@ -18,11 +17,10 @@ interface Categoria {
 @Component({
   selector: 'app-inicio',
   standalone: true,
-  imports: [CommonModule, FormsModule, NavComponent],
+  imports: [FormsModule, NavComponent],
   template: `
     <div class="landing">
 
-      <!-- NAV -->
       <app-nav></app-nav>
 
       <!-- HERO -->
@@ -53,24 +51,31 @@ interface Categoria {
               Software construido sobre una base probada. Cada producto se adapta a tu rubro y necesidades.
             </span>
 
-            <div class="grid-3" *ngIf="!loading">
-              <div class="card prod-card"
-                   [class.card--clickable]="hasRoute(cat.nombre)"
-                   (click)="navigateTo(cat.nombre)"
-                   *ngFor="let cat of categorias">
-                <div class="card-header">
-                  <div class="card-logo" *ngIf="cat.logo">
-                    <img [src]="cat.logo" [alt]="cat.nombre" />
+            @if (!loading) {
+              <div class="grid-3">
+                @for (cat of categorias; track cat.id) {
+                  <div class="card prod-card"
+                       [class.card--clickable]="hasRoute(cat.nombre)"
+                       (click)="navigateTo(cat.nombre)">
+                    <div class="card-header">
+                      @if (cat.logo) {
+                        <div class="card-logo">
+                          <img [src]="cat.logo" [alt]="cat.nombre" />
+                        </div>
+                      }
+                      <h3 class="cat-title"><span [style.color]="getCategoryColor(cat.nombre)">{{ getCategorySuffix(cat.nombre) }}</span></h3>
+                    </div>
+                    <p class="prod-desc">{{ cat.descripcion }}</p>
                   </div>
-                  <h3 class="cat-title"><span [style.color]="getCategoryColor(cat.nombre)">{{ getCategorySuffix(cat.nombre) }}</span></h3>
-                </div>
-                <p class="prod-desc">{{ cat.descripcion }}</p>
+                }
               </div>
-            </div>
-
-            <div class="grid-3" *ngIf="loading">
-              <div class="card skeleton" *ngFor="let n of [1,2,3,4,5,6]"></div>
-            </div>
+            } @else {
+              <div class="grid-3">
+                @for (_ of [1,2,3,4,5,6]; track $index) {
+                  <div class="card skeleton"></div>
+                }
+              </div>
+            }
           </div>
         </div>
       </div>
@@ -119,7 +124,9 @@ interface Categoria {
                   <label>Mensaje</label>
                   <textarea [(ngModel)]="form.mensaje" placeholder="Contanos brevemente qué necesitás..."></textarea>
                 </div>
-                <p class="form-error" *ngIf="formError">{{ formError }}</p>
+                @if (formError) {
+                  <p class="form-error">{{ formError }}</p>
+                }
                 <button class="btn-submit" [disabled]="formSubmitted || formLoading" (click)="submitForm()">
                   {{ formSubmitted ? '✓ Enviado — te contactamos pronto' : formLoading ? 'Enviando...' : 'Enviar consulta →' }}
                 </button>

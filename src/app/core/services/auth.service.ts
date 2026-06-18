@@ -37,7 +37,4 @@ export class AuthService {
     this.router.navigate(['/inicio']);
   }
 
-  isLoggedIn(): boolean {
-    return !!this.supabase.getCurrentUser();
-  }
 }

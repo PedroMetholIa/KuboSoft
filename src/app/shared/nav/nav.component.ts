@@ -1,6 +1,5 @@
 import { Component, OnInit, OnDestroy, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
 import { SupabaseService } from '../../core/services/supabase.service';
@@ -10,7 +9,7 @@ import { filter } from 'rxjs/operators';
 @Component({
   selector: 'app-nav',
   standalone: true,
-  imports: [RouterLink, CommonModule, FormsModule],
+  imports: [RouterLink, FormsModule],
   styleUrl: './nav.component.scss',
   template: `
     <nav class="platform-nav">
@@ -20,90 +19,104 @@ import { filter } from 'rxjs/operators';
           <span class="logo-text">Kubo<em>Soft</em></span>
         </a>
 
-        <div class="nav-actions" *ngIf="authChecked && isLoggedIn">
-          <span class="nav-welcome" *ngIf="userName">¡Bienvenido {{ userName }}!</span>
-          <button class="nav-btn nav-logout" (click)="logout()">Cerrar sesión</button>
-        </div>
+        @if (authChecked && isLoggedIn) {
+          <div class="nav-actions">
+            @if (userName) {
+              <span class="nav-welcome">¡Bienvenido {{ userName }}!</span>
+            }
+            <button class="nav-btn nav-logout" (click)="logout()">Cerrar sesión</button>
+          </div>
+        }
 
-        <div class="nav-actions" *ngIf="authChecked && !isLoggedIn">
-          <button class="nav-btn nav-signin" (click)="openModal('login')">Iniciar sesión</button>
-          <button class="nav-btn nav-register" (click)="openModal('register')">Crear cuenta</button>
-        </div>
+        @if (authChecked && !isLoggedIn) {
+          <div class="nav-actions">
+            <button class="nav-btn nav-signin" (click)="openModal('login')">Iniciar sesión</button>
+            <button class="nav-btn nav-register" (click)="openModal('register')">Crear cuenta</button>
+          </div>
+        }
       </div>
     </nav>
 
-    <!-- Login Modal -->
-    <div class="modal-overlay" *ngIf="activeModal === 'login'" (click)="closeModal()">
-      <div class="modal-card" (click)="$event.stopPropagation()">
-        <button class="modal-close" (click)="closeModal()">×</button>
-        <div class="modal-logo">
-          <img src="assets/kubosoft.png" alt="KuboSoft" />
-          <span class="modal-logo-text">Kubo<em>Soft</em></span>
-        </div>
-        <h2 class="modal-title">Iniciar sesión</h2>
+    @if (activeModal === 'login') {
+      <div class="modal-overlay" (click)="closeModal()">
+        <div class="modal-card" (click)="$event.stopPropagation()">
+          <button class="modal-close" (click)="closeModal()">×</button>
+          <div class="modal-logo">
+            <img src="assets/kubosoft.png" alt="KuboSoft" />
+            <span class="modal-logo-text">Kubo<em>Soft</em></span>
+          </div>
+          <h2 class="modal-title">Iniciar sesión</h2>
 
-        <div class="alert alert-error" *ngIf="loginError">{{ loginError }}</div>
+          @if (loginError) {
+            <div class="alert alert-error">{{ loginError }}</div>
+          }
 
-        <div class="field">
-          <label>Email</label>
-          <input type="email" [(ngModel)]="loginEmail" placeholder="tu@email.com" />
-        </div>
-        <div class="field">
-          <label>Contraseña</label>
-          <input type="password" [(ngModel)]="loginPassword" placeholder="••••••••" (keyup.enter)="login()" />
-        </div>
-
-        <button class="btn-primary" (click)="login()" [disabled]="loginLoading">
-          {{ loginLoading ? 'Ingresando...' : 'Entrar' }}
-        </button>
-
-        <p class="modal-switch">¿No tenés cuenta? <a (click)="openModal('register')">Registrate</a></p>
-      </div>
-    </div>
-
-    <!-- Register Modal -->
-    <div class="modal-overlay" *ngIf="activeModal === 'register'" (click)="closeModal()">
-      <div class="modal-card" (click)="$event.stopPropagation()">
-        <button class="modal-close" (click)="closeModal()">×</button>
-        <div class="modal-logo">
-          <img src="assets/kubosoft.png" alt="KuboSoft" />
-          <span class="modal-logo-text">Kubo<em>Soft</em></span>
-        </div>
-        <h2 class="modal-title">Crear cuenta</h2>
-
-        <div class="alert alert-success" *ngIf="regSuccess">{{ regSuccess }}</div>
-        <div class="alert alert-error" *ngIf="regError">{{ regError }}</div>
-
-        <div class="field-row">
           <div class="field">
-            <label>Nombre</label>
-            <input type="text" [(ngModel)]="regNombre" placeholder="Juan" />
+            <label>Email</label>
+            <input type="email" [(ngModel)]="loginEmail" placeholder="tu@email.com" />
           </div>
           <div class="field">
-            <label>Apellido</label>
-            <input type="text" [(ngModel)]="regApellido" placeholder="Pérez" />
+            <label>Contraseña</label>
+            <input type="password" [(ngModel)]="loginPassword" placeholder="••••••••" (keyup.enter)="login()" />
           </div>
-        </div>
-        <div class="field">
-          <label>Email</label>
-          <input type="email" [(ngModel)]="regEmail" placeholder="tu@email.com" />
-        </div>
-        <div class="field">
-          <label>Contraseña</label>
-          <input type="password" [(ngModel)]="regPassword" placeholder="••••••••" />
-        </div>
-        <div class="field">
-          <label>Repetir contraseña</label>
-          <input type="password" [(ngModel)]="regRepeatPassword" placeholder="••••••••" (keyup.enter)="register()" />
-        </div>
 
-        <button class="btn-primary" (click)="register()" [disabled]="regLoading">
-          {{ regLoading ? 'Creando cuenta...' : 'Registrarse' }}
-        </button>
+          <button class="btn-primary" (click)="login()" [disabled]="loginLoading">
+            {{ loginLoading ? 'Ingresando...' : 'Entrar' }}
+          </button>
 
-        <p class="modal-switch">¿Ya tenés cuenta? <a (click)="openModal('login')">Iniciá sesión</a></p>
+          <p class="modal-switch">¿No tenés cuenta? <a (click)="openModal('register')">Registrate</a></p>
+        </div>
       </div>
-    </div>
+    }
+
+    @if (activeModal === 'register') {
+      <div class="modal-overlay" (click)="closeModal()">
+        <div class="modal-card" (click)="$event.stopPropagation()">
+          <button class="modal-close" (click)="closeModal()">×</button>
+          <div class="modal-logo">
+            <img src="assets/kubosoft.png" alt="KuboSoft" />
+            <span class="modal-logo-text">Kubo<em>Soft</em></span>
+          </div>
+          <h2 class="modal-title">Crear cuenta</h2>
+
+          @if (regSuccess) {
+            <div class="alert alert-success">{{ regSuccess }}</div>
+          }
+          @if (regError) {
+            <div class="alert alert-error">{{ regError }}</div>
+          }
+
+          <div class="field-row">
+            <div class="field">
+              <label>Nombre</label>
+              <input type="text" [(ngModel)]="regNombre" placeholder="Juan" />
+            </div>
+            <div class="field">
+              <label>Apellido</label>
+              <input type="text" [(ngModel)]="regApellido" placeholder="Pérez" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <input type="email" [(ngModel)]="regEmail" placeholder="tu@email.com" />
+          </div>
+          <div class="field">
+            <label>Contraseña</label>
+            <input type="password" [(ngModel)]="regPassword" placeholder="••••••••" />
+          </div>
+          <div class="field">
+            <label>Repetir contraseña</label>
+            <input type="password" [(ngModel)]="regRepeatPassword" placeholder="••••••••" (keyup.enter)="register()" />
+          </div>
+
+          <button class="btn-primary" (click)="register()" [disabled]="regLoading">
+            {{ regLoading ? 'Creando cuenta...' : 'Registrarse' }}
+          </button>
+
+          <p class="modal-switch">¿Ya tenés cuenta? <a (click)="openModal('login')">Iniciá sesión</a></p>
+        </div>
+      </div>
+    }
   `,
 })
 export class NavComponent implements OnInit, OnDestroy {

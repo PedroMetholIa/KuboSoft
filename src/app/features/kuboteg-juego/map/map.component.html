@@ -9,7 +9,6 @@
         <stop offset="100%" stop-color="#060b19"/>
       </radialGradient>
 
-      <!-- Expande la silueta continental, extrae solo el borde exterior, colorea cyan y difumina -->
       <filter id="coastal-glow" x="-12%" y="-12%" width="124%" height="124%">
         <feMorphology operator="dilate" radius="8" result="expanded"/>
         <feComposite in="expanded" in2="SourceGraphic" operator="out" result="outline"/>
@@ -23,35 +22,38 @@
 
     <g id="map-content">
 
-      <!-- Halo costero: silueta continental unificada con glow cyan -->
+      <!-- Halo costero -->
       <g id="coastal-glow-layer" pointer-events="none" filter="url(#coastal-glow)" opacity="0.5">
-        <path *ngFor="let t of territories" [attr.d]="t.svgPath" fill="white" stroke="none"/>
+        @for (t of territories; track t.id) {
+          <path [attr.d]="t.svgPath" fill="white" stroke="none"/>
+        }
       </g>
 
-      <!-- Territorios: fill + stroke en un solo pase -->
+      <!-- Territorios -->
       <g id="territories">
-        <path
-          *ngFor="let t of territories"
-          [attr.d]="t.svgPath"
-          [attr.fill]="getTerritoryFill(t)"
-          [attr.stroke]="getTerritoryStroke(t)"
-          [attr.stroke-width]="getTerritoryStrokeWidth(t)"
-          stroke-linejoin="round"
-          stroke-linecap="round"
-          class="terr"
-          [class.selected]="isSelected(t)"
-          [class.highlighted]="isHighlighted(t)"
-          (click)="onTerritoryClick(t); $event.stopPropagation()"
-          (contextmenu)="onTerritoryRightClick(t, $event); $event.stopPropagation()"
-          (mouseenter)="onTerritoryHover(t, $event)"
-          (mouseleave)="onTerritoryLeave()"
-        />
+        @for (t of territories; track t.id) {
+          <path
+            [attr.d]="t.svgPath"
+            [attr.fill]="getTerritoryFill(t)"
+            [attr.stroke]="getTerritoryStroke(t)"
+            [attr.stroke-width]="getTerritoryStrokeWidth(t)"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+            class="terr"
+            [class.selected]="isSelected(t)"
+            [class.highlighted]="isHighlighted(t)"
+            (click)="onTerritoryClick(t); $event.stopPropagation()"
+            (contextmenu)="onTerritoryRightClick(t, $event); $event.stopPropagation()"
+            (mouseenter)="onTerritoryHover(t, $event)"
+            (mouseleave)="onTerritoryLeave()"
+          />
+        }
       </g>
 
       <!-- Badges de tropas -->
       <g id="badges" pointer-events="none">
-        <ng-container *ngFor="let t of territories">
-          <ng-container *ngIf="getTropas(t.id) > 0">
+        @for (t of territories; track t.id) {
+          @if (getTropas(t.id) > 0) {
             <circle
               [attr.cx]="t.labelPosition.x"
               [attr.cy]="t.labelPosition.y"
@@ -70,25 +72,29 @@
               font-family="'Outfit', sans-serif"
               letter-spacing="0.5"
             >{{ getTropas(t.id) }}</text>
-          </ng-container>
-        </ng-container>
+          }
+        }
       </g>
 
     </g>
 
   </svg>
 
-  <div
-    class="tooltip"
-    *ngIf="tooltip"
-    [style.left.px]="tooltipX"
-    [style.top.px]="tooltipY"
-  >
-    <div class="tooltip-name">{{ tooltip.name }}</div>
-    <div class="tooltip-continent">{{ continentLabel(tooltip.continent) }}</div>
-    <div class="tooltip-owner" *ngIf="getOwnerName(tooltip.id)">Dueño: <strong>{{ getOwnerName(tooltip.id) }}</strong></div>
-    <div class="tooltip-owner" *ngIf="!getOwnerName(tooltip.id)">Sin dueño</div>
-    <div class="tooltip-troops">Tropas: <strong>{{ getTropas(tooltip.id) }}</strong></div>
-  </div>
+  @if (tooltip) {
+    <div
+      class="tooltip"
+      [style.left.px]="tooltipX"
+      [style.top.px]="tooltipY"
+    >
+      <div class="tooltip-name">{{ tooltip.name }}</div>
+      <div class="tooltip-continent">{{ continentLabel(tooltip.continent) }}</div>
+      @if (getOwnerName(tooltip.id)) {
+        <div class="tooltip-owner">Dueño: <strong>{{ getOwnerName(tooltip.id) }}</strong></div>
+      } @else {
+        <div class="tooltip-owner">Sin dueño</div>
+      }
+      <div class="tooltip-troops">Tropas: <strong>{{ getTropas(tooltip.id) }}</strong></div>
+    </div>
+  }
 
 </div>

@@ -10,6 +10,7 @@ interface Juego {
   nombre: string;
   descripcion: string | null;
   requiere_suscripcion?: boolean;
+  subscribed?: boolean;
 }
 
 type PopupType = 'not-published' | 'subscription' | null;
@@ -46,18 +47,40 @@ export class KuboJuegosComponent implements OnInit {
   }
 
   async loadJuegos() {
+    const user = this.supabase.getCurrentUser();
     const [productosRes, categoriaRes] = await Promise.all([
       this.supabase.getProductosByCategoriaNombre('KuboJuegos'),
       this.supabase.getCategoriaByNombre('KuboJuegos'),
     ]);
     if (productosRes.error) this.toast.show('Error al cargar los juegos.', 'error');
-    this.juegos = (productosRes.data as Juego[]) ?? [];
+    const juegos = (productosRes.data as Juego[]) ?? [];
+    if (user) {
+      await Promise.all(
+        juegos
+          .filter(j => j.requiere_suscripcion)
+          .map(async j => { j.subscribed = await this.supabase.isSubscribedToProduct(user.id, j.id); })
+      );
+    }
+    this.juegos = juegos;
     if (categoriaRes.data) {
       const cat = categoriaRes.data as { nombre: string; logo: string };
       this.categoriaNombre = cat.nombre;
       this.categoriaLogo   = cat.logo;
     }
     this.loading = false;
+  }
+
+  async suscribirse(event: Event, juego: Juego) {
+    event.stopPropagation();
+    await this.doSuscribir(juego);
+  }
+
+  private readonly displayNames: Record<string, string> = {
+    'KuboTeg': 'HEGEMONY',
+  };
+
+  getDisplayName(nombre: string): string {
+    return this.displayNames[nombre] ?? nombre.slice(4).toUpperCase();
   }
 
   getImgPath(nombre: string): string {
@@ -96,9 +119,30 @@ export class KuboJuegosComponent implements OnInit {
     this.selectedJuego = null;
   }
 
-  goToSubscription() {
-    this.closePopup();
-    this.router.navigate(['/inicio'], { fragment: 'contacto' });
+  async goToSubscription() {
+    if (!this.selectedJuego) return;
+    const ok = await this.doSuscribir(this.selectedJuego);
+    if (ok) {
+      this.closePopup();
+      const slug = this.selectedJuego.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+      this.router.navigate([`/${slug}`]);
+    }
+  }
+
+  private async doSuscribir(juego: Juego): Promise<boolean> {
+    const user = this.supabase.getCurrentUser();
+    if (!user) {
+      this.toast.show('Necesitás iniciar sesión para suscribirte.', 'info');
+      return false;
+    }
+    const { error } = await this.supabase.subscribeToProduct(user.id, juego.id);
+    if (error) {
+      this.toast.show('Error al suscribirse. Intentá de nuevo.', 'error');
+      return false;
+    }
+    juego.subscribed = true;
+    this.toast.show(`¡Te suscribiste a ${this.getDisplayName(juego.nombre)}!`, 'success');
+    return true;
   }
 
   submitForm() { this.submitted.set(true); }

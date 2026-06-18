@@ -47,7 +47,7 @@
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
-  width: fit-content;
+  width: 60%;
   &:hover { color: #fff; border-color: rgba(255,255,255,.25); }
 }
 
@@ -70,7 +70,7 @@
 .game-header-left {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.3rem;
   flex-shrink: 0;
 }
 
@@ -81,9 +81,9 @@
 }
 
 .header-brand {
-  font-size: 0.95rem;
+  font-size: 1.00rem;
   font-weight: 800;
-  color: #e2e8f0;
+  color: #FF4757;
   letter-spacing: 0.02em;
 }
 
@@ -141,6 +141,59 @@
   text-transform: uppercase;
 }
 
+
+// ── Tratados (aside derecho) ──────────────────────────
+.tratados-panel {
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 10px;
+  background: rgba(255,255,255,.03);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.tratados-header {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: #666;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+
+  svg { flex-shrink: 0; }
+}
+
+.politica-acciones {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.btn-politica-icono {
+  flex: 1;
+  height: 42px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.4);
+  transition: transform .1s, box-shadow .15s, background .15s;
+
+  &:hover  { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+  &:active { transform: translateY(0);    box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+}
+
+.btn-politica-gris  { background: #6b7280; &:hover { background: #7d8693; } &:active { background: #4b5563; } }
+.btn-politica-rojo  { background: #f3d0d0; &:hover { background: #fca5a5; } &:active { background: #e5a0a0; } }
+.btn-politica-azul  { background: #dbeafe; &:hover { background: #bfdbfe; } &:active { background: #93c5fd; } }
+.btn-politica-verde { background: #d1fae5; &:hover { background: #a7f3d0; } &:active { background: #6ee7b7; } }
 
 // ── Acciones (aside derecho) ───────────────────────────
 .acciones-panel {
@@ -502,10 +555,11 @@
 
 // ── Objetivo secreto ────────────────────────────────────
 .obj-box {
-  background: rgba(167, 139, 250, 0.06);
-  border: 1px solid rgba(167, 139, 250, 0.18);
+  background: rgba(245, 158, 11, 0.07);
+  border: 1px solid rgba(245, 158, 11, 0.28);
   border-radius: 8px;
   padding: 0.6rem 0.75rem;
+  margin-top: 0.7rem;
   margin-bottom: 0.7rem;
 }
 
@@ -514,7 +568,7 @@
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: #a78bfa;
+  color: #f59e0b;
   margin-bottom: 0.45rem;
 }
 
@@ -523,12 +577,12 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.78rem;
-  color: #64748b;
+  color: #d97706;
   padding: 0.12rem 0;
 
   &.obj-done { color: #34d399; }
 
-  &.obj-alt { color: #94a3b8; }
+  &.obj-alt { color: #92400e; }
 }
 
 .obj-mark {
@@ -536,6 +590,7 @@
   width: 1rem;
   text-align: center;
   flex-shrink: 0;
+  color: #fbbf24;
 }
 
 .obj-color-dot {
@@ -549,8 +604,126 @@
 .obj-prog {
   margin-left: auto;
   font-size: 0.7rem;
-  color: #475569;
+  color: #b45309;
   font-variant-numeric: tabular-nums;
+}
+
+// ── Cartas (panel Inicio) ───────────────────────────────
+.cartas-section {
+  margin-top: 1.2rem;
+  margin-bottom: 1.4rem;
+  padding: 0 0.1rem;
+}
+
+.cartas-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 0.8rem;
+}
+
+.cartas-count {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.cartas-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.carta-chip {
+  font-size: 0.68rem;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  white-space: nowrap;
+}
+
+// ── Botón canjear cartas ────────────────────────────────
+.btn-canjear-cartas {
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 6px;
+  color: #a5b4fc;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover:not(:disabled) {
+    background: rgba(99, 102, 241, 0.22);
+    border-color: rgba(99, 102, 241, 0.55);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+// ── Notificación carta robada ───────────────────────────
+.carta-notif {
+  position: fixed;
+  bottom: 5.5rem;
+  right: 1.5rem;
+  z-index: 900;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: #0f1729;
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  min-width: 180px;
+  max-width: 240px;
+  animation: carta-slide-in 0.3s ease;
+}
+
+@keyframes carta-slide-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.carta-notif-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.carta-notif-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.carta-notif-title {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #818cf8;
+}
+
+.carta-notif-terr {
+  font-size: 0.82rem;
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.carta-notif-bonus {
+  font-size: 0.72rem;
+  color: #f59e0b;
+  font-weight: 600;
+  margin-top: 0.1rem;
 }
 
 // ── Desglose de tropas (panel Inicio) ──────────────────
@@ -783,21 +956,6 @@
 }
 
 
-.btn-ganar {
-  background: linear-gradient(135deg, #d97706, #b45309);
-  color: #fff;
-  border: none;
-  border-radius: 12px;
-  padding: 0.85rem 1.5rem;
-  font-size: 0.95rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover:not(:disabled) { box-shadow: 0 4px 20px rgba(217, 119, 6, 0.55); filter: brightness(1.1); }
-  &:disabled { opacity: 0.4; cursor: not-allowed; }
-}
-
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -892,6 +1050,195 @@
 @keyframes bob {
   0%, 100% { transform: translateY(0); }
   50%       { transform: translateY(-6px); }
+}
+
+// ── Popup carta robada ─────────────────────────────────
+.carta-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+}
+
+.carta-popup-card {
+  position: relative;
+  width: 300px;
+  border-radius: 22px;
+  background: linear-gradient(170deg, #0e1529 0%, #090d1c 55%, #0d1132 100%);
+  box-shadow:
+    0 0 0 1.5px rgba(99, 102, 241, 0.6),
+    0 0 45px rgba(99, 102, 241, 0.2),
+    0 24px 70px rgba(0, 0, 0, 0.75);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  animation: carta-popup-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -80%;
+    width: 45%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.055) 50%,
+      transparent 100%
+    );
+    transform: skewX(-18deg);
+    animation: carta-shine 1s ease 0.45s forwards;
+    pointer-events: none;
+  }
+}
+
+@keyframes carta-popup-in {
+  0%   { opacity: 0; transform: scale(0.6) translateY(28px); }
+  65%  { transform: scale(1.04) translateY(-4px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes carta-shine {
+  0%   { left: -80%; }
+  100% { left: 220%; }
+}
+
+.carta-popup-badge {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  background: linear-gradient(90deg, #3730a3, #4f46e5 40%, #6366f1 70%, #4f46e5);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #fff;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 2px 12px rgba(79, 70, 229, 0.4);
+}
+
+.carta-badge-dot {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.5);
+  flex-shrink: 0;
+}
+
+.carta-popup-mapa {
+  width: 100%;
+  height: 220px;
+  border-top: 1px solid rgba(99, 102, 241, 0.2);
+  background: radial-gradient(ellipse at center, #12193a 0%, #080c1a 100%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 60% at center, rgba(99, 102, 241, 0.16) 0%, transparent 72%);
+    pointer-events: none;
+  }
+}
+
+.carta-popup-svg {
+  display: block;
+  width: 96%;
+  height: 200px;
+  overflow: visible;
+  position: relative;
+  z-index: 1;
+  filter:
+    drop-shadow(0 4px 16px rgba(0, 0, 0, 0.65))
+    drop-shadow(0 0 22px rgba(99, 102, 241, 0.35));
+}
+
+.carta-popup-info {
+  padding: 0.7rem 1.8rem 0.4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.carta-popup-nombre {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #e8ecf5;
+  text-align: center;
+  letter-spacing: 0.03em;
+  text-shadow: 0 0 24px rgba(129, 140, 248, 0.45);
+}
+
+.carta-popup-bonus {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 20px;
+  padding: 0.2rem 0.8rem;
+
+  .bonus-star {
+    color: #fbbf24;
+    font-size: 0.65rem;
+  }
+}
+
+.carta-popup-tropas-bonus {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+  border-radius: 20px;
+  padding: 0.2rem 0.8rem;
+
+  .tropas-bonus-star {
+    font-size: 0.65rem;
+  }
+}
+
+.carta-popup-cerrar {
+  margin: 0.3rem 1.6rem 1.4rem;
+  padding: 0.52rem 0;
+  width: calc(100% - 3.2rem);
+  border-radius: 10px;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.28);
+  color: #a5b4fc;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+
+  &:hover {
+    background: rgba(99, 102, 241, 0.22);
+    border-color: rgba(99, 102, 241, 0.5);
+    color: #c7d2fe;
+  }
 }
 
 // ── Popup fin de partida ───────────────────────────────
@@ -1316,6 +1663,8 @@
   transition: all 0.2s;
   filter: brightness(0.95);
 
+  &.btn-confirmar-lider { background-color: #7c3aed; }
+
   &:hover:not(:disabled) { filter: brightness(1.15); box-shadow: 0 6px 20px rgba(0,0,0,.4); }
   &:disabled {
     background: rgba(255,255,255,.08) !important;
@@ -1521,4 +1870,914 @@
   .game-body,
   .loading-screen,
   .color-selector-overlay { visibility: hidden; }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ── Sistema de Pactos ───────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+// ── Panel Tratados (tab content) ────────────────────────────
+.pactos-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  position: relative;
+}
+
+.pactos-section-title {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #555;
+  padding: 0 0.25rem;
+}
+
+.pactos-empty {
+  font-size: 0.75rem;
+  color: #444;
+  text-align: center;
+  padding: 0.75rem 0;
+}
+
+.pactos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pacto-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  font-size: 0.73rem;
+}
+
+.pacto-icon { font-size: 1rem; flex-shrink: 0; }
+
+.pacto-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pacto-contraparte {
+  font-weight: 600;
+  color: #c8c8e0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pacto-detalle {
+  font-size: 0.65rem;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pacto-tipo-badge {
+  font-size: 1rem;
+  flex-shrink: 0;
+  line-height: 1;
+  padding: 2px;
+}
+
+.pacto-nombre {
+  font-weight: 600;
+  color: #c8c8e0;
+  font-size: 0.73rem;
+}
+
+.pacto-con {
+  font-size: 0.65rem;
+  color: #666;
+}
+
+.pacto-terrs {
+  font-size: 0.63rem;
+  color: #555;
+}
+
+.pacto-expira {
+  font-size: 0.65rem;
+  color: #888;
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+// ── Proponer lista ──────────────────────────────────────────
+.proponer-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.proponer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.25rem;
+}
+
+.proponer-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.proponer-nombre {
+  flex: 1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #b0b0c8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// ── Proponer pactos a enemigos ──────────────────────────────
+.proponer-separator {
+  height: 1px;
+  background: rgba(255,255,255,0.06);
+  margin: 0.25rem 0;
+}
+
+.enemigos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.enemigo-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.25rem;
+}
+
+.enemigo-nombre {
+  flex: 1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #b0b0c8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.proponer-btns {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.btn-proponer-tipo {
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  white-space: nowrap;
+
+  &:active { transform: scale(0.95); }
+
+  &.tipo-alianza {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.4);
+    color: #a5b4fc;
+    &:hover { background: rgba(99, 102, 241, 0.28); }
+  }
+
+  &.tipo-no-agresion {
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.35);
+    color: #6ee7b7;
+    &:hover { background: rgba(16, 185, 129, 0.22); }
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    &:hover { background: inherit; }
+    &:active { transform: none; }
+  }
+}
+
+.propuesta-pendiente {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.65rem;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 6px;
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+
+// ── Popup: propuesta entrante ────────────────────────────────
+.propuesta-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.6);
+  backdrop-filter: blur(6px);
+  padding: 1rem;
+  animation: overlayFadeIn .2s ease;
+}
+
+.propuesta-card {
+  background: linear-gradient(160deg, #0f1428, #0a0e20);
+  border: 1px solid rgba(99,102,241,.35);
+  border-top: 2px solid rgba(99,102,241,.7);
+  border-radius: 20px;
+  padding: 1.75rem 1.75rem 1.5rem;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 0 60px rgba(99,102,241,.2), 0 30px 80px rgba(0,0,0,.7);
+  animation: propuesta-in .35s cubic-bezier(.34,1.56,.64,1);
+}
+
+@keyframes propuesta-in {
+  from { opacity: 0; transform: scale(.85) translateY(20px); }
+  to   { opacity: 1; transform: scale(1)   translateY(0); }
+}
+
+.propuesta-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: #6366f1;
+}
+
+.propuesta-badge-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #6366f1;
+  animation: pulseDot 1.2s ease-in-out infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: .4; transform: scale(.7); }
+}
+
+.propuesta-icon { font-size: 2.8rem; line-height: 1; }
+
+.propuesta-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  text-align: center;
+}
+
+.propuesta-de {
+  font-size: 0.82rem;
+  color: #64748b;
+  text-align: center;
+  strong { color: #a5b4fc; }
+}
+
+.propuesta-terr-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: #334155;
+}
+
+.propuesta-territorios {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+  background: rgba(99,102,241,.08);
+  border: 1px solid rgba(99,102,241,.2);
+  border-radius: 10px;
+  padding: 0.6rem 0.85rem;
+}
+
+.propuesta-terr-propio {
+  font-size: 0.8rem;
+  color: #818cf8;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.propuesta-flecha {
+  font-size: 0.9rem;
+  color: #4338ca;
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+
+.propuesta-terr-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.propuesta-terr-chip {
+  font-size: 0.75rem;
+  color: #818cf8;
+  font-weight: 600;
+  background: rgba(99,102,241,.15);
+  border: 1px solid rgba(99,102,241,.25);
+  border-radius: 5px;
+  padding: 0.1rem 0.45rem;
+}
+
+.propuesta-duracion {
+  font-size: 0.72rem;
+  color: #334155;
+}
+
+.propuesta-actions {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.btn-propuesta-rechazar,
+.btn-propuesta-aceptar {
+  flex: 1;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .1s, opacity .15s, box-shadow .15s;
+  &:active { transform: scale(.96); }
+}
+
+.btn-propuesta-rechazar {
+  background: rgba(239,68,68,.12);
+  color: #fca5a5;
+  border: 1px solid rgba(239,68,68,.3);
+  &:hover { background: rgba(239,68,68,.22); }
+}
+
+.btn-propuesta-aceptar {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(99,102,241,.35);
+  &:hover { opacity: .9; box-shadow: 0 6px 22px rgba(99,102,241,.5); }
+}
+
+// ── Popup: romper pacto ──────────────────────────────────────
+.romper-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 550;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: overlayFadeIn .2s ease;
+}
+
+.romper-modal {
+  background: linear-gradient(160deg, #0f1428, #0a0e20);
+  border: 1px solid rgba(239,68,68,.25);
+  border-top: 2px solid rgba(239,68,68,.55);
+  border-radius: 18px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 0 50px rgba(239,68,68,.1), 0 30px 70px rgba(0,0,0,.7);
+  animation: propuesta-in .3s cubic-bezier(.34,1.56,.64,1);
+}
+
+.romper-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.romper-modal-icon { font-size: 1.6rem; line-height: 1; }
+
+.romper-modal-titles {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.romper-modal-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.romper-modal-sub {
+  font-size: 0.75rem;
+  color: #475569;
+}
+
+.romper-modal-close {
+  background: none;
+  border: none;
+  color: #475569;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+  &:hover { color: #94a3b8; }
+}
+
+.romper-pacto-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.romper-pacto-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+  transition: background .15s;
+  &:hover { background: rgba(255,255,255,.06); }
+}
+
+.romper-pacto-tipo-icon {
+  font-size: 1.4rem;
+  width: 2rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.romper-pacto-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.romper-pacto-nombre {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.romper-pacto-con {
+  font-size: 0.78rem;
+  color: #64748b;
+  strong { color: #a5b4fc; }
+}
+
+.romper-pacto-terrs {
+  font-size: 0.72rem;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.romper-flecha {
+  margin: 0 0.3rem;
+  color: #334155;
+}
+
+.romper-pacto-expira {
+  font-size: 0.7rem;
+  color: #334155;
+  flex-shrink: 0;
+  padding: 0 0.25rem;
+}
+
+.btn-romper-pacto {
+  flex-shrink: 0;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid rgba(239,68,68,.4);
+  background: rgba(239,68,68,.1);
+  color: #fca5a5;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, transform .1s;
+  &:hover { background: rgba(239,68,68,.22); }
+  &:active { transform: scale(.95); }
+}
+
+.romper-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-romper-cancelar {
+  padding: 0.55rem 1.25rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.05);
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  &:hover { background: rgba(255,255,255,.1); color: #94a3b8; }
+}
+
+// ── Popup: proponer tratado ──────────────────────────────────
+.tratado-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: overlayFadeIn .2s ease;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.tratado-modal {
+  background: linear-gradient(160deg, rgba(15,20,45,.98), rgba(8,12,30,.98));
+  border: 1px solid rgba(255,255,255,.1);
+  border-top: 2px solid rgba(148,163,184,.4);
+  border-radius: 20px;
+  padding: 1.75rem;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 30px 80px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.04);
+  animation: modalSlideIn .22s cubic-bezier(.21,1.02,.73,1);
+}
+
+@keyframes modalSlideIn {
+  from { transform: scale(.93) translateY(12px); opacity: 0; }
+  to   { transform: scale(1)   translateY(0);    opacity: 1; }
+}
+
+.tratado-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.tratado-modal-icon {
+  font-size: 2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.tratado-modal-titles { flex: 1; }
+
+.tratado-modal-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.tratado-modal-sub {
+  font-size: 0.75rem;
+  color: #475569;
+  margin-top: 0.1rem;
+}
+
+.tratado-modal-close {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  color: #555;
+  border-radius: 8px;
+  width: 30px; height: 30px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+  flex-shrink: 0;
+  &:hover { background: rgba(255,255,255,.12); color: #aaa; }
+}
+
+.tratado-section-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #475569;
+  margin-bottom: -0.25rem;
+}
+
+.tratado-tipo-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-tratado-tipo {
+  flex: 1;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 12px;
+  padding: 0.75rem 0.5rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all .15s;
+  color: #94a3b8;
+
+  &:hover {
+    background: rgba(255,255,255,.08);
+    border-color: rgba(255,255,255,.18);
+    color: #cbd5e1;
+  }
+
+  &.selected {
+    background: rgba(148,163,184,.12);
+    border-color: rgba(148,163,184,.45);
+    color: #e2e8f0;
+    box-shadow: 0 0 0 1px rgba(148,163,184,.2) inset;
+  }
+}
+
+.btn-tratado-tipo-icon { font-size: 1.4rem; line-height: 1; }
+.btn-tratado-tipo-text { font-size: 0.82rem; font-weight: 700; }
+.btn-tratado-tipo-desc { font-size: 0.68rem; color: #475569; }
+
+.tratado-select {
+  width: 100%;
+  background: rgba(0,0,0,.3);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  color: #e2e8f0;
+  font-size: 0.85rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color .15s;
+  &:focus { border-color: rgba(148,163,184,.5); }
+  option { background: #10142a; }
+}
+
+.tratado-territorios-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.tratado-terr-col { flex: 1; display: flex; flex-direction: column; gap: 0.35rem; }
+
+.tratado-terr-label {
+  font-size: 0.72rem;
+  color: #475569;
+}
+
+.tratado-terr-sep {
+  font-size: 1rem;
+  color: #334155;
+  padding-bottom: 0.55rem;
+  flex-shrink: 0;
+}
+
+.tratado-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 130px;
+  overflow-y: auto;
+  padding: 0.5rem 0.6rem;
+  background: rgba(0,0,0,.25);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px;
+
+  &::-webkit-scrollbar { width: 3px; }
+  &::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 3px; }
+}
+
+.tratado-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  padding: 0.2rem 0.25rem;
+  border-radius: 5px;
+  transition: background .12s;
+  font-size: 0.8rem;
+  color: #94a3b8;
+
+  &:hover { background: rgba(255,255,255,.05); color: #cbd5e1; }
+
+  input[type='checkbox'] {
+    accent-color: #94a3b8;
+    width: 13px;
+    height: 13px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+}
+
+.tratado-checkboxes-empty {
+  font-size: 0.75rem;
+  color: #334155;
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+.tratado-duracion {
+  font-size: 0.75rem;
+  color: #334155;
+  text-align: center;
+  padding: 0.4rem 0;
+  border-top: 1px solid rgba(255,255,255,.05);
+}
+
+.tratado-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.btn-tratado-cancelar {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.1);
+  color: #475569;
+  border-radius: 10px;
+  padding: 0.65rem 1.1rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all .15s;
+  &:hover { border-color: rgba(255,255,255,.22); color: #94a3b8; }
+}
+
+.btn-tratado-confirmar {
+  flex: 1;
+  background: linear-gradient(135deg, #334155, #1e293b);
+  border: 1px solid rgba(148,163,184,.3);
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  &:hover:not(:disabled) { background: linear-gradient(135deg, #475569, #334155); border-color: rgba(148,163,184,.5); transform: translateY(-1px); }
+  &:disabled { opacity: .35; cursor: not-allowed; }
+}
+
+// ── Modal: crear pacto ──────────────────────────────────────
+.modal-pacto-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  border-radius: 12px;
+  animation: fade-in 0.2s ease;
+}
+
+.modal-pacto-card {
+  background: linear-gradient(145deg, #1a1a2e, #16213e);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 1.25rem 1.25rem 1rem;
+  width: calc(100% - 2rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  animation: propuesta-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal-pacto-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  text-align: center;
+}
+
+.modal-pacto-con {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  text-align: center;
+
+  strong { color: #c8c8e8; }
+}
+
+.modal-pacto-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+
+  label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #555;
+  }
+
+  select {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    color: #c8c8e0;
+    font-size: 0.8rem;
+    padding: 0.4rem 0.6rem;
+    outline: none;
+    cursor: pointer;
+    appearance: auto;
+
+    &:focus { border-color: rgba(99,102,241,0.5); }
+
+    option {
+      background: #1a1a2e;
+      color: #c8c8e0;
+    }
+  }
+}
+
+.modal-pacto-info {
+  font-size: 0.7rem;
+  color: #555;
+  text-align: center;
+}
+
+.modal-pacto-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.btn-modal-cancelar,
+.btn-modal-proponer {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  border: none;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.15s;
+  &:active { transform: scale(0.96); }
+}
+
+.btn-modal-cancelar {
+  background: rgba(255,255,255,0.06);
+  color: #888;
+  border: 1px solid rgba(255,255,255,0.1);
+  &:hover { background: rgba(255,255,255,0.1); }
+}
+
+.btn-modal-proponer {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(99,102,241,0.35);
+  &:hover { opacity: 0.9; }
 }

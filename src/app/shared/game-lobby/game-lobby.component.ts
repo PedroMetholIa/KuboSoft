@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
-import { CommonModule, Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Location } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { filter, take } from 'rxjs/operators';
@@ -43,55 +43,55 @@ interface PartidaFinalizada {
 @Component({
   selector: 'app-game-lobby',
   standalone: true,
-  imports: [CommonModule, FormsModule, JugadoresChatComponent],
+  imports: [FormsModule, JugadoresChatComponent],
   template: `
     <div class="partida">
 
-      <!-- Notification popup modal -->
-      <div class="notif-overlay" *ngIf="notificacionActiva">
-        <div class="notif-modal">
-          <button class="notif-close-btn" (click)="cerrarNotificacion()">
-            <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
-              <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-          </button>
-          <div class="notif-logo-wrap">
-            <img src="assets/productos/favicon-kuboteg.svg" alt="KuboTeg" class="notif-logo">
-          </div>
-          <div class="notif-title">¡Partida iniciada!</div>
-          <p class="notif-msg">{{ notifMsgFormatted }}</p>
-          <button class="btn-ir" (click)="irAPartida()">Ir a jugar →</button>
-        </div>
-      </div>
-
-      <!-- Header: modo KuboTeg con brand -->
-      <div class="page-header" *ngIf="config.showBrand">
-        <div class="container">
-          <div class="page-brand">
-            <img class="page-logo" src="assets/productos/favicon-kuboteg.svg" alt="KuboTeg">
-            <h1 class="page-title">
-              <span class="title-kubo">Kubo</span><span class="title-teg">Teg</span>
-            </h1>
-          </div>
-          <div class="page-actions">
-            <button class="btn-footer btn-back" (click)="volver()">← Volver atrás</button>
-            <button class="btn-footer btn-refresh" (click)="refresh()">↺ Refrescar</button>
-            <button class="btn btn-fill" (click)="showCreateForm = true">+ Crear nueva partida</button>
+      @if (notificacionActiva) {
+        <div class="notif-overlay">
+          <div class="notif-modal">
+            <button class="notif-close-btn" (click)="cerrarNotificacion()">
+              <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
+                <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </button>
+            <div class="notif-logo-wrap">
+              <img src="assets/productos/favicon-kuboteg.svg" alt="KuboTeg" class="notif-logo">
+            </div>
+            <div class="notif-title">¡Partida iniciada!</div>
+            <p class="notif-msg">{{ notifMsgFormatted }}</p>
+            <button class="btn-ir" (click)="irAPartida()">Ir a jugar →</button>
           </div>
         </div>
-      </div>
+      }
 
-      <!-- Header: modo simple (Partidas) -->
-      <header class="top-bar" *ngIf="!config.showBrand">
-        <div class="container">
-          <div class="title-block">
-            <h1>Partidas</h1>
-            <p>Gestión de partidas y suscriptores</p>
+      @if (config.showBrand) {
+        <div class="page-header">
+          <div class="container">
+            <div class="page-brand">
+              <img class="page-logo" src="assets/productos/favicon-kuboteg.svg" alt="KuboTeg">
+              <h1 class="page-title" style="color:#FF4757">HEGEMONY</h1>
+            </div>
+            <div class="page-actions">
+              <button class="btn-footer btn-back" (click)="volver()">← Volver atrás</button>
+              <button class="btn-footer btn-refresh" (click)="refresh()">↺ Refrescar</button>
+              <button class="btn btn-fill" (click)="showCreateForm = true">+ Crear nueva partida</button>
+            </div>
           </div>
         </div>
-      </header>
+      }
 
-      <!-- Main -->
+      @if (!config.showBrand) {
+        <header class="top-bar">
+          <div class="container">
+            <div class="title-block">
+              <h1>Partidas</h1>
+              <p>Gestión de partidas y suscriptores</p>
+            </div>
+          </div>
+        </header>
+      }
+
       <main class="content">
         <div class="container">
           <div class="main-grid">
@@ -108,99 +108,100 @@ interface PartidaFinalizada {
                     <tr><th>Partida</th><th>Jugadores</th><th></th></tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let p of misPartidas">
-                      <td>{{ p.nombre }}</td>
-                      <td class="num-cell">{{ p.jugadores_registrados }} / {{ p.limite_jugadores }}</td>
-                      <td class="actions-cell">
-                        <button
-                          class="btn-comenzar"
-                          (click)="comenzarPartida(p)"
-                          *ngIf="p.estado === 'Iniciada'"
-                          [disabled]="p.jugadores_registrados < p.limite_jugadores || comenzando"
-                          [title]="p.jugadores_registrados < p.limite_jugadores ? 'Faltan ' + (p.limite_jugadores - p.jugadores_registrados) + ' jugadores' : 'Iniciar partida'">
-                          {{ comenzando ? '...' : '✓ Comenzar' }}
-                        </button>
-                        <button
-                          class="btn-ir-juego"
-                          *ngIf="p.estado === 'En juego' && p.host_id === userId"
-                          (click)="irAJuego(p.id)">
-                          Ir a jugar →
-                        </button>
-                        <button class="btn-icon-delete" (click)="eliminarPartida(p.id)" title="Eliminar">🗑</button>
-                      </td>
-                    </tr>
-                    <tr *ngIf="misPartidas.length === 0">
-                      <td colspan="4" class="empty-row">No tenés partidas creadas</td>
-                    </tr>
+                    @for (p of misPartidas; track p.id) {
+                      <tr>
+                        <td>{{ p.nombre }}</td>
+                        <td class="num-cell">{{ p.jugadores_registrados }} / {{ p.limite_jugadores }}</td>
+                        <td class="actions-cell">
+                          @if (p.estado === 'Iniciada') {
+                            <button
+                              class="btn-comenzar"
+                              (click)="comenzarPartida(p)"
+                              [disabled]="p.jugadores_registrados < p.limite_jugadores || comenzando"
+                              [title]="p.jugadores_registrados < p.limite_jugadores ? 'Faltan ' + (p.limite_jugadores - p.jugadores_registrados) + ' jugadores' : 'Iniciar partida'">
+                              {{ comenzando ? '...' : '✓ Comenzar' }}
+                            </button>
+                          }
+                          @if (p.estado === 'En juego' && p.host_id === userId) {
+                            <button class="btn-ir-juego" (click)="irAJuego(p.id)">Ir a jugar →</button>
+                          }
+                          <button class="btn-icon-delete" (click)="eliminarPartida(p.id)" title="Eliminar">🗑</button>
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="4" class="empty-row">No tenés partidas creadas</td></tr>
+                    }
                   </tbody>
                 </table>
               </div>
             </div>
 
-            <div class="panel panel-disponibles" *ngIf="partidasDisponibles.length > 0">
-              <div class="panel-header">
-                <span class="panel-icon purple">🌐</span>
-                <h3>Disponibles</h3>
-                <span class="count-badge purple">{{ partidasDisponibles.length }}</span>
+            @if (partidasDisponibles.length > 0) {
+              <div class="panel panel-disponibles">
+                <div class="panel-header">
+                  <span class="panel-icon purple">🌐</span>
+                  <h3>Disponibles</h3>
+                  <span class="count-badge purple">{{ partidasDisponibles.length }}</span>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>Partida</th><th>Jugadores</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                      @for (p of partidasDisponibles; track p.id) {
+                        <tr>
+                          <td>{{ p.nombre }}</td>
+                          <td class="num-cell">{{ p.jugadores_registrados }} / {{ p.limite_jugadores }}</td>
+                          <td>
+                            @if (!misPartidasIds.has(p.id)) {
+                              <button
+                                class="btn-unirse"
+                                (click)="unirse(p)"
+                                [disabled]="p.jugadores_registrados >= p.limite_jugadores">
+                                Unirse
+                              </button>
+                            } @else {
+                              <button class="btn-salirse" (click)="salirse(p)">Salirse</button>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr><th>Partida</th><th>Jugadores</th><th></th></tr>
-                  </thead>
-                  <tbody>
-                    <tr *ngFor="let p of partidasDisponibles">
-                      <td>{{ p.nombre }}</td>
-                      <td class="num-cell">{{ p.jugadores_registrados }} / {{ p.limite_jugadores }}</td>
-                      <td>
-                        <button
-                          *ngIf="!misPartidasIds.has(p.id)"
-                          class="btn-unirse"
-                          (click)="unirse(p)"
-                          [disabled]="p.jugadores_registrados >= p.limite_jugadores">
-                          Unirse
-                        </button>
-                        <button
-                          *ngIf="misPartidasIds.has(p.id)"
-                          class="btn-salirse"
-                          (click)="salirse(p)">
-                          Salirse
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            }
 
-            <div class="panel panel-en-juego" *ngIf="partidasEnJuego.length > 0">
-              <div class="panel-header">
-                <span class="panel-icon green">⚡</span>
-                <h3>En juego</h3>
-                <span class="count-badge green">{{ partidasEnJuego.length }}</span>
+            @if (partidasEnJuego.length > 0) {
+              <div class="panel panel-en-juego">
+                <div class="panel-header">
+                  <span class="panel-icon green">⚡</span>
+                  <h3>En juego</h3>
+                  <span class="count-badge green">{{ partidasEnJuego.length }}</span>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>Partida</th><th>Jugadores</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                      @for (p of partidasEnJuego; track p.id) {
+                        <tr>
+                          <td>{{ p.nombre }}</td>
+                          <td class="num-cell">{{ p.jugadores_registrados }} / {{ p.limite_jugadores }}</td>
+                          <td>
+                            @if (misPartidasIds.has(p.id)) {
+                              <button class="btn-ir-juego" (click)="irAJuego(p.id)">Volver →</button>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr><th>Partida</th><th>Jugadores</th><th></th></tr>
-                  </thead>
-                  <tbody>
-                    <tr *ngFor="let p of partidasEnJuego">
-                      <td>{{ p.nombre }}</td>
-                      <td class="num-cell">{{ p.jugadores_registrados }} / {{ p.limite_jugadores }}</td>
-                      <td>
-                        <button
-                          class="btn-ir-juego"
-                          *ngIf="misPartidasIds.has(p.id)"
-                          (click)="irAJuego(p.id)">
-                          Volver →
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            }
 
             <div class="panel panel-finalizadas" [style.grid-column]="'span ' + finalizadasSpan">
               <div class="panel-header">
@@ -214,20 +215,24 @@ interface PartidaFinalizada {
                     <tr><th>Ganador</th><th>Partida</th><th>Día</th><th>Jugadores</th></tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let p of partidasFinalizadas">
-                      <td>
-                        <span class="ganador-tag" *ngIf="p.ganador_id">{{ ganadorNombre(p.ganador_id) }}</span>
-                        <span class="no-clave" *ngIf="!p.ganador_id">—</span>
-                      </td>
-                      <td>{{ p.nombre }}</td>
-                      <td class="date-cell">{{ formatDay(p.created_at) }}</td>
-                      <td class="jugadores-cell">
-                        <button class="btn-ver-jugadores" (click)="verJugadores(p.jugadores)">👥</button>
-                      </td>
-                    </tr>
-                    <tr *ngIf="partidasFinalizadas.length === 0">
-                      <td colspan="4" class="empty-row">No hay partidas finalizadas</td>
-                    </tr>
+                    @for (p of partidasFinalizadas; track p.id) {
+                      <tr>
+                        <td>
+                          @if (p.ganador_id) {
+                            <span class="ganador-tag">{{ ganadorNombre(p.ganador_id) }}</span>
+                          } @else {
+                            <span class="no-clave">—</span>
+                          }
+                        </td>
+                        <td>{{ p.nombre }}</td>
+                        <td class="date-cell">{{ formatDay(p.created_at) }}</td>
+                        <td class="jugadores-cell">
+                          <button class="btn-ver-jugadores" (click)="verJugadores(p.jugadores)">👥</button>
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="4" class="empty-row">No hay partidas finalizadas</td></tr>
+                    }
                   </tbody>
                 </table>
               </div>
@@ -263,86 +268,120 @@ interface PartidaFinalizada {
         </div>
       </main>
 
-      <!-- Footer: solo en modo partida (con logout) -->
-      <footer class="footer-bar" *ngIf="!config.showNavBack">
-        <div class="container">
-          <button class="btn-footer btn-back" (click)="logout()">← Cerrar sesión</button>
-          <button class="btn-footer btn-refresh" (click)="refresh()">↺ Refrescar</button>
-          <button class="btn-footer btn-crear" (click)="showCreateForm = true">+ Crear nueva partida</button>
-        </div>
-      </footer>
+      @if (!config.showNavBack) {
+        <footer class="footer-bar">
+          <div class="container">
+            <button class="btn-footer btn-back" (click)="logout()">← Cerrar sesión</button>
+            <button class="btn-footer btn-refresh" (click)="refresh()">↺ Refrescar</button>
+            <button class="btn-footer btn-crear" (click)="showCreateForm = true">+ Crear nueva partida</button>
+          </div>
+        </footer>
+      }
 
-      <!-- Modal crear partida -->
-      <div class="modal-overlay" *ngIf="showCreateForm" (click)="cancelarForm()">
-        <div class="modal-panel" (click)="$event.stopPropagation()">
-          <h3>Nueva partida</h3>
-          <div class="form-grid">
-            <div class="field">
-              <label>Nombre</label>
-              <input type="text" [(ngModel)]="form.nombre" placeholder="Nombre de la partida" />
-            </div>
-            <div class="field" *ngIf="config.showProductSelector">
-              <label>Producto</label>
-              <select [(ngModel)]="form.producto_id">
-                <option value="">Seleccioná...</option>
-                <option *ngFor="let p of productos" [value]="p.id">{{ p.nombre }}</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>Límite de jugadores (2–8)</label>
-              <div class="num-stepper">
-                <button type="button" class="step-btn" [disabled]="form.limite_jugadores <= 2" (click)="form.limite_jugadores = form.limite_jugadores - 1">−</button>
-                <span class="step-value">{{ form.limite_jugadores }}</span>
-                <button type="button" class="step-btn" [disabled]="form.limite_jugadores >= 8" (click)="form.limite_jugadores = form.limite_jugadores + 1">+</button>
+      @if (showCreateForm) {
+        <div class="modal-overlay" (click)="cancelarForm()">
+          <div class="modal-panel" (click)="$event.stopPropagation()">
+            <h3>Nueva partida</h3>
+            <div class="form-grid">
+              <div class="field">
+                <label>Nombre</label>
+                <input type="text" [(ngModel)]="form.nombre" placeholder="Nombre de la partida" />
+              </div>
+              @if (config.showProductSelector) {
+                <div class="field">
+                  <label>Producto</label>
+                  <select [(ngModel)]="form.producto_id">
+                    <option value="">Seleccioná...</option>
+                    @for (p of productos; track p.id) {
+                      <option [value]="p.id">{{ p.nombre }}</option>
+                    }
+                  </select>
+                </div>
+              }
+              <div class="form-row">
+                <div class="field field-narrow">
+                  <label>Límite de jugadores</label>
+                  <div class="num-stepper">
+                    <button type="button" class="step-btn" [disabled]="form.limite_jugadores <= 2" (click)="form.limite_jugadores = form.limite_jugadores - 1">−</button>
+                    <span class="step-value">{{ form.limite_jugadores }}</span>
+                    <button type="button" class="step-btn" [disabled]="form.limite_jugadores >= 8" (click)="form.limite_jugadores = form.limite_jugadores + 1">+</button>
+                  </div>
+                </div>
+                <div class="field-check field-check-inline">
+                  <label>
+                    <input type="checkbox" [(ngModel)]="form.requiere_contrasena" />
+                    Requiere contraseña
+                  </label>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="field field-narrow">
+                  <label>Tropas iniciales (4–10)</label>
+                  <div class="num-stepper">
+                    <button type="button" class="step-btn" [disabled]="form.tropas_iniciales <= 4" (click)="form.tropas_iniciales = form.tropas_iniciales - 1">−</button>
+                    <span class="step-value">{{ form.tropas_iniciales }}</span>
+                    <button type="button" class="step-btn" [disabled]="form.tropas_iniciales >= 10" (click)="form.tropas_iniciales = form.tropas_iniciales + 1">+</button>
+                  </div>
+                </div>
+                <div class="field field-narrow">
+                  <label>Límite de rondas (mín. 10)</label>
+                  <div class="num-stepper">
+                    <button type="button" class="step-btn" [disabled]="form.limite_rondas <= 10" (click)="form.limite_rondas = form.limite_rondas - 5">−</button>
+                    <span class="step-value">{{ form.limite_rondas }}</span>
+                    <button type="button" class="step-btn" (click)="form.limite_rondas = form.limite_rondas + 5">+</button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-          <div class="field-check">
-            <label>
-              <input type="checkbox" [(ngModel)]="form.requiere_contrasena" />
-              Requiere contraseña
-            </label>
-          </div>
-          <div class="field" *ngIf="form.requiere_contrasena">
-            <label>Contraseña</label>
-            <input type="text" [(ngModel)]="form.contrasena" placeholder="Clave de acceso" />
-          </div>
-          <div class="form-actions">
-            <button class="btn-cancel" (click)="cancelarForm()">Cancelar</button>
-            <button class="btn-crear-confirm" (click)="guardarPartida()"
-              [disabled]="formLoading || !form.nombre || (config.showProductSelector && !form.producto_id)">
-              {{ formLoading ? 'Creando...' : '+ Crear partida' }}
-            </button>
+            @if (form.requiere_contrasena) {
+              <div class="field">
+                <label>Contraseña</label>
+                <input type="text" [(ngModel)]="form.contrasena" placeholder="Clave de acceso" />
+              </div>
+            }
+            <div class="form-actions">
+              <button class="btn-cancel" (click)="cancelarForm()">Cancelar</button>
+              <button class="btn-crear-confirm" (click)="guardarPartida()"
+                [disabled]="formLoading || !form.nombre || (config.showProductSelector && !form.producto_id)">
+                {{ formLoading ? 'Creando...' : '+ Crear partida' }}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      }
 
-      <!-- Modal jugadores finalizadas -->
-      <div class="modal-overlay" *ngIf="showJugadoresModal" (click)="showJugadoresModal = false">
-        <div class="modal-panel modal-jugadores" (click)="$event.stopPropagation()">
-          <ul class="jugadores-list">
-            <li *ngFor="let nombre of jugadoresModal">{{ nombre }}</li>
-          </ul>
+      @if (showJugadoresModal) {
+        <div class="modal-overlay" (click)="showJugadoresModal = false">
+          <div class="modal-panel modal-jugadores" (click)="$event.stopPropagation()">
+            <ul class="jugadores-list">
+              @for (nombre of jugadoresModal; track $index) {
+                <li>{{ nombre }}</li>
+              }
+            </ul>
+          </div>
         </div>
-      </div>
+      }
 
-      <!-- Modal contraseña -->
-      <div class="modal-overlay" *ngIf="showPasswordModal" (click)="cerrarPasswordModal()">
-        <div class="modal-panel" (click)="$event.stopPropagation()">
-          <h3>🔒 Partida con contraseña</h3>
-          <p class="modal-sub">Ingresá la clave para unirte a <strong>{{ partidaParaUnirse?.nombre }}</strong></p>
-          <div class="field">
-            <label>Contraseña</label>
-            <input type="password" [(ngModel)]="passwordInput" placeholder="••••••••"
-                   (keydown.enter)="confirmarUnirse()" autofocus />
-          </div>
-          <p class="password-error" *ngIf="passwordError">{{ passwordError }}</p>
-          <div class="form-actions">
-            <button class="btn-cancel" (click)="cerrarPasswordModal()">Cancelar</button>
-            <button class="btn-crear-confirm" (click)="confirmarUnirse()">Confirmar</button>
+      @if (showPasswordModal) {
+        <div class="modal-overlay" (click)="cerrarPasswordModal()">
+          <div class="modal-panel" (click)="$event.stopPropagation()">
+            <h3>🔒 Partida con contraseña</h3>
+            <p class="modal-sub">Ingresá la clave para unirte a <strong>{{ partidaParaUnirse?.nombre }}</strong></p>
+            <div class="field">
+              <label>Contraseña</label>
+              <input type="password" [(ngModel)]="passwordInput" placeholder="••••••••"
+                     (keydown.enter)="confirmarUnirse()" autofocus />
+            </div>
+            @if (passwordError) {
+              <p class="password-error">{{ passwordError }}</p>
+            }
+            <div class="form-actions">
+              <button class="btn-cancel" (click)="cerrarPasswordModal()">Cancelar</button>
+              <button class="btn-crear-confirm" (click)="confirmarUnirse()">Confirmar</button>
+            </div>
           </div>
         </div>
-      </div>
+      }
 
     </div>
   `,
@@ -389,6 +428,8 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     nombre: '',
     producto_id: '',
     limite_jugadores: 2,
+    tropas_iniciales: 5,
+    limite_rondas: 30,
     requiere_contrasena: false,
     contrasena: ''
   };
@@ -611,6 +652,8 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       nombre: '',
       producto_id: this.config.showProductSelector ? '' : this.autoProductoId,
       limite_jugadores: 2,
+      tropas_iniciales: 5,
+      limite_rondas: 30,
       requiere_contrasena: false,
       contrasena: ''
     };
@@ -630,7 +673,9 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       ganador_id: null,
       requiere_contrasena: this.form.requiere_contrasena,
       contrasena: this.form.requiere_contrasena ? this.form.contrasena : null,
-      turno_actual_usuario_id: null
+      turno_actual_usuario_id: null,
+      tropas_iniciales: this.form.tropas_iniciales,
+      limite_rondas: this.form.limite_rondas
     });
     if (nuevaPartida) {
       await this.supabaseService.insertPartidaJugador(nuevaPartida.id, this.userId, 0);
@@ -708,7 +753,7 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.misPartidasIds.add(p.id);
   }
 
-  hostNombre(hostId: string): string {
+  private hostNombre(hostId: string): string {
     const p = this.profiles.find(p => p.id === hostId);
     if (!p) return '—';
     return [p.nombre, p.apellido].filter(Boolean).join(' ') || p.email;

@@ -181,6 +181,21 @@ h2 {
 .prod-card { display: flex; flex-direction: column; }
 .card--clickable { cursor: pointer; }
 
+.btn-subscribe {
+  margin-top: .75rem;
+  align-self: flex-start;
+  background: var(--ac);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: .45rem 1rem;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity .15s, transform .15s;
+}
+.btn-subscribe:hover { opacity: .88; transform: translateY(-1px); }
+
 .card-header {
   display: flex;
   align-items: center;

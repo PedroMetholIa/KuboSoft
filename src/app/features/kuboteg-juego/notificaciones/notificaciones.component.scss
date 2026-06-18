@@ -104,3 +104,53 @@
   margin-top: 4px;
   border: 1px solid rgba(255,255,255,.2);
 }
+
+// ── Carta robada ────────────────────────────────────────
+.notif-carta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  background: rgba(99, 102, 241, 0.08);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.18);
+
+  &:last-child { border-bottom: none; }
+}
+
+.carta-grande-icon {
+  font-size: 2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.carta-grande-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.carta-grande-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #818cf8;
+}
+
+.carta-grande-nombre {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.carta-grande-bonus {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #f59e0b;
+  margin-top: 0.1rem;
+}

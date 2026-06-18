@@ -39,9 +39,12 @@
               <div class="card-logo">
                 <img [src]="getImgPath(j.nombre)" [alt]="j.nombre">
               </div>
-              <h3 class="cat-title"><em class="accent">{{ j.nombre.slice(4).toUpperCase() }}</em></h3>
+              <h3 class="cat-title"><em class="accent">{{ getDisplayName(j.nombre) }}</em></h3>
             </div>
             <p class="prod-desc">{{ j.descripcion }}</p>
+            @if (j.requiere_suscripcion && !j.subscribed) {
+              <button class="btn-subscribe" (click)="suscribirse($event, j)">Suscribirse</button>
+            }
           </div>
         }
         @for (_ of emptySlots; track $index) {

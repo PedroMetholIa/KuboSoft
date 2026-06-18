@@ -55,8 +55,10 @@ export interface Partida {
   ganador_id: string | null;
   requiere_contrasena: boolean;
   contrasena?: string | null;
+  pactos?: unknown[] | null;
   turno_actual_usuario_id: string | null;
   tropas_iniciales?: number | null;
+  limite_rondas?: number | null;
   fase_actual?: 'colocacion' | 'ataque' | 'reagrupacion' | null;
   ronda_actual?: number;
   orden_jugadores?: string[] | null;
@@ -76,7 +78,8 @@ export interface PartidaJugador {
   tropas_por_colocar?: number;
   color?: string | null;
   lider?: string | null;
-  objetivo?: any;
+  objetivo?: unknown;
+  cartas?: string[] | null;
   usuario?: { nombre: string | null; apellido: string | null; email: string } | null;
   created_at: string;
 }
@@ -113,13 +116,7 @@ export class SupabaseService {
   currentUser$: Observable<User | null | undefined> = this.currentUserSubject.asObservable();
 
   constructor() {
-    this.supabase = createClient(environment.supabase.url, environment.supabase.anonKey, {
-      global: {
-        headers: {
-          apikey: environment.supabase.anonKey,
-        },
-      },
-    });
+    this.supabase = createClient(environment.supabase.url, environment.supabase.anonKey);
 
     this.supabase.auth.getSession().then(({ data }) => {
       this.currentUserSubject.next(data.session?.user ?? null);
@@ -169,13 +166,40 @@ export class SupabaseService {
 
   // ── Suscripciones ─────────────────────────────────────
   async isSubscribedToProduct(userId: string, productId: string): Promise<boolean> {
+    const today = new Date().toISOString().split('T')[0];
     const { data } = await this.supabase
       .from('suscripcion')
       .select('id')
       .eq('usuario_id', userId)
       .eq('producto_id', productId)
+      .or(`fecha_fin.is.null,fecha_fin.gte.${today}`)
       .maybeSingle();
     return !!data;
+  }
+
+  async subscribeToProduct(userId: string, productId: string): Promise<{ data: null; error: any }> {
+    const { data: { session } } = await this.supabase.auth.getSession();
+    if (!session) return { data: null, error: { message: 'No autenticado' } };
+
+    const res = await fetch(
+      `${environment.supabase.url}/rest/v1/suscripcion?on_conflict=usuario_id,producto_id`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': environment.supabase.anonKey,
+          'Authorization': `Bearer ${session.access_token}`,
+          'Prefer': 'resolution=ignore-duplicates,return=minimal',
+        },
+        body: JSON.stringify({ usuario_id: userId, producto_id: productId }),
+      }
+    );
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => null);
+      return { data: null, error };
+    }
+    return { data: null, error: null };
   }
 
   async getUsuariosPorProducto(nombreProducto: string): Promise<{ data: any[] | null; error: any }> {
@@ -187,7 +211,7 @@ export class SupabaseService {
       .from('suscripcion').select('usuario_id').eq('producto_id', prod.id);
     if (e2) return { data: [], error: e2 };
 
-    const ids = (subs ?? []).map((s: any) => s.usuario_id);
+    const ids = (subs ?? []).map((s: { usuario_id: string }) => s.usuario_id);
     if (ids.length === 0) return { data: [], error: null };
 
     return this.supabase.from('usuario').select('nombre, apellido, email, last_seen, mensaje, is_online').in('id', ids);
@@ -348,7 +372,18 @@ export class SupabaseService {
     return this._rpc('declarar_ganador_objetivo', { p_partida_id: partidaId });
   }
 
-  setObjetivo(partidaId: string, usuarioId: string, objetivo: any) {
+  setCartas(partidaId: string, usuarioId: string, cartas: string[]) {
+    return this.supabase.from('partida_jugador')
+      .update({ cartas })
+      .eq('partida_id', partidaId)
+      .eq('usuario_id', usuarioId);
+  }
+
+  setPactos(partidaId: string, pactos: unknown[]) {
+    return this.supabase.from('partida').update({ pactos }).eq('id', partidaId);
+  }
+
+  setObjetivo(partidaId: string, usuarioId: string, objetivo: unknown) {
     return this.supabase.from('partida_jugador')
       .update({ objetivo })
       .eq('partida_id', partidaId)
@@ -459,7 +494,7 @@ export class SupabaseService {
       .eq('categoria_id', cat.id);
 
     return {
-      data: (data ?? []).map((r: any) => r.producto).filter(Boolean),
+      data: (data ?? []).map((r: { producto: unknown }) => r.producto).filter(Boolean),
       error,
     };
   }
