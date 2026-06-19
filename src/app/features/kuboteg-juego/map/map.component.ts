@@ -13,7 +13,6 @@ import { TERRITORIES } from './territories.data';
 export class MapComponent implements OnInit, AfterViewInit {
   @Input() territoriosOwner: Record<string, string> = {};
   @Input() jugadorColores: Record<string, string> = {};
-  @Input() currentUserId: string = '';
   @Input() tropas: Record<string, number> = {};
   @Input() territorioSeleccionado: string | null = null;
   @Input() jugadorNombres: Record<string, string> = {};
@@ -21,6 +20,8 @@ export class MapComponent implements OnInit, AfterViewInit {
   @Input() set territoriosDestacados(val: string[]) {
     this._destacadosSet = new Set(val);
   }
+
+  @Input() territoriosBloqueadosMsgs: Record<string, string> = {};
 
   @Output() territorioClick = new EventEmitter<string>();
   @Output() territorioRightClick = new EventEmitter<string>();
@@ -31,6 +32,7 @@ export class MapComponent implements OnInit, AfterViewInit {
   tooltip: Territory | null = null;
   tooltipX = 0;
   tooltipY = 0;
+  activePactoMsg: string | null = null;
 
   private _destacadosSet = new Set<string>();
 
@@ -73,12 +75,14 @@ export class MapComponent implements OnInit, AfterViewInit {
 
   onTerritoryHover(territory: Territory, event: MouseEvent): void {
     this.tooltip = territory;
+    this.activePactoMsg = this.territoriosBloqueadosMsgs[territory.id] ?? null;
     this.updateTooltipPosition(event);
     this.cdr.markForCheck();
   }
 
   onTerritoryLeave(): void {
     this.tooltip = null;
+    this.activePactoMsg = null;
     this.cdr.markForCheck();
   }
 

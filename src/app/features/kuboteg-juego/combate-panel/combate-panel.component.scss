@@ -2,11 +2,11 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 1.2rem;
-  padding: 0.4rem 0.9rem;
+  gap: 1.8rem;
+  padding: 0.65rem 1.5rem;
   background: rgba(255,255,255,.02);
   border: 1px solid rgba(255,255,255,.07);
-  border-radius: 10px;
+  border-radius: 12px;
   animation: cp-in .2s ease;
   white-space: nowrap;
 }
@@ -17,8 +17,8 @@
 }
 
 .cp-lider-img {
-  width: 44px;
-  height: 44px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   object-fit: cover;
   object-position: top;
@@ -43,28 +43,28 @@
 }
 
 .cp-terr {
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   color: #64748b;
   font-weight: 400;
 }
 
 .cp-nombre {
-  font-size: 1.1rem;
+  font-size: 1.35rem;
   font-weight: 700;
   color: #fff;
-  max-width: 140px;
+  max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .cp-vs {
-  font-size: 1.2rem;
+  font-size: 1.8rem;
 }
 
 .cp-dados-grupo {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.5rem;
 }
 
 
@@ -73,11 +73,11 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
-  width: 46px;
-  height: 46px;
-  padding: 6px;
-  border-radius: 10px;
-  gap: 2px;
+  width: 64px;
+  height: 64px;
+  padding: 9px;
+  border-radius: 12px;
+  gap: 3px;
 
 
   &.dado-ataque {
@@ -115,13 +115,13 @@
 }
 
 .cp-btn-continuar {
-  margin-left: 0.4rem;
-  padding: 0.55rem 1rem;
+  margin-left: 0.5rem;
+  padding: 0.7rem 1.3rem;
   background: #4d3c81;
   border: none;
   color: #fff;
-  border-radius: 7px;
-  font-size: 0.82rem;
+  border-radius: 9px;
+  font-size: 0.92rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;

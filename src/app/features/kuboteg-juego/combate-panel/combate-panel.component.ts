@@ -26,7 +26,7 @@ interface DieState {
 
         <div class="cp-player">
           @if (combate.liderAtacanteImg) {
-            <img class="cp-lider-img" [src]="combate.liderAtacanteImg" [style.border-color]="combate.colorAtacante" alt="">
+            <img loading="lazy" class="cp-lider-img" [src]="combate.liderAtacanteImg" [style.border-color]="combate.colorAtacante" alt="">
           }
           <div class="cp-player-info">
             <span class="cp-terr">{{ combate.atacanteNombre }}</span>
@@ -62,7 +62,7 @@ interface DieState {
             <span class="cp-nombre">{{ combate.destinoNombre }}</span>
           </div>
           @if (combate.liderDefensorImg) {
-            <img class="cp-lider-img" [src]="combate.liderDefensorImg" [style.border-color]="combate.colorDefensor" alt="">
+            <img loading="lazy" class="cp-lider-img" [src]="combate.liderDefensorImg" [style.border-color]="combate.colorDefensor" alt="">
           }
         </div>
 

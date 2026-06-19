@@ -7,6 +7,7 @@ export interface ChatMensaje {
   texto: string;
   color: string;
   ts: number;
+  grupoId?: string;
 }
 
 @Component({
@@ -51,7 +52,6 @@ export interface ChatMensaje {
 export class KubotegChatComponent implements OnChanges {
   @Input() messages: ChatMensaje[] = [];
   @Input() userId = '';
-  @Input() playerColors: Record<string, string> = {};
   @Output() sendMessage = new EventEmitter<string>();
 
   @ViewChild('chatRef') private chatRef!: ElementRef<HTMLDivElement>;

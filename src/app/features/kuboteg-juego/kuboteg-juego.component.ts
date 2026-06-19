@@ -39,16 +39,36 @@ interface Pacto {
   territoriosId2?: string[];
   rondaInicio: number;
   rondaExpira: number;
+  estado?: 'activo' | 'en_transicion';
 }
 
 interface PropuestaPacto {
   id: string;
-  tipo: 'alianza' | 'no_agresion';
+  tipo: 'alianza' | 'no_agresion' | 'renovacion';
   proponenteId: string;
   receptorId: string;
   territorioId1?: string;
   territorioId2?: string;
   territoriosId2?: string[];
+  pactoId?: string;
+  ts: number;
+}
+
+interface GrupoChat {
+  id: string;
+  nombre: string;
+  bandera: string;
+  jugadoresIds: string[];
+  creadoPor: string;
+}
+
+interface InvitacionGrupo {
+  id: string;
+  grupoId: string;
+  grupoNombre: string;
+  grupoBandera: string;
+  invitadorId: string;
+  invitadoId: string;
   ts: number;
 }
 
@@ -168,6 +188,11 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   conquistaPendiente: ConquistaPendiente | null = null;
   conquistaTropasAMover = 1;
   miObjetivo: ObjetivoSecreto | null = null;
+  mostrarObjetivoPopup = false;
+  gameNotif: { msg: string; tipo: 'ok' | 'info' | 'warn' } | null = null;
+  private gameNotifTimer: ReturnType<typeof setTimeout> | null = null;
+  modalPostura: { jugadorId: string; postura: 'amigable' | 'neutral' | 'hostil' } | null = null;
+  posturas: Record<string, 'amigable' | 'neutral' | 'hostil'> = {};
   reagrupacionDestinoId: string | null = null;
   reagrupacionTropasAMover = 1;
   reagrupacionLimites: Record<string, number> = {};
@@ -176,6 +201,10 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   musicaMuteada = false;
   tiempoPartida = '00:00:00';
   private audio!: HTMLAudioElement;
+  private audioCtx: AudioContext | null = null;
+  private gainNode: GainNode | null = null;
+  private sourceConnected = false;
+  private readonly BASE_VOLUME = 0.4;
   private sfxPool = new Map<string, HTMLAudioElement>();
   private timerInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -183,7 +212,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   pactos: Pacto[] = [];
   propuestaEntrante: PropuestaPacto | null = null;
   propuestaSaliente: PropuestaPacto | null = null;
-  modalPacto: { receptorId: string; tipo: 'alianza' | 'no_agresion'; territorioId1: string; territorioId2: string } | null = null;
+  modalPacto: { receptorId: string; tipo: 'alianza' | 'no_agresion' | 'renovacion'; territorioId1: string; territorioId2: string; modalidad: 1 | 2; pactoId?: string } | null = null;
   territoriosLimitrofesSeleccionados: string[] = [];
   modalRomperPacto = false;
 
@@ -197,6 +226,46 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   // ── Chat ──────────────────────────────────────────────
   chatMensajes: ChatMensaje[] = [];
+  grupos: GrupoChat[] = [];
+  chatActivoId: 'global' | string = 'global';
+  modalGrupos: { nombre: string; bandera: string; jugadoresIds: string[] } | null = null;
+  invitacionGrupoEntrante: InvitacionGrupo | null = null;
+
+  readonly BANDERAS = Array.from({ length: 12 }, (_, i) => `bandera${i + 1}.webp`);
+
+  get banderasEnUso(): Set<string> {
+    return new Set(this.grupos.map(g => g.bandera));
+  }
+
+  get grupoConMismosIntegrantes(): boolean {
+    if (!this.modalGrupos) return false;
+    const propuestos = [this.userId, ...this.modalGrupos.jugadoresIds].sort().join(',');
+    return this.grupos.some(g => [...g.jugadoresIds].sort().join(',') === propuestos);
+  }
+
+  get grupoConTodosLosJugadores(): boolean {
+    if (!this.modalGrupos) return false;
+    return this.modalGrupos.jugadoresIds.length + 1 >= this.jugadores.length;
+  }
+
+  get errorCrearGrupo(): string | null {
+    if (!this.modalGrupos) return null;
+    if (this.modalGrupos.jugadoresIds.length < 2) return 'Seleccioná al menos 2 jugadores (mínimo 3 en total)';
+    if (this.grupoConTodosLosJugadores) return 'No se puede crear un grupo con todos los jugadores de la partida';
+    if (this.grupoConMismosIntegrantes) return 'Ya existe un grupo con exactamente estos integrantes';
+    return null;
+  }
+
+  get chatMensajesFiltrados(): ChatMensaje[] {
+    if (this.chatActivoId === 'global') {
+      return this.chatMensajes.filter(m => !m.grupoId);
+    }
+    return this.chatMensajes.filter(m => m.grupoId === this.chatActivoId);
+  }
+
+  get gruposMios(): GrupoChat[] {
+    return this.grupos.filter(g => g.jugadoresIds.includes(this.userId));
+  }
 
   // ── Notificaciones de eventos ─────────────────────────
   notifItems: NotifItem[] = [];
@@ -219,9 +288,15 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
-    this.audio = new Audio('assets/KuboTeg/sonidos/musica-fondo.mp3');
+    this.audio = new Audio();
     this.audio.loop = true;
-    this.audio.volume = 0.4;
+    this.audio.onerror = () => {
+      const fallback = '/assets/KuboTeg/sonidos/musica-fondo.mp3';
+      if (!this.audio.src.endsWith(fallback)) {
+        this.audio.src = fallback;
+        if (!this.musicaMuteada) this.audio.play().catch(() => {});
+      }
+    };
     this.partidaId = this.route.snapshot.paramMap.get('id') ?? '';
     const user = this.service.getCurrentUser();
     if (user) {
@@ -272,16 +347,64 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   toggleMusica() {
     this.musicaMuteada = !this.musicaMuteada;
-    this.audio.muted = this.musicaMuteada;
-    if (!this.musicaMuteada && this.audio.paused) {
-      this.audio.play().catch(() => {});
+    if (this.gainNode) this.gainNode.gain.value = this.musicaMuteada ? 0 : this.BASE_VOLUME;
+    if (!this.musicaMuteada) {
+      this.cambiarMusicaLider();
+    } else {
+      this.audio.pause();
     }
     this.cdr.markForCheck();
   }
 
   private iniciarMusica() {
-    if (!this.audio.paused) return;
-    this.audio.play().catch(() => {});
+    this.cambiarMusicaLider();
+  }
+
+  private setupAudioContext() {
+    if (this.audioCtx) return;
+    this.audioCtx = new AudioContext();
+
+    const compressor = this.audioCtx.createDynamicsCompressor();
+    compressor.threshold.value = -18;
+    compressor.knee.value      = 20;
+    compressor.ratio.value     = 8;
+    compressor.attack.value    = 0.005;
+    compressor.release.value   = 0.3;
+
+    this.gainNode = this.audioCtx.createGain();
+    this.gainNode.gain.value = this.musicaMuteada ? 0 : this.BASE_VOLUME;
+
+    compressor.connect(this.gainNode);
+    this.gainNode.connect(this.audioCtx.destination);
+
+    const source = this.audioCtx.createMediaElementSource(this.audio);
+    source.connect(compressor);
+    this.sourceConnected = true;
+  }
+
+  private cambiarMusicaLider() {
+    const liderNombre = this.jugadorLideres[this.jugadorActualId];
+    const lider = this.lideres.find(l => l.nombre === liderNombre);
+    const rawSrc = lider?.sonido ?? 'assets/KuboTeg/sonidos/musica-fondo.mp3';
+    const src = rawSrc.startsWith('/') || rawSrc.startsWith('http') ? rawSrc : `/${rawSrc}`;
+
+    const volumen = (lider?.volumen ?? 1.0) * this.BASE_VOLUME;
+
+    if (this.audio.src.endsWith(src)) {
+      if (this.gainNode) this.gainNode.gain.value = this.musicaMuteada ? 0 : volumen;
+      if (this.audio.paused && !this.musicaMuteada) this.audio.play().catch(() => {});
+      return;
+    }
+
+    this.audio.pause();
+    this.audio.src = src;
+    this.audio.loop = true;
+
+    this.setupAudioContext();
+    if (this.audioCtx?.state === 'suspended') this.audioCtx.resume();
+    if (this.gainNode) this.gainNode.gain.value = this.musicaMuteada ? 0 : volumen;
+
+    if (!this.musicaMuteada) this.audio.play().catch(() => {});
   }
 
   // ── Computed ──────────────────────────────────────────
@@ -332,10 +455,11 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       return this.continenteActualColocacion?.territoriosPermitidos ?? [];
     }
     if (this.fase === 'ataque' && this.esMiTurno && this.territorioAtacanteId) {
-      const terr = TERRITORIES.find(t => t.id === this.territorioAtacanteId);
+      const origenId = this.territorioAtacanteId;
+      const terr = TERRITORIES.find(t => t.id === origenId);
       return (terr?.neighbors ?? []).filter(nid => {
         const e = this.territorios[nid];
-        return e && e.usuario_id !== this.userId;
+        return e && e.usuario_id !== this.userId && this.puedoAtacar(origenId, nid);
       });
     }
     if (this.fase === 'reagrupacion' && this.esMiTurno && this.territorioOrigenId && !this.reagrupacionDestinoId) {
@@ -348,16 +472,51 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     return [];
   }
 
+  get territoriosBloqueadosMsgs(): Record<string, string> {
+    if (this.fase !== 'ataque' || !this.esMiTurno || !this.territorioAtacanteId) return {};
+    const origenId = this.territorioAtacanteId;
+    const terr = TERRITORIES.find(t => t.id === origenId);
+    const result: Record<string, string> = {};
+    for (const nid of (terr?.neighbors ?? [])) {
+      const e = this.territorios[nid];
+      if (!e || e.usuario_id === this.userId) continue;
+      if (this.tieneAlianza(this.userId, e.usuario_id)) {
+        result[nid] = 'No podés atacar: alianza vigente';
+      } else if (this.tieneNoAgresion(origenId, nid)) {
+        result[nid] = 'No podés atacar: pacto de no agresión';
+      }
+    }
+    return result;
+  }
+
   get jugadorActualNombre(): string {
     const j = this.jugadores.find(j => j.usuario_id === this.jugadorActualId);
     return j ? this.nombreJugador(j) : '...';
+  }
+
+  get posturaJugadorActual(): 'amigable' | 'neutral' | 'hostil' | null {
+    if (this.jugadorActualId === this.userId) return null;
+    const j = this.jugadores.find(j => j.usuario_id === this.jugadorActualId);
+    return j?.posturas?.[this.userId] ?? null;
   }
 
   get liderActualImgPath(): string {
     const liderNombre = this.jugadorLideres[this.jugadorActualId];
     if (!liderNombre) return '';
     const lider = this.lideres.find(l => l.nombre === liderNombre);
-    return lider ? this.getLiderImgPath(lider) : '';
+    if (!lider) return '';
+    if (this.jugadorActualId === this.userId) {
+      return this.getLiderImgPath(lider);
+    }
+    const jugadorActual = this.jugadores.find(j => j.usuario_id === this.jugadorActualId);
+    const posturaHaciaMe = jugadorActual?.posturas?.[this.userId] ?? 'neutral';
+    if (posturaHaciaMe === 'hostil') {
+      return this.validarImgPath(lider.img_hostil ?? lider.img_neutra ?? '');
+    }
+    if (posturaHaciaMe === 'amigable') {
+      return this.validarImgPath(lider.img_amigable ?? lider.img_neutra ?? '');
+    }
+    return this.getLiderImgPath(lider);
   }
 
   get jugadoresEnOrden(): PartidaJugador[] {
@@ -420,13 +579,14 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     );
 
     try {
-      const [{ data: partida }, { data: jugadores }, { data: lideres }, { data: territorios }] =
+      const [{ data: partida }, { data: jugadores }, { data: lideres }, { data: territorios }, { data: gruposDb }] =
         await Promise.race([
           Promise.all([
             this.service.getPartidaById(this.partidaId),
             this.service.getPartidaJugadores(this.partidaId),
             this.service.getLideres(),
             this.service.getTerritoriosEstado(this.partidaId),
+            this.service.getGruposChat(this.partidaId),
           ]),
           timeout,
         ]);
@@ -435,6 +595,15 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       this.jugadores = jugadores ?? [];
       this.lideres   = lideres ?? [];
       if (Array.isArray(partida?.pactos)) this.pactos = partida.pactos as Pacto[];
+      if (gruposDb) {
+        this.grupos = gruposDb.map((g: any) => ({
+          id: g.id,
+          nombre: g.nombre,
+          bandera: g.bandera,
+          creadoPor: g.creado_por,
+          jugadoresIds: (g.grupo_chat_miembro as { usuario_id: string }[]).map(m => m.usuario_id),
+        }));
+      }
       const miJ = this.jugadores.find(j => j.usuario_id === this.userId);
       if (miJ?.objetivo) this.miObjetivo = miJ.objetivo as ObjetivoSecreto;
       if (miJ?.cartas)   this.misCartas  = miJ.cartas;
@@ -443,11 +612,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       this.territorios = {};
       terrArray.forEach(t => { this.territorios[t.territorio_id] = t; });
 
-      this.buildJugadorColores();
-      this.buildJugadorLideres();
-      this.rebuildOwnerMap();
-      this.rebuildTropasMap();
-      this.rebuildJugadorNombres();
+      this.rebuildJugadores();
+      this.rebuildMaps();
       this.loading = false;
       if (this.partida?.estado === 'En juego') { this.iniciarMusica(); this.iniciarTimer(); }
       if (this.partida?.fase_actual === 'colocacion' && this.esMiTurno) {
@@ -459,6 +625,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
       const miJugador = this.jugadores.find(j => j.usuario_id === this.userId);
       if (miJugador) {
+        if (miJugador.posturas) this.posturas = { ...miJugador.posturas };
         // BD es fuente de verdad; localStorage es fallback por si la BD aún no lo tiene
         const color = miJugador.color
           || localStorage.getItem(`mat-color-${this.partidaId}-${this.userId}`);
@@ -531,15 +698,114 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         }
       })
       .on('broadcast', { event: 'pacto_respuesta' }, ({ payload }) => {
-        const r = payload as { id: string; accepted: boolean; pacto?: Pacto };
+        const r = payload as { id: string; accepted: boolean; pacto?: Pacto; pactoRenovadoId?: string; rondaExpira?: number };
         if (this.propuestaSaliente?.id === r.id) {
           this.propuestaSaliente = null;
-          if (r.accepted && r.pacto) {
+          if (r.accepted && r.pactoRenovadoId && r.rondaExpira) {
+            this.pactos = this.pactos.map(p =>
+              p.id === r.pactoRenovadoId
+                ? { ...p, estado: 'activo' as const, rondaExpira: r.rondaExpira! }
+                : p
+            );
+            this.showGameNotif('¡Pacto renovado!', 'ok');
+          } else if (r.accepted && r.pacto) {
             this.pactos = [...this.pactos, r.pacto];
-            this.toast.show('¡Pacto aceptado!', 'success');
-          } else {
-            this.toast.show('Tu propuesta fue rechazada.', 'error');
+            this.showGameNotif('¡Pacto aceptado!', 'ok');
+          } else if (!r.accepted) {
+            this.showGameNotif('Tu propuesta fue rechazada.', 'warn');
           }
+          this.cdr.markForCheck();
+        }
+      })
+      .on('broadcast', { event: 'grupo_nuevo' }, ({ payload }) => {
+        const g = payload as GrupoChat;
+        if (g.creadoPor === this.userId && !this.grupos.find(x => x.id === g.id)) {
+          this.grupos = [...this.grupos, g];
+          this.cdr.markForCheck();
+        }
+      })
+      .on('broadcast', { event: 'evento_grupo' }, ({ payload }) => {
+        const e = payload as { accion: 'creado' | 'disuelto'; grupoNombre: string; autorNombre: string; autorId: string };
+        this.addNotif({
+          tipo: 'grupo',
+          icono: e.accion === 'creado' ? '👥' : '💔',
+          linea1: e.accion === 'creado'
+            ? `${e.autorNombre} creó el grupo "${e.grupoNombre}"`
+            : `El grupo "${e.grupoNombre}" fue disuelto`,
+          linea2: e.accion === 'creado' ? 'Nuevo grupo de chat' : `${e.autorNombre} rechazó la invitación`,
+          color: this.jugadorColores[e.autorId] ?? '#94a3b8',
+          ts: Date.now(),
+        });
+        this.cdr.markForCheck();
+      })
+      .on('broadcast', { event: 'invitacion_grupo' }, ({ payload }) => {
+        const inv = payload as InvitacionGrupo;
+        if (inv.invitadoId === this.userId) {
+          this.invitacionGrupoEntrante = inv;
+          this.cdr.markForCheck();
+        }
+      })
+      .on('broadcast', { event: 'grupo_unirse' }, ({ payload }) => {
+        const { grupoId, jugadorId } = payload as { grupoId: string; jugadorId: string };
+        const idx = this.grupos.findIndex(g => g.id === grupoId);
+        if (idx !== -1 && !this.grupos[idx].jugadoresIds.includes(jugadorId)) {
+          const g = this.grupos[idx];
+          this.grupos = [
+            ...this.grupos.slice(0, idx),
+            { ...g, jugadoresIds: [...g.jugadoresIds, jugadorId] },
+            ...this.grupos.slice(idx + 1),
+          ];
+          const nombre = this.jugadorNombres[jugadorId] ?? jugadorId;
+          this.showGameNotif(`${nombre} se unió al grupo`, 'ok');
+          this.cdr.markForCheck();
+        }
+      })
+      .on('broadcast', { event: 'grupo_rechazar' }, ({ payload }) => {
+        const { grupoId, grupoNombre, jugadorId } = payload as { grupoId: string; grupoNombre: string; jugadorId: string };
+        const nombre = this.jugadorNombres[jugadorId] ?? jugadorId;
+        const grupo = this.grupos.find(g => g.id === grupoId);
+        this.grupos = this.grupos.filter(g => g.id !== grupoId);
+        if (this.chatActivoId === grupoId) this.chatActivoId = 'global';
+        if (grupo?.creadoPor === this.userId) {
+          this.service.eliminarGrupoChat(grupoId);
+        }
+        this.showGameNotif(`${nombre} rechazó unirse a "${grupoNombre}". El grupo fue eliminado.`, 'warn');
+        this.cdr.markForCheck();
+      })
+      .on('broadcast', { event: 'postura_declarada' }, ({ payload }) => {
+        const p = payload as { declaranteId: string; receptorId: string; postura: 'amigable' | 'neutral' | 'hostil'; declaranteNombre: string };
+        if (p.receptorId === this.userId) {
+          // Actualizar posturas del declarante en el array local para reflejar la imagen inmediatamente
+          const idx = this.jugadores.findIndex(j => j.usuario_id === p.declaranteId);
+          if (idx !== -1) {
+            const prev = this.jugadores[idx];
+            const updatedPosturas = { ...(prev.posturas ?? {}), [this.userId]: p.postura };
+            this.jugadores = [
+              ...this.jugadores.slice(0, idx),
+              { ...prev, posturas: updatedPosturas },
+              ...this.jugadores.slice(idx + 1),
+            ];
+          }
+          this.showGameNotif(`${p.declaranteNombre} te declaró ${p.postura}`, p.postura === 'amigable' ? 'ok' : p.postura === 'hostil' ? 'warn' : 'info');
+        }
+        const receptorNombre = this.nombreJugadorById(p.receptorId);
+        this.pushNotifPostura(p.declaranteNombre, receptorNombre, p.postura, this.jugadorColores[p.declaranteId] ?? '#94a3b8');
+        this.cdr.markForCheck();
+      })
+      .on('broadcast', { event: 'pacto_aceptado' }, ({ payload }) => {
+        const e = payload as { jugador1Nombre: string; jugador2Nombre: string; tipo: 'alianza' | 'no_agresion'; color: string; ts: number; esRenovacion: boolean };
+        this.pushNotifPacto(e.jugador1Nombre, e.jugador2Nombre, e.tipo, e.color, e.esRenovacion, e.ts);
+        this.cdr.markForCheck();
+      })
+      .on('broadcast', { event: 'carta_robada' }, ({ payload }) => {
+        const e = payload as { jugadorId: string; jugadorNombre: string; cartaNombre: string; bonusNombre: string | null; ts: number };
+        if (e.jugadorId !== this.userId) {
+          this.addNotif({
+            tipo: 'carta', icono: '🃏',
+            linea1: e.cartaNombre, linea2: e.bonusNombre ?? '',
+            color: this.jugadorColores[e.jugadorId] ?? '#818cf8',
+            ts: e.ts, bonusNombre: e.bonusNombre, jugador: e.jugadorNombre,
+          });
           this.cdr.markForCheck();
         }
       })
@@ -576,7 +842,13 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
           // Sincronizar territorios al cambio de turno/fase para compensar
           // eventos de postgres_changes que el observador pudo haber perdido.
           const turnoCambio = prevFase !== this.fase || prevJugadorIdx !== newPartida.jugador_actual_index;
-          if (turnoCambio) { this.syncTerritorios(); }
+          if (turnoCambio) {
+            this.syncTerritorios();
+            if (this.partida?.estado === 'En juego') this.cambiarMusicaLider();
+            if (this.esMiTurno && prevJugadorIdx !== newPartida.jugador_actual_index) {
+              this.playSfx('assets/KuboTeg/sonidos/confirma-seleccion.mp3');
+            }
+          }
           this.cdr.markForCheck();
         }
       })
@@ -598,12 +870,17 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
             ...this.jugadores.slice(idx + 1),
           ];
           if (updated.usuario_id === this.userId) {
-            if (updated.objetivo) this.miObjetivo = updated.objetivo as ObjetivoSecreto;
+            if (updated.objetivo) {
+              this.miObjetivo = updated.objetivo as ObjetivoSecreto;
+              const seenKey = `obj_visto_${this.partidaId}_${this.userId}`;
+              if (!localStorage.getItem(seenKey)) {
+                this.mostrarObjetivoPopup = true;
+              }
+            }
+            if (updated.posturas) this.posturas = { ...updated.posturas };
             if (updated.cartas != null) this.misCartas = updated.cartas;
           }
-          this.buildJugadorColores();
-          this.buildJugadorLideres();
-          this.rebuildJugadorNombres();
+          this.rebuildJugadores();
           this.cdr.markForCheck();
           this.checkAutoDistribuir();
         }
@@ -621,8 +898,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
           const prevOwner = this.territorios[t.territorio_id]?.usuario_id;
           const newOwner  = t.usuario_id;
           this.territorios = { ...this.territorios, [t.territorio_id]: t };
-          this.rebuildOwnerMap();
-          this.rebuildTropasMap();
+          this.rebuildMaps();
           if (newOwner && newOwner !== prevOwner) {
             this.verificarConquistaContinente(newOwner, t.territorio_id);
           }
@@ -641,8 +917,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     const map: Record<string, TerritorioEstado> = {};
     for (const t of data) map[t.territorio_id] = t;
     this.territorios = { ...this.territorios, ...map };
-    this.rebuildOwnerMap();
-    this.rebuildTropasMap();
+    this.rebuildMaps();
     this.cdr.markForCheck();
   }
 
@@ -662,16 +937,13 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         if (partida) this.partida = partida;
         if (jugadores) {
           this.jugadores = jugadores;
-          this.buildJugadorColores();
-          this.buildJugadorLideres();
-          this.rebuildJugadorNombres();
+          this.rebuildJugadores();
         }
         if (territorios) {
           this.territorios = {};
           territorios.forEach(t => { this.territorios[t.territorio_id] = t; });
         }
-        this.rebuildOwnerMap();
-        this.rebuildTropasMap();
+        this.rebuildMaps();
         this.toast.show('Conexión restaurada', 'success');
       } catch {
         this.toast.show('No se pudo reconectar. Recargá la página.', 'error');
@@ -892,12 +1164,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     const esEnemigo    = estado.usuario_id !== this.userId;
 
     if (esAdyacente && esEnemigo && !this.procesandoCombate) {
-      if (!this.puedoAtacar(this.territorioAtacanteId, territorioId)) {
-        const defId = this.territorios[territorioId]?.usuario_id ?? '';
-        const tipoP = this.tieneAlianza(this.userId, defId) ? 'alianza' : 'no agresión';
-        this.toast.show(`Tenés un pacto de ${tipoP} activo con este jugador.`, 'error');
-        return;
-      }
+      if (!this.puedoAtacar(this.territorioAtacanteId, territorioId)) return;
       await this.ejecutarAtaque(this.territorioAtacanteId, territorioId);
     } else if (estado.usuario_id === this.userId && estado.tropas > 1) {
       this.territorioAtacanteId = territorioId;
@@ -988,11 +1255,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       if (destinoEstado) localPatch[destinoId] = { ...destinoEstado, tropas: destinoEstado.tropas + aMover, usuario_id: this.userId };
       if (Object.keys(localPatch).length) {
         this.territorios = { ...this.territorios, ...localPatch };
-        this.rebuildOwnerMap();
-        this.rebuildTropasMap();
+        this.rebuildMaps();
       }
 
-      this.disolverPactosTerritorio(destinoId);
       this.conquistoEnEsteTurno = true;
       this.ultimoTerritorioConquistadoId = destinoId;
 
@@ -1002,6 +1267,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
           ).length
         : 1;
       const eliminadoId = defensorQuedan === 0 ? defensorId : null;
+      this.disolverPactosTerritorio(destinoId, eliminadoId);
 
       const conquistaData: UltimaConquista = {
         territorioNombre: this.nombreTerritorio(destinoId),
@@ -1231,11 +1497,16 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   private mostrarNotifCarta(cartaId: string, bonusCartaId: string | null, tropasBonus = 0) {
     const nombre      = this.nombreTerritorio(cartaId);
     const bonusNombre = bonusCartaId ? this.nombreTerritorio(bonusCartaId) : null;
+    const ts          = Date.now();
 
     this.addNotif({
       tipo: 'carta', icono: '🃏',
       linea1: nombre, linea2: bonusNombre ?? '',
-      color: '#818cf8', ts: Date.now(), bonusNombre,
+      color: '#818cf8', ts, bonusNombre, jugador: this.miNombre,
+    });
+    this.channelEventos?.send({
+      type: 'broadcast', event: 'carta_robada',
+      payload: { jugadorId: this.userId, jugadorNombre: this.miNombre, cartaNombre: nombre, bonusNombre, ts },
     });
 
     const terr    = TERRITORIES.find(t => t.id === cartaId);
@@ -1261,6 +1532,59 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     if (this.cartaPopupTimer) clearTimeout(this.cartaPopupTimer);
     this.cartaPopup = null;
     this.cdr.markForCheck();
+  }
+
+  cerrarObjetivoPopup() {
+    this.mostrarObjetivoPopup = false;
+    localStorage.setItem(`obj_visto_${this.partidaId}_${this.userId}`, '1');
+    this.cdr.markForCheck();
+  }
+
+  abrirModalPostura() {
+    const primerJugador = this.enemigos[0];
+    if (!primerJugador) return;
+    this.modalPostura = {
+      jugadorId: primerJugador.usuario_id,
+      postura: this.posturas[primerJugador.usuario_id] ?? 'neutral',
+    };
+    this.cdr.markForCheck();
+  }
+
+  async confirmarPostura() {
+    if (!this.modalPostura) return;
+    const { jugadorId, postura } = this.modalPostura;
+    const nuevas = { ...this.posturas, [jugadorId]: postura };
+    this.modalPostura = null;
+    const { error } = await this.service.setPosturas(this.partidaId, this.userId, nuevas);
+    if (error) {
+      this.toast.show('Error al guardar postura.', 'error');
+      return;
+    }
+    this.posturas = nuevas;
+    const miNombre = this.nombreJugadorById(this.userId);
+    this.channelEventos?.send({
+      type: 'broadcast',
+      event: 'postura_declarada',
+      payload: { declaranteId: this.userId, receptorId: jugadorId, postura, declaranteNombre: miNombre },
+    });
+    this.showGameNotif('Postura declarada.', 'ok');
+    this.cdr.markForCheck();
+  }
+
+  onPosturaJugadorChange(jugadorId: string) {
+    if (!this.modalPostura) return;
+    this.modalPostura.jugadorId = jugadorId;
+    this.modalPostura.postura = this.posturas[jugadorId] ?? 'neutral';
+  }
+
+  private showGameNotif(msg: string, tipo: 'ok' | 'info' | 'warn' = 'info') {
+    if (this.gameNotifTimer) clearTimeout(this.gameNotifTimer);
+    this.gameNotif = { msg, tipo };
+    this.cdr.markForCheck();
+    this.gameNotifTimer = setTimeout(() => {
+      this.gameNotif = null;
+      this.cdr.markForCheck();
+    }, 3500);
   }
 
   // ── Rotación de turnos ────────────────────────────────
@@ -1332,12 +1656,55 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   territoriosDe(userId: string): TerritorioEstado[] {
-    return Object.values(this.territorios).filter(t => t.usuario_id === userId);
+    return Object.values(this.territorios)
+      .filter(t => t.usuario_id === userId)
+      .sort((a, b) => this.nombreTerritorio(a.territorio_id).localeCompare(this.nombreTerritorio(b.territorio_id)));
   }
 
   pactosActivos(): Pacto[] {
     const ronda = this.partida?.ronda_actual ?? 0;
-    return this.pactos.filter(p => p.rondaExpira > ronda);
+    return this.pactos.filter(p => p.rondaExpira >= ronda);
+  }
+
+  pactosRompibles(): Pacto[] {
+    const ronda = this.partida?.ronda_actual ?? 0;
+    return this.pactosActivos().filter(p =>
+      p.estado !== 'en_transicion' && p.rondaExpira !== ronda
+    );
+  }
+
+  pactosRenovables(): Pacto[] {
+    return this.pactosActivos().filter(p =>
+      this.esPactoEnTransicion(p) &&
+      (p.jugador1Id === this.userId || p.jugador2Id === this.userId)
+    );
+  }
+
+  seleccionarPactoRenovacion(pactoId: string) {
+    if (!this.modalPacto) return;
+    const pacto = this.pactos.find(p => p.id === pactoId);
+    if (!pacto) return;
+    const receptorId = pacto.jugador1Id === this.userId ? pacto.jugador2Id : pacto.jugador1Id;
+    this.modalPacto.pactoId = pactoId;
+    this.modalPacto.receptorId = receptorId;
+  }
+
+  esPactoEnTransicion(p: Pacto): boolean {
+    const ronda = this.partida?.ronda_actual ?? 0;
+    return p.estado === 'en_transicion' || p.rondaExpira === ronda;
+  }
+
+  esAcuerdoRoto(p: Pacto): boolean {
+    return p.estado === 'en_transicion';
+  }
+
+  esEnRevisionNatural(p: Pacto): boolean {
+    const ronda = this.partida?.ronda_actual ?? 0;
+    return p.estado !== 'en_transicion' && p.rondaExpira === ronda;
+  }
+
+  terrYaEnPacto(miTerrId: string, suTerrId: string): boolean {
+    return this.tieneNoAgresion(miTerrId, suTerrId);
   }
 
   contraParteId(pacto: Pacto): string {
@@ -1352,7 +1719,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   private tieneAlianza(uid1: string, uid2: string): boolean {
     const ronda = this.partida?.ronda_actual ?? 0;
     return this.pactos.some(p =>
-      p.tipo === 'alianza' && p.rondaExpira > ronda &&
+      p.tipo === 'alianza' && p.rondaExpira >= ronda &&
       ((p.jugador1Id === uid1 && p.jugador2Id === uid2) ||
        (p.jugador1Id === uid2 && p.jugador2Id === uid1))
     );
@@ -1360,11 +1727,12 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   private tieneNoAgresion(tId1: string, tId2: string): boolean {
     const ronda = this.partida?.ronda_actual ?? 0;
-    return this.pactos.some(p =>
-      p.tipo === 'no_agresion' && p.rondaExpira > ronda &&
-      ((p.territorioId1 === tId1 && p.territorioId2 === tId2) ||
-       (p.territorioId1 === tId2 && p.territorioId2 === tId1))
-    );
+    return this.pactos.some(p => {
+      if (p.tipo !== 'no_agresion' || p.rondaExpira < ronda) return false;
+      const terrsId2 = p.territoriosId2?.length ? p.territoriosId2 : (p.territorioId2 ? [p.territorioId2] : []);
+      return (p.territorioId1 === tId1 && terrsId2.includes(tId2)) ||
+             (p.territorioId1 === tId2 && terrsId2.includes(tId1));
+    });
   }
 
   private puedoAtacar(origenId: string, destinoId: string): boolean {
@@ -1375,11 +1743,17 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     return true;
   }
 
-  private disolverPactosTerritorio(territorioId: string) {
-    const filtrados = this.pactos.filter(p =>
-      p.tipo !== 'no_agresion' ||
-      (p.territorioId1 !== territorioId && p.territorioId2 !== territorioId)
-    );
+  private disolverPactosTerritorio(territorioId: string, jugadorEliminadoId?: string | null) {
+    const filtrados = this.pactos.filter(p => {
+      if (p.tipo === 'no_agresion') {
+        const terrsId2 = p.territoriosId2?.length ? p.territoriosId2 : (p.territorioId2 ? [p.territorioId2] : []);
+        if (p.territorioId1 === territorioId || terrsId2.includes(territorioId)) return false;
+      }
+      if (p.tipo === 'alianza' && jugadorEliminadoId) {
+        if (p.jugador1Id === jugadorEliminadoId || p.jugador2Id === jugadorEliminadoId) return false;
+      }
+      return true;
+    });
     if (filtrados.length < this.pactos.length) {
       this.pactos = filtrados;
       this.service.setPactos(this.partidaId, this.pactos);
@@ -1395,8 +1769,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   abrirRomperPacto() {
-    if (this.pactosActivos().length === 0) {
-      this.toast.show('No tenés pactos activos para romper.', 'error');
+    if (this.pactosRompibles().length === 0) {
+      this.showGameNotif('No tenés pactos activos para romper.', 'info');
       return;
     }
     this.modalRomperPacto = true;
@@ -1404,31 +1778,41 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   async romperPacto(pactoId: string) {
-    this.pactos = this.pactos.filter(p => p.id !== pactoId);
+    const rondaActual = this.partida?.ronda_actual ?? 0;
+    this.pactos = this.pactos.map(p =>
+      p.id === pactoId
+        ? { ...p, estado: 'en_transicion' as const, rondaExpira: rondaActual + 1 }
+        : p
+    );
     await this.service.setPactos(this.partidaId, this.pactos);
-    if (this.pactosActivos().length === 0) this.modalRomperPacto = false;
+    if (this.pactosRompibles().length === 0) this.modalRomperPacto = false;
     this.cdr.markForCheck();
   }
 
   abrirPropuestaCompleta() {
     const primerEnemigo = this.enemigos[0];
     if (!primerEnemigo) {
-      this.toast.show('No hay jugadores disponibles para proponer un tratado.', 'error');
+      this.showGameNotif('No hay jugadores disponibles para proponer un tratado.', 'info');
       return;
     }
-    this.abrirModalPacto(primerEnemigo.usuario_id, 'alianza');
+    this.abrirModalPacto(primerEnemigo.usuario_id, 'no_agresion');
   }
 
   onReceptorChange(receptorId: string) {
     if (!this.modalPacto) return;
-    const limitrofes = this.territoriosLimitrofesDeReceptor(this.modalPacto.territorioId1, receptorId);
-    this.territoriosLimitrofesSeleccionados = limitrofes.map(t => t.territorio_id);
+    const t1 = this.modalPacto.territorioId1;
+    const limitrofes = this.territoriosLimitrofesDeReceptor(t1, receptorId);
+    this.territoriosLimitrofesSeleccionados = limitrofes
+      .filter(t => !this.tieneNoAgresion(t1, t.territorio_id))
+      .map(t => t.territorio_id);
   }
 
   onMiTerritorioChange(territorioId: string) {
     if (!this.modalPacto) return;
     const limitrofes = this.territoriosLimitrofesDeReceptor(territorioId, this.modalPacto.receptorId);
-    this.territoriosLimitrofesSeleccionados = limitrofes.map(t => t.territorio_id);
+    this.territoriosLimitrofesSeleccionados = limitrofes
+      .filter(t => !this.tieneNoAgresion(territorioId, t.territorio_id))
+      .map(t => t.territorio_id);
   }
 
   toggleTerritorioLimitrofe(id: string) {
@@ -1442,19 +1826,95 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     if (!miTerrId) return todos;
     const vecinos = TERRITORIES.find(t => t.id === miTerrId)?.neighbors ?? [];
     const limitrofes = todos.filter(t => vecinos.includes(t.territorio_id));
-    return limitrofes.length > 0 ? limitrofes : todos;
+    return limitrofes.sort((a, b) =>
+      this.nombreTerritorio(a.territorio_id).localeCompare(this.nombreTerritorio(b.territorio_id))
+    );
   }
 
-  abrirModalPacto(receptorId: string, tipo: 'alianza' | 'no_agresion') {
+  territoriosLimitrofesMios(suTerrId: string): TerritorioEstado[] {
+    const vecinos = TERRITORIES.find(t => t.id === suTerrId)?.neighbors ?? [];
+    return this.territoriosDe(this.userId)
+      .filter(t => vecinos.includes(t.territorio_id))
+      .sort((a, b) =>
+        this.nombreTerritorio(a.territorio_id).localeCompare(this.nombreTerritorio(b.territorio_id))
+      );
+  }
+
+  get hayPactosEnRevision(): boolean {
+    return this.pactosActivos().some(p => this.esPactoEnTransicion(p));
+  }
+
+  get pactoARenovar(): Pacto | null {
+    if (!this.propuestaEntrante?.pactoId) return null;
+    return this.pactos.find(p => p.id === this.propuestaEntrante!.pactoId) ?? null;
+  }
+
+  propuestaNoCubiertos(): string[] {
+    const p = this.propuestaEntrante;
+    if (!p || p.tipo !== 'no_agresion' || !p.territorioId1) return [];
+    const terrsId2 = p.territoriosId2?.length ? p.territoriosId2 : (p.territorioId2 ? [p.territorioId2] : []);
+    const vecinos = TERRITORIES.find(t => t.id === p.territorioId1)?.neighbors ?? [];
+    const ownerId1 = this.territorios[p.territorioId1]?.usuario_id;
+    const otroJugadorId = ownerId1 === p.proponenteId ? this.userId : p.proponenteId;
+    const otroTerrIds = this.territoriosDe(otroJugadorId).map(t => t.territorio_id);
+    return vecinos
+      .filter(v => otroTerrIds.includes(v) && !terrsId2.includes(v))
+      .map(id => this.nombreTerritorio(id));
+  }
+
+  onModalidadChange(m: 1 | 2) {
+    if (!this.modalPacto) return;
+    this.modalPacto.modalidad = m;
+    if (m === 1) {
+      const misT = this.territoriosDe(this.userId);
+      const terrId1 = misT[0]?.territorio_id ?? '';
+      this.modalPacto.territorioId1 = terrId1;
+      const limitrofes = this.territoriosLimitrofesDeReceptor(terrId1, this.modalPacto.receptorId);
+      this.territoriosLimitrofesSeleccionados = limitrofes
+        .filter(t => !this.tieneNoAgresion(terrId1, t.territorio_id))
+        .map(t => t.territorio_id);
+    } else {
+      const susT = this.territoriosDe(this.modalPacto.receptorId);
+      const terrId1 = susT[0]?.territorio_id ?? '';
+      this.modalPacto.territorioId1 = terrId1;
+      const limitrofes = this.territoriosLimitrofesMios(terrId1);
+      this.territoriosLimitrofesSeleccionados = limitrofes
+        .filter(t => !this.tieneNoAgresion(terrId1, t.territorio_id))
+        .map(t => t.territorio_id);
+    }
+    this.cdr.markForCheck();
+  }
+
+  onSuTerritorioChange(suTerrId: string) {
+    if (!this.modalPacto) return;
+    this.modalPacto.territorioId1 = suTerrId;
+    const limitrofes = this.territoriosLimitrofesMios(suTerrId);
+    this.territoriosLimitrofesSeleccionados = limitrofes
+      .filter(t => !this.tieneNoAgresion(suTerrId, t.territorio_id))
+      .map(t => t.territorio_id);
+  }
+
+  abrirModalPacto(receptorId: string, tipo: 'alianza' | 'no_agresion' | 'renovacion') {
+    if (tipo === 'renovacion') {
+      const renovables = this.pactosRenovables();
+      const primer = renovables[0];
+      const rid = primer ? (primer.jugador1Id === this.userId ? primer.jugador2Id : primer.jugador1Id) : receptorId;
+      this.modalPacto = { receptorId: rid, tipo: 'renovacion', territorioId1: '', territorioId2: '', modalidad: 1, pactoId: primer?.id };
+      this.cdr.markForCheck();
+      return;
+    }
     const misT  = Object.values(this.territorios).filter(t => t.usuario_id === this.userId);
     const terrId1 = this.territorioAtacanteId ?? (misT[0]?.territorio_id ?? '');
     const limitrofes = this.territoriosLimitrofesDeReceptor(terrId1, receptorId);
-    this.territoriosLimitrofesSeleccionados = limitrofes.map(t => t.territorio_id);
+    this.territoriosLimitrofesSeleccionados = limitrofes
+      .filter(t => !this.tieneNoAgresion(terrId1, t.territorio_id))
+      .map(t => t.territorio_id);
     this.modalPacto = {
       receptorId,
       tipo,
       territorioId1: terrId1,
       territorioId2: limitrofes[0]?.territorio_id ?? '',
+      modalidad: 1,
     };
     this.cdr.markForCheck();
   }
@@ -1463,7 +1923,11 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     if (!this.modalPacto || this.propuestaSaliente) return;
     const { tipo, receptorId, territorioId1 } = this.modalPacto;
     if (tipo === 'no_agresion' && (!territorioId1 || this.territoriosLimitrofesSeleccionados.length === 0)) {
-      this.toast.show('Seleccioná al menos un territorio.', 'error');
+      this.showGameNotif('Seleccioná al menos un territorio.', 'info');
+      return;
+    }
+    if (tipo === 'renovacion' && !this.modalPacto.pactoId) {
+      this.showGameNotif('Seleccioná un pacto para renovar.', 'info');
       return;
     }
     const propuesta: PropuestaPacto = {
@@ -1472,6 +1936,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       territorioId1: tipo === 'no_agresion' ? territorioId1 : undefined,
       territorioId2: tipo === 'no_agresion' ? this.territoriosLimitrofesSeleccionados[0] : undefined,
       territoriosId2: tipo === 'no_agresion' ? [...this.territoriosLimitrofesSeleccionados] : undefined,
+      pactoId: tipo === 'renovacion' ? this.modalPacto.pactoId : undefined,
       ts: Date.now(),
     };
     this.propuestaSaliente = propuesta;
@@ -1484,10 +1949,39 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     if (!this.propuestaEntrante) return;
     const p = this.propuestaEntrante;
     const rondaActual = this.partida?.ronda_actual ?? 1;
+
+    if (p.tipo === 'renovacion' && p.pactoId) {
+      this.pactos = this.pactos.map(pacto =>
+        pacto.id === p.pactoId
+          ? { ...pacto, estado: 'activo' as const, rondaInicio: rondaActual, rondaExpira: rondaActual + 3 }
+          : pacto
+      );
+      this.propuestaEntrante = null;
+      this.channelEventos?.send({
+        type: 'broadcast', event: 'pacto_respuesta',
+        payload: { id: p.id, accepted: true, pactoRenovadoId: p.pactoId, rondaExpira: rondaActual + 3 },
+      });
+      const tipoPacto = this.pactos.find(x => x.id === p.pactoId)?.tipo ?? 'alianza';
+      const renovPayload = {
+        jugador1Nombre: this.nombreJugadorById(p.proponenteId),
+        jugador2Nombre: this.nombreJugadorById(p.receptorId),
+        tipo: tipoPacto, color: this.jugadorColores[p.proponenteId] ?? '#94a3b8',
+        ts: Date.now(), esRenovacion: true,
+      };
+      this.pushNotifPacto(renovPayload.jugador1Nombre, renovPayload.jugador2Nombre, tipoPacto, renovPayload.color, true, renovPayload.ts);
+      this.channelEventos?.send({ type: 'broadcast', event: 'pacto_aceptado', payload: renovPayload });
+      await this.service.setPactos(this.partidaId, this.pactos);
+      this.showGameNotif('¡Pacto renovado!', 'ok');
+      this.cdr.markForCheck();
+      return;
+    }
+
     const nuevoPacto: Pacto = {
-      id: p.id, tipo: p.tipo,
+      id: p.id, tipo: p.tipo as 'alianza' | 'no_agresion',
       jugador1Id: p.proponenteId, jugador2Id: p.receptorId,
-      territorioId1: p.territorioId1, territorioId2: p.territorioId2,
+      territorioId1: p.territorioId1,
+      territorioId2: p.territorioId2,
+      territoriosId2: p.territoriosId2,
       rondaInicio: rondaActual, rondaExpira: rondaActual + 3,
     };
     this.pactos = [...this.pactos, nuevoPacto];
@@ -1496,6 +1990,14 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       type: 'broadcast', event: 'pacto_respuesta',
       payload: { id: p.id, accepted: true, pacto: nuevoPacto },
     });
+    const nuevoPayload = {
+      jugador1Nombre: this.nombreJugadorById(p.proponenteId),
+      jugador2Nombre: this.nombreJugadorById(p.receptorId),
+      tipo: nuevoPacto.tipo, color: this.jugadorColores[p.proponenteId] ?? '#94a3b8',
+      ts: Date.now(), esRenovacion: false,
+    };
+    this.pushNotifPacto(nuevoPayload.jugador1Nombre, nuevoPayload.jugador2Nombre, nuevoPacto.tipo, nuevoPayload.color, false, nuevoPayload.ts);
+    this.channelEventos?.send({ type: 'broadcast', event: 'pacto_aceptado', payload: nuevoPayload });
     await this.service.setPactos(this.partidaId, this.pactos);
     this.cdr.markForCheck();
   }
@@ -1598,7 +2100,10 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   private validarImgPath(p: string): string {
-    return (p.startsWith('/assets/') || p.startsWith('assets/')) ? encodeURI(p) : '';
+    if (!p.startsWith('/assets/') && !p.startsWith('assets/')) return '';
+    // Rutas de líderes vienen de la BD con .png — servir siempre el .webp convertido
+    const webp = p.replace(/\.(png|jpg|jpeg)$/i, '.webp');
+    return encodeURI(webp);
   }
 
   getLiderImgPath(l: Lider): string {
@@ -1658,11 +2163,10 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
     if (colorTomado) {
       this.jugadores = frescos ?? [];
-      this.buildJugadorColores();
-      this.buildJugadorLideres();
+      this.rebuildJugadores();
       this.colorPreseleccionado = null;
       this.avanzandoALider = false;
-      this.toast.show('Ese color fue tomado. Elegí otro.', 'error');
+      this.showGameNotif('Ese color fue tomado. Elegí otro.', 'warn');
       this.cdr.markForCheck();
       return;
     }
@@ -1694,23 +2198,21 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
     if (colorTomado) {
       this.jugadores = frescos ?? [];
-      this.buildJugadorColores();
-      this.buildJugadorLideres();
+      this.rebuildJugadores();
       this.colorPreseleccionado = null;
       this.liderPreseleccionado = null;
       this.pasoModal = 'color';
-      this.toast.show('Ese color fue tomado por otro jugador. Elegí otro.', 'error');
+      this.showGameNotif('Ese color fue tomado por otro jugador. Elegí otro.', 'warn');
       this.cdr.markForCheck();
       return;
     }
 
     if (liderTomado) {
       this.jugadores = frescos ?? [];
-      this.buildJugadorColores();
-      this.buildJugadorLideres();
+      this.rebuildJugadores();
       this.liderPreseleccionado = null;
       this.pasoModal = 'lider';
-      this.toast.show('Ese líder fue elegido por otro jugador. Elegí otro.', 'error');
+      this.showGameNotif('Ese líder fue elegido por otro jugador. Elegí otro.', 'warn');
       this.cdr.markForCheck();
       return;
     }
@@ -1721,6 +2223,17 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     localStorage.setItem(`mat-lider-${this.partidaId}-${this.userId}`, this.liderPreseleccionado);
     this.mostrarSelectorModal = false;
     await this.service.marcarEstaDentroConColor(this.partidaId, this.userId, this.colorPreseleccionado, this.liderPreseleccionado);
+  }
+
+  private rebuildMaps() {
+    this.rebuildOwnerMap();
+    this.rebuildTropasMap();
+  }
+
+  private rebuildJugadores() {
+    this.buildJugadorColores();
+    this.buildJugadorLideres();
+    this.rebuildJugadorNombres();
   }
 
   private rebuildOwnerMap() {
@@ -1805,13 +2318,17 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     const existing = this.territorios[territorioId];
     if (existing) {
       this.territorios = { ...this.territorios, [territorioId]: { ...existing, ...data } };
-      this.rebuildOwnerMap();
-      this.rebuildTropasMap();
+      this.rebuildMaps();
     }
     return true;
   }
 
   volver() { this.router.navigate(['/kuboteg']); }
+
+  async repararEstado() {
+    await this.syncTerritorios();
+    this.toast.show('Estado reparado', 'success');
+  }
 
   // ── Chat ──────────────────────────────────────────────
   get miNombre(): string {
@@ -1826,9 +2343,114 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       texto,
       color: this.jugadorColores[this.userId] ?? '#ffffff',
       ts: Date.now(),
+      ...(this.chatActivoId !== 'global' ? { grupoId: this.chatActivoId } : {}),
     };
     this.chatMensajes = [...this.chatMensajes, msg];
     await this.channelChat.send({ type: 'broadcast', event: 'chat', payload: msg });
+  }
+
+  // ── Grupos ──────────────────────────────────────────────
+  abrirModalGrupos() {
+    this.modalGrupos = { nombre: '', bandera: this.BANDERAS[0], jugadoresIds: [] };
+    this.cdr.markForCheck();
+  }
+
+  toggleJugadorGrupo(uid: string) {
+    if (!this.modalGrupos) return;
+    const idx = this.modalGrupos.jugadoresIds.indexOf(uid);
+    if (idx >= 0) {
+      this.modalGrupos.jugadoresIds = this.modalGrupos.jugadoresIds.filter(id => id !== uid);
+    } else {
+      this.modalGrupos.jugadoresIds = [...this.modalGrupos.jugadoresIds, uid];
+    }
+  }
+
+  async crearGrupo() {
+    if (!this.modalGrupos || !this.modalGrupos.nombre.trim()) return;
+    if (this.errorCrearGrupo) return;
+    const id = crypto.randomUUID();
+    const grupo: GrupoChat = {
+      id,
+      nombre: this.modalGrupos.nombre.trim(),
+      bandera: this.modalGrupos.bandera,
+      jugadoresIds: [this.userId],
+      creadoPor: this.userId,
+    };
+    await this.service.crearGrupoChat({ id, partida_id: this.partidaId, nombre: grupo.nombre, bandera: grupo.bandera, creado_por: this.userId });
+    await this.service.unirseGrupoChat(id, this.userId);
+    this.grupos = [...this.grupos, grupo];
+    this.chatActivoId = grupo.id;
+    this.addNotif({
+      tipo: 'grupo', icono: '👥',
+      linea1: `Creaste el grupo "${grupo.nombre}"`,
+      linea2: 'Nuevo grupo de chat',
+      color: this.jugadorColores[this.userId] ?? '#94a3b8',
+      ts: Date.now(),
+    });
+    await this.channelEventos?.send({ type: 'broadcast', event: 'grupo_nuevo', payload: grupo });
+    await this.channelEventos?.send({
+      type: 'broadcast', event: 'evento_grupo',
+      payload: { accion: 'creado', grupoNombre: grupo.nombre, autorNombre: this.miNombre, autorId: this.userId },
+    });
+    for (const invitadoId of this.modalGrupos.jugadoresIds) {
+      const inv: InvitacionGrupo = {
+        id: crypto.randomUUID(),
+        grupoId: grupo.id,
+        grupoNombre: grupo.nombre,
+        grupoBandera: grupo.bandera,
+        invitadorId: this.userId,
+        invitadoId,
+        ts: Date.now(),
+      };
+      await this.channelEventos?.send({ type: 'broadcast', event: 'invitacion_grupo', payload: inv });
+    }
+    this.modalGrupos = null;
+    this.cdr.markForCheck();
+  }
+
+  async aceptarInvitacionGrupo() {
+    const inv = this.invitacionGrupoEntrante;
+    if (!inv) return;
+    await this.service.unirseGrupoChat(inv.grupoId, this.userId);
+    if (!this.grupos.find(g => g.id === inv.grupoId)) {
+      const grupo: GrupoChat = {
+        id: inv.grupoId,
+        nombre: inv.grupoNombre,
+        bandera: inv.grupoBandera,
+        jugadoresIds: [inv.invitadorId, this.userId],
+        creadoPor: inv.invitadorId,
+      };
+      this.grupos = [...this.grupos, grupo];
+    }
+    this.invitacionGrupoEntrante = null;
+    await this.channelEventos?.send({
+      type: 'broadcast', event: 'grupo_unirse',
+      payload: { grupoId: inv.grupoId, jugadorId: this.userId },
+    });
+    this.chatActivoId = inv.grupoId;
+    this.cdr.markForCheck();
+  }
+
+  async rechazarInvitacionGrupo() {
+    const inv = this.invitacionGrupoEntrante;
+    if (!inv) return;
+    this.invitacionGrupoEntrante = null;
+    await this.channelEventos?.send({
+      type: 'broadcast', event: 'grupo_rechazar',
+      payload: { grupoId: inv.grupoId, grupoNombre: inv.grupoNombre, jugadorId: this.userId },
+    });
+    await this.channelEventos?.send({
+      type: 'broadcast', event: 'evento_grupo',
+      payload: { accion: 'disuelto', grupoNombre: inv.grupoNombre, autorNombre: this.miNombre, autorId: this.userId },
+    });
+    this.addNotif({
+      tipo: 'grupo', icono: '💔',
+      linea1: `El grupo "${inv.grupoNombre}" fue disuelto`,
+      linea2: 'Rechazaste la invitación',
+      color: this.jugadorColores[this.userId] ?? '#94a3b8',
+      ts: Date.now(),
+    });
+    this.cdr.markForCheck();
   }
 
   private addNotif(item: NotifItem) {
@@ -1851,6 +2473,30 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       linea1: `${data.atacanteNombre} conquistó`,
       linea2: `${data.territorioNombre} (de ${data.defensorNombre})`,
       color: data.colorAtacante, ts: data.ts,
+    });
+  }
+
+  private pushNotifPacto(j1: string, j2: string, tipo: 'alianza' | 'no_agresion', color: string, esRenovacion: boolean, ts: number) {
+    const icono = tipo === 'alianza' ? '🤝' : '🛡️';
+    const label = tipo === 'alianza' ? 'Alianza' : 'No agresión';
+    this.addNotif({
+      tipo: 'pacto', icono,
+      linea1: `${label}: ${j1} & ${j2}`,
+      linea2: esRenovacion ? 'Pacto renovado' : 'Pacto establecido',
+      color, ts,
+    });
+  }
+
+  private pushNotifPostura(declaranteNombre: string, receptorNombre: string, postura: 'amigable' | 'neutral' | 'hostil', color: string) {
+    const iconos = { amigable: '😊', neutral: '😐', hostil: '😠' };
+    const labels = { amigable: 'Amigable', neutral: 'Neutral', hostil: 'Hostil' };
+    this.addNotif({
+      tipo: 'combate',
+      icono: iconos[postura],
+      linea1: `${declaranteNombre} → ${receptorNombre}`,
+      linea2: labels[postura],
+      color,
+      ts: Date.now(),
     });
   }
 

@@ -56,7 +56,7 @@ interface PartidaFinalizada {
               </svg>
             </button>
             <div class="notif-logo-wrap">
-              <img src="assets/productos/favicon-kuboteg.svg" alt="KuboTeg" class="notif-logo">
+              <img loading="lazy" src="assets/productos/favicon-kuboteg.svg" alt="KuboTeg" class="notif-logo">
             </div>
             <div class="notif-title">¡Partida iniciada!</div>
             <p class="notif-msg">{{ notifMsgFormatted }}</p>
@@ -69,7 +69,7 @@ interface PartidaFinalizada {
         <div class="page-header">
           <div class="container">
             <div class="page-brand">
-              <img class="page-logo" src="assets/productos/favicon-kuboteg.svg" alt="KuboTeg">
+              <img loading="lazy" class="page-logo" src="assets/productos/favicon-kuboteg.svg" alt="KuboTeg">
               <h1 class="page-title" style="color:#FF4757">HEGEMONY</h1>
             </div>
             <div class="page-actions">

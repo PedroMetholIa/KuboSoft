@@ -26,7 +26,7 @@
         @if (categoriaNombre) {
           <div class="section-logo">
             @if (categoriaLogo) {
-              <img class="section-logo-img" [src]="categoriaLogo" [alt]="categoriaNombre">
+              <img loading="lazy" class="section-logo-img" [src]="categoriaLogo" [alt]="categoriaNombre">
             }
           </div>
         }
@@ -37,7 +37,7 @@
           <div class="card prod-card card--clickable" (click)="navigateTo(j)">
             <div class="card-header">
               <div class="card-logo">
-                <img [src]="getImgPath(j.nombre)" [alt]="j.nombre">
+                <img loading="lazy" [src]="getImgPath(j.nombre)" [alt]="j.nombre">
               </div>
               <h3 class="cat-title"><em class="accent">{{ getDisplayName(j.nombre) }}</em></h3>
             </div>
@@ -140,7 +140,7 @@
   <div class="footer-inner">
     <p>© 2025 KuboSoft · Todos los derechos reservados</p>
     <a class="footer-brand" href="#">
-      <img class="footer-logo-img" [src]="categoriaLogo || 'assets/kubosoft.png'" [alt]="categoriaNombre || 'KuboSoft'">
+      <img fetchpriority="high" loading="eager" class="footer-logo-img" [src]="categoriaLogo || 'assets/kubosoft.webp'" [alt]="categoriaNombre || 'KuboSoft'">
       <span class="footer-logo-text">Kubo<em>Soft</em></span>
     </a>
   </div>

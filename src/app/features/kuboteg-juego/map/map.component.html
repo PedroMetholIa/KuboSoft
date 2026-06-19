@@ -18,7 +18,7 @@
       </filter>
     </defs>
 
-    <image href="assets/KuboTeg/FondoOceano.png" x="0" y="50" width="1100" height="550" preserveAspectRatio="xMidYMid slice"/>
+    <image href="assets/KuboTeg/FondoOceano.webp" x="0" y="50" width="1100" height="550" preserveAspectRatio="xMidYMid slice"/>
 
     <g id="map-content">
 
@@ -94,6 +94,13 @@
         <div class="tooltip-owner">Sin dueño</div>
       }
       <div class="tooltip-troops">Tropas: <strong>{{ getTropas(tooltip.id) }}</strong></div>
+    </div>
+  }
+
+  @if (activePactoMsg) {
+    <div class="pacto-popup">
+      <div class="pacto-popup-icon">🛡</div>
+      <div class="pacto-popup-msg">{{ activePactoMsg }}</div>
     </div>
   }
 

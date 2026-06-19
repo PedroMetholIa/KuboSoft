@@ -60,7 +60,7 @@ interface Categoria {
                     <div class="card-header">
                       @if (cat.logo) {
                         <div class="card-logo">
-                          <img [src]="cat.logo" [alt]="cat.nombre" />
+                          <img loading="lazy" [src]="cat.logo" [alt]="cat.nombre" />
                         </div>
                       }
                       <h3 class="cat-title"><span [style.color]="getCategoryColor(cat.nombre)">{{ getCategorySuffix(cat.nombre) }}</span></h3>
@@ -141,7 +141,7 @@ interface Categoria {
         <div class="footer-inner">
           <p>© 2025 KuboSoft · Todos los derechos reservados</p>
           <a class="footer-brand" href="#">
-            <img class="footer-logo-img" src="assets/kubosoft.png" alt="KuboSoft">
+            <img fetchpriority="high" loading="eager" class="footer-logo-img" src="assets/kubosoft.webp" alt="KuboSoft">
             <span class="footer-logo-text">Kubo<em>Soft</em></span>
           </a>
         </div>

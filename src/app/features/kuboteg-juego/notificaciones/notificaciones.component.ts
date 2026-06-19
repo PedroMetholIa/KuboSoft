@@ -1,13 +1,14 @@
 import { Component, Input } from '@angular/core';
 
 export interface NotifItem {
-  tipo: 'combate' | 'conquista' | 'carta';
+  tipo: 'combate' | 'conquista' | 'carta' | 'grupo' | 'pacto';
   icono: string;
   linea1: string;
   linea2: string;
   color: string;
   ts: number;
   bonusNombre?: string | null;
+  jugador?: string | null;
 }
 
 @Component({
@@ -16,7 +17,7 @@ export interface NotifItem {
   template: `
     <div class="notif-panel">
       <div class="notif-header">
-        <span class="notif-title">Eventos</span>
+        <span class="notif-title">Noticias</span>
         @if (items.length > 0) {
           <span class="notif-badge">{{ items.length }}</span>
         }
@@ -32,7 +33,10 @@ export interface NotifItem {
             <div class="notif-item notif-carta-item">
               <div class="carta-grande-icon">🃏</div>
               <div class="carta-grande-body">
-                <div class="carta-grande-label">Carta robada</div>
+                @if (item.jugador) {
+                <div class="carta-grande-jugador">{{ item.jugador }}</div>
+              }
+              <div class="carta-grande-label">Carta robada</div>
                 <div class="carta-grande-nombre">{{ item.linea1 }}</div>
                 @if (item.bonusNombre) {
                   <div class="carta-grande-bonus">✦ Bonus: {{ item.bonusNombre }}</div>

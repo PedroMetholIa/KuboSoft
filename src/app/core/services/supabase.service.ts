@@ -80,6 +80,7 @@ export interface PartidaJugador {
   lider?: string | null;
   objetivo?: unknown;
   cartas?: string[] | null;
+  posturas?: Record<string, 'amigable' | 'neutral' | 'hostil'> | null;
   usuario?: { nombre: string | null; apellido: string | null; email: string } | null;
   created_at: string;
 }
@@ -97,6 +98,8 @@ export interface Lider {
   img_neutra: string | null;
   img_amigable: string | null;
   img_hostil: string | null;
+  sonido: string | null;
+  volumen: number | null;
 }
 
 export interface Notificacion {
@@ -309,7 +312,7 @@ export class SupabaseService {
 
   getPartidaJugadores(partidaId: string) {
     return this.supabase.from('partida_jugador')
-      .select('id, usuario_id, orden_turno, puntos, esta_dentro, tropas_por_colocar, color, lider, objetivo, usuario(nombre, apellido, email)')
+      .select('id, usuario_id, orden_turno, puntos, esta_dentro, tropas_por_colocar, color, lider, objetivo, posturas, usuario(nombre, apellido, email)')
       .eq('partida_id', partidaId)
       .order('orden_turno')
       .then(r => ({ ...r, data: r.data as unknown as PartidaJugador[] | null }));
@@ -388,6 +391,33 @@ export class SupabaseService {
       .update({ objetivo })
       .eq('partida_id', partidaId)
       .eq('usuario_id', usuarioId);
+  }
+
+  setPosturas(partidaId: string, usuarioId: string, posturas: Record<string, 'amigable' | 'neutral' | 'hostil'>) {
+    return this.supabase.from('partida_jugador')
+      .update({ posturas })
+      .eq('partida_id', partidaId)
+      .eq('usuario_id', usuarioId);
+  }
+
+  // ── Grupos de chat ────────────────────────────────────
+  getGruposChat(partidaId: string) {
+    return this.supabase
+      .from('grupo_chat')
+      .select('*, grupo_chat_miembro(usuario_id)')
+      .eq('partida_id', partidaId);
+  }
+
+  crearGrupoChat(grupo: { id: string; partida_id: string; nombre: string; bandera: string; creado_por: string }) {
+    return this.supabase.from('grupo_chat').insert(grupo);
+  }
+
+  unirseGrupoChat(grupoId: string, usuarioId: string) {
+    return this.supabase.from('grupo_chat_miembro').insert({ grupo_id: grupoId, usuario_id: usuarioId });
+  }
+
+  eliminarGrupoChat(grupoId: string) {
+    return this.supabase.from('grupo_chat').delete().eq('id', grupoId);
   }
 
   // ── Territorios ───────────────────────────────────────

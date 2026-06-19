@@ -15,7 +15,7 @@ import { filter } from 'rxjs/operators';
     <nav class="platform-nav">
       <div class="nav-container">
         <a class="logo" [routerLink]="['/inicio']">
-          <img class="nav-logo-img" [src]="logoSrc || 'assets/kubosoft.png'" [alt]="logoSrc ? 'Logo' : 'KuboSoft'">
+          <img fetchpriority="high" loading="eager" class="nav-logo-img" [src]="logoSrc || 'assets/kubosoft.webp'" [alt]="logoSrc ? 'Logo' : 'KuboSoft'">
           <span class="logo-text">Kubo<em>Soft</em></span>
         </a>
 
@@ -42,7 +42,7 @@ import { filter } from 'rxjs/operators';
         <div class="modal-card" (click)="$event.stopPropagation()">
           <button class="modal-close" (click)="closeModal()">×</button>
           <div class="modal-logo">
-            <img src="assets/kubosoft.png" alt="KuboSoft" />
+            <img loading="lazy" src="assets/kubosoft.webp" alt="KuboSoft" />
             <span class="modal-logo-text">Kubo<em>Soft</em></span>
           </div>
           <h2 class="modal-title">Iniciar sesión</h2>
@@ -74,7 +74,7 @@ import { filter } from 'rxjs/operators';
         <div class="modal-card" (click)="$event.stopPropagation()">
           <button class="modal-close" (click)="closeModal()">×</button>
           <div class="modal-logo">
-            <img src="assets/kubosoft.png" alt="KuboSoft" />
+            <img loading="lazy" src="assets/kubosoft.webp" alt="KuboSoft" />
             <span class="modal-logo-text">Kubo<em>Soft</em></span>
           </div>
           <h2 class="modal-title">Crear cuenta</h2>
