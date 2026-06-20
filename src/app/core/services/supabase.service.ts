@@ -51,7 +51,7 @@ export interface Partida {
   host_id: string;
   limite_jugadores: number;
   jugadores_registrados: number;
-  estado: 'Iniciada' | 'En juego' | 'Finalizada';
+  estado: 'Iniciada' | 'En juego' | 'En pausa' | 'Finalizada';
   ganador_id: string | null;
   requiere_contrasena: boolean;
   contrasena?: string | null;
@@ -65,6 +65,8 @@ export interface Partida {
   jugador_actual_index?: number;
   ultimo_combate?: UltimoCombate | null;
   ultima_conquista?: UltimaConquista | null;
+  acumulado_territorios?: Record<string, number> | null;
+  pausado_por?: string | null;
   created_at: string;
 }
 
@@ -373,6 +375,28 @@ export class SupabaseService {
 
   declararGanadorObjetivo(partidaId: string) {
     return this._rpc('declarar_ganador_objetivo', { p_partida_id: partidaId });
+  }
+
+  pausarPartida(partidaId: string, pausadoPor: string) {
+    return this.supabase.from('partida')
+      .update({ estado: 'En pausa', pausado_por: pausadoPor })
+      .eq('id', partidaId);
+  }
+
+  reanudarPartida(partidaId: string) {
+    return this.supabase.from('partida')
+      .update({ estado: 'En juego', pausado_por: null })
+      .eq('id', partidaId);
+  }
+
+  updateAcumuladoTerritorios(partidaId: string, acumulado: Record<string, number>) {
+    return this.supabase.from('partida').update({ acumulado_territorios: acumulado }).eq('id', partidaId);
+  }
+
+  declararGanadorAcumulacion(partidaId: string, ganadorId: string) {
+    return this.supabase.from('partida')
+      .update({ ganador_id: ganadorId, estado: 'Finalizada' })
+      .eq('id', partidaId);
   }
 
   setCartas(partidaId: string, usuarioId: string, cartas: string[]) {

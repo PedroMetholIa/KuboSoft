@@ -1,11 +1,25 @@
 .notif-panel {
   display: flex;
   flex-direction: column;
+  position: relative;
   background: rgba(255,255,255,.02);
   border: 1px solid rgba(255,255,255,.06);
   border-radius: 12px;
   overflow: hidden;
   flex-shrink: 0;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 28px;
+    background: linear-gradient(to top, rgba(8,6,20,.85), transparent);
+    pointer-events: none;
+    z-index: 1;
+    border-radius: 0 0 12px 12px;
+  }
 }
 
 .notif-header {
@@ -40,6 +54,33 @@
   flex-direction: column;
   overflow-y: auto;
   max-height: 160px;
+  scroll-behavior: smooth;
+
+  // ── Scrollbar custom ──────────────────────────────────
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.12) transparent;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,.12);
+    border-radius: 4px;
+    transition: background .2s;
+  }
+
+  &:hover::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,.22);
+  }
+
+  &::-webkit-scrollbar-thumb:active {
+    background: rgba(255,255,255,.32);
+  }
 }
 
 .notif-empty {
@@ -105,52 +146,3 @@
   border: 1px solid rgba(255,255,255,.2);
 }
 
-// ── Carta robada ────────────────────────────────────────
-.notif-carta-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 0.9rem;
-  background: rgba(99, 102, 241, 0.08);
-  border-bottom: 1px solid rgba(99, 102, 241, 0.18);
-
-  &:last-child { border-bottom: none; }
-}
-
-.carta-grande-icon {
-  font-size: 2rem;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.carta-grande-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  flex: 1;
-  min-width: 0;
-}
-
-.carta-grande-label {
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: #818cf8;
-}
-
-.carta-grande-nombre {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: #e2e8f0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.carta-grande-bonus {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #f59e0b;
-  margin-top: 0.1rem;
-}

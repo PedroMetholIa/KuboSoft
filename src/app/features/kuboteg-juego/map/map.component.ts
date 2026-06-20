@@ -64,6 +64,10 @@ export class MapComponent implements OnInit, AfterViewInit {
     });
   }
 
+  refresh(): void {
+    this.cdr.markForCheck();
+  }
+
   onTerritoryClick(territory: Territory): void {
     this.territorioClick.emit(territory.id);
   }

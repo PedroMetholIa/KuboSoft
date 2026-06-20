@@ -29,30 +29,14 @@ export interface NotifItem {
         }
 
         @for (item of items; track item.ts) {
-          @if (item.tipo === 'carta') {
-            <div class="notif-item notif-carta-item">
-              <div class="carta-grande-icon">🃏</div>
-              <div class="carta-grande-body">
-                @if (item.jugador) {
-                <div class="carta-grande-jugador">{{ item.jugador }}</div>
-              }
-              <div class="carta-grande-label">Carta robada</div>
-                <div class="carta-grande-nombre">{{ item.linea1 }}</div>
-                @if (item.bonusNombre) {
-                  <div class="carta-grande-bonus">✦ Bonus: {{ item.bonusNombre }}</div>
-                }
-              </div>
+          <div class="notif-item" [class.notif-conquista]="item.tipo === 'conquista'">
+            <span class="notif-icono">{{ item.icono }}</span>
+            <div class="notif-body">
+              <span class="notif-linea1">{{ item.jugador ? item.jugador + ' · ' + item.linea1 : item.linea1 }}</span>
+              <span class="notif-linea2">{{ item.linea2 }}</span>
             </div>
-          } @else {
-            <div class="notif-item" [class.notif-conquista]="item.tipo === 'conquista'">
-              <span class="notif-icono">{{ item.icono }}</span>
-              <div class="notif-body">
-                <span class="notif-linea1">{{ item.linea1 }}</span>
-                <span class="notif-linea2">{{ item.linea2 }}</span>
-              </div>
-              <span class="notif-dot" [style.background-color]="item.color"></span>
-            </div>
-          }
+            <span class="notif-dot" [style.background-color]="item.color"></span>
+          </div>
         }
       </div>
     </div>

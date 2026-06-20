@@ -95,6 +95,9 @@
           </div>
           <div class="modal-actions">
             <button class="btn-volver-paso" (click)="volverAColor()">← Atrás</button>
+            <button class="btn-aleatorio-lider" (click)="seleccionarLiderAleatorio()" title="Selección aleatoria">
+              🎲 Aleatorio
+            </button>
             <button
               class="btn-confirmar-color btn-confirmar-lider"
               [disabled]="!liderPreseleccionado"
@@ -129,11 +132,18 @@
         />
       </div>
       <div class="game-header-right">
-        <button class="btn-repair" (click)="repararEstado()" data-tooltip="Reparar estado">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-          </svg>
-        </button>
+        @if (!enPausa) {
+          <button class="btn-pausa" (click)="togglePausa()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            Pausar
+          </button>
+        }
+        @if (enPausa && esPausador) {
+          <button class="btn-pausa btn-pausa--activo" (click)="togglePausa()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+            Reanudar
+          </button>
+        }
         <button class="btn-back" (click)="volver()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -158,8 +168,11 @@
                [style.border-color]="jugadorColores[jugadorActualId]"
                [style.box-shadow]="'0 0 12px ' + jugadorColores[jugadorActualId] + '55'">
             <img class="turno-lider-img"
+                 [class.turno-lider-img--clickable]="!esMiTurno"
                  [src]="liderActualImgPath"
-                 [alt]="jugadorLideres[jugadorActualId]">
+                 [attr.title]="!esMiTurno ? 'Chatear con ' + jugadorActualNombre : null"
+                 [alt]="jugadorLideres[jugadorActualId]"
+                 (click)="!esMiTurno && abrirChatPrivado(jugadorActualId)">
             <div class="turno-lider-footer">
               <span class="turno-color-dot"
                     [style.background-color]="jugadorColores[jugadorActualId]"></span>
@@ -180,10 +193,20 @@
           </div>
         }
 
+        @if (panelActivo !== 'chat') {
         <app-menu-jugador [panelActivo]="panelActivo">
           @switch (panelActivo) {
 
             @case ('jugadores') {
+              @if (esFaseAcumulacion && partida) {
+                <div class="fase-final-banner">
+                  <span class="fase-final-icon">⏳</span>
+                  <div class="fase-final-texto">
+                    <span class="fase-final-titulo">FASE FINAL</span>
+                    <span class="fase-final-sub">Ronda {{ partida.ronda_actual }} / {{ partida.limite_rondas }} · Gana por territorios acumulados</span>
+                  </div>
+                </div>
+              }
               <div class="score-list">
                 @for (j of jugadoresEnOrden; track j.usuario_id; let i = $index) {
                   @if (i > 0) {
@@ -191,7 +214,9 @@
                       class="score-item"
                       [class.active]="j.usuario_id === jugadorActualId && !!fase"
                       [class.me]="j.usuario_id === userId"
-                      [class.fuera]="!j.esta_dentro">
+                      [class.fuera]="!j.esta_dentro"
+                      [class.score-item-clickable]="j.usuario_id !== userId"
+                      (click)="j.usuario_id !== userId && abrirChatPrivado(j.usuario_id)">
                       <span class="pos">{{ i + 1 }}</span>
                       @if (getLiderImgByUserId(j.usuario_id)) {
                         <img [src]="getLiderImgByUserId(j.usuario_id)"
@@ -200,11 +225,19 @@
                              alt="">
                       }
                       <div class="player-info">
-                        <span class="player-name">{{ nombreJugador(j) }}</span>
-                        @if (jugadorLideres[j.usuario_id]) {
-                          <span class="player-lider" [style.color]="jugadorColores[j.usuario_id]">{{ jugadorLideres[j.usuario_id] }}</span>
+                        <div class="player-name-row">
+                          <span class="player-name">{{ nombreJugador(j) }}</span>
+                          @if (jugadorLideres[j.usuario_id]) {
+                            <span class="player-lider" [style.color]="jugadorColores[j.usuario_id]">{{ jugadorLideres[j.usuario_id] }}</span>
+                          }
+                        </div>
+                        @if (posturas[j.usuario_id]) {
+                          <span class="postura-text postura-text--{{ posturas[j.usuario_id] }}">{{ posturaLabel(j.usuario_id) }}</span>
                         }
                       </div>
+                      @if (posturaIcono(j.usuario_id)) {
+                        <span class="postura-badge" [title]="posturas[j.usuario_id]">{{ posturaIcono(j.usuario_id) }}</span>
+                      }
                       <span class="dentro-dot" [class.dentro]="j.esta_dentro">
                         {{ j.esta_dentro ? '●' : '○' }}
                       </span>
@@ -256,16 +289,23 @@
               }
 
               <!-- Cartas -->
-              @if (misCartas.length > 0) {
-                <div class="cartas-section">
-                  <div class="cartas-label">🃏 Cartas <span class="cartas-count">({{ misCartas.length }})</span></div>
+              <div class="cartas-section">
+                <div class="cartas-label">
+                  🃏 Cartas <span class="cartas-count">({{ misCartas.length }})</span>
+                  @if (cartasRobadasTotal > 0) {
+                    <span class="cartas-historico">{{ cartasRobadasTotal }} robadas en total</span>
+                  }
+                </div>
+                @if (misCartas.length > 0) {
                   <div class="cartas-list">
                     @for (c of misCartas; track $index) {
                       <span class="carta-chip">{{ nombreTerritorio(c) }}</span>
                     }
                   </div>
-                </div>
-              }
+                } @else {
+                  <div class="cartas-empty">Sin cartas en mano</div>
+                }
+              </div>
 
               <!-- Grupos de chat -->
               <div class="grupos-inicio-section">
@@ -275,8 +315,8 @@
                 } @else {
                   @for (g of gruposMios; track g.id) {
                     <div class="grupos-inicio-item" [class.grupos-inicio-item--activo]="chatActivoId === g.id"
+                         [attr.data-tooltip]="grupoMiembrosTooltip(g)"
                          (click)="chatActivoId = g.id">
-                      <img class="grupos-inicio-bandera" [src]="'assets/KuboTeg/banderas/' + g.bandera" [alt]="g.nombre" />
                       <div class="grupos-inicio-info">
                         <span class="grupos-inicio-nombre">{{ g.nombre }}</span>
                         <div class="grupos-inicio-miembros">
@@ -298,16 +338,103 @@
               <div class="mj-placeholder">Notificaciones</div>
             }
             @case ('informacion') {
-              <div class="mj-placeholder">Información</div>
+              <div class="info-rules">
+
+                  <section class="info-section">
+                    <h3 class="info-section-title">🎯 Objetivo</h3>
+                    <p>Cada jugador tiene un <strong>objetivo secreto</strong>. Si lo cumplís, ganás de inmediato. Si nadie lo cumple, gana quien acumule más territorios en las <strong>últimas 3 rondas</strong>. En caso de empate, gana quien tenga más tropas en juego.</p>
+                  </section>
+
+                  <section class="info-section">
+                    <h3 class="info-section-title">🗺️ Distribución inicial</h3>
+                    <p>Los territorios se distribuyen automáticamente de forma aleatoria y equitativa entre todos los jugadores al inicio de la partida.</p>
+                  </section>
+
+                  <section class="info-section">
+                    <h3 class="info-section-title">🔄 Fases del turno</h3>
+                    <p>Cada turno tiene tres fases obligatorias en orden:</p>
+                    <ol class="info-list">
+                      <li><strong>Colocación</strong> — Recibís tropas y las ubicás en tus territorios.</li>
+                      <li><strong>Ataque</strong> — Podés atacar territorios adyacentes enemigos (opcional).</li>
+                      <li><strong>Reagrupación</strong> — Movés tropas entre dos territorios propios conectados (opcional).</li>
+                    </ol>
+                  </section>
+
+                  <section class="info-section">
+                    <h3 class="info-section-title">🪖 Colocación de tropas</h3>
+                    <p>Las tropas que recibís por ronda se calculan así:</p>
+                    <ul class="info-list">
+                      <li>La tercera parte de tus territorios (mínimo 3).</li>
+                      <li><strong>Bonus de continente</strong>: si controlás todos los territorios de un continente, recibís tropas extra según su valor.</li>
+                      <li><strong>Canje de cartas</strong>: canjeando sets de 3 cartas obtenés tropas adicionales.</li>
+                    </ul>
+                  </section>
+
+                  <section class="info-section">
+                    <h3 class="info-section-title">⚔️ Ataque</h3>
+                    <p>Para atacar, el territorio de origen debe tener <strong>al menos 2 tropas</strong> y ser adyacente al objetivo.</p>
+                    <ul class="info-list">
+                      <li><strong>Atacante</strong>: tira hasta 3 dados (según tropas disponibles).</li>
+                      <li><strong>Defensor</strong>: tira hasta 2 dados.</li>
+                      <li>Se comparan los dados de mayor a menor. El dado mayor gana. En empate, gana el defensor.</li>
+                      <li>Si el defensor queda sin tropas, el atacante conquista el territorio y debe mover al menos 1 tropa.</li>
+                    </ul>
+                  </section>
+
+                  <section class="info-section">
+                    <h3 class="info-section-title">🃏 Cartas</h3>
+                    <p>Al conquistar al menos un territorio en tu turno, robás una carta automáticamente.</p>
+                    <ul class="info-list">
+                      <li>Cada carta representa un territorio y un tipo (infantería, caballería, artillería).</li>
+                      <li>Podés canjear 3 cartas del mismo tipo o una de cada tipo para obtener tropas.</li>
+                      <li>El canje solo está disponible durante tu fase de colocación.</li>
+                    </ul>
+                  </section>
+
+                  <section class="info-section">
+                    <h3 class="info-section-title">🤝 Tratados</h3>
+                    <p>Podés firmar acuerdos diplomáticos con otros jugadores. Límite: <strong>2 tratados activos</strong> simultáneamente (contando los activos, en revisión y rotos).</p>
+                    <ul class="info-list">
+                      <li><strong>Alianza</strong>: no podés atacar al aliado ni él a vos durante las rondas pactadas.</li>
+                      <li><strong>No agresión</strong>: protege territorios específicos mutuamente acordados.</li>
+                      <li>Romper un tratado lo marca como <em>roto</em> y sigue contando hacia el límite de 2.</li>
+                    </ul>
+                  </section>
+
+                  <section class="info-section">
+                    <h3 class="info-section-title">😊 Posturas</h3>
+                    <p>Podés definir tu postura hacia cada jugador. Es solo informativa para los demás:</p>
+                    <ul class="info-list">
+                      <li>😊 <strong>Amigable</strong>: disposición a negociar.</li>
+                      <li>😐 <strong>Neutral</strong>: postura por defecto.</li>
+                      <li>😠 <strong>Hostil</strong>: intención de ataque.</li>
+                    </ul>
+                  </section>
+
+                  <section class="info-section">
+                    <h3 class="info-section-title">📊 Acumulación final</h3>
+                    <p>Cuando faltan <strong>3 rondas</strong> para el límite, comienza la fase de acumulación. En cada una de esas rondas se registra la cantidad de territorios de cada jugador. Al terminar la última ronda, se suman los totales y gana quien acumuló más.</p>
+                  </section>
+
+                  <section class="info-section">
+                    <h3 class="info-section-title">🏆 Condiciones de victoria</h3>
+                    <ul class="info-list">
+                      <li><strong>Objetivo secreto</strong>: cumplirlo en cualquier momento gana la partida al instante.</li>
+                      <li><strong>Acumulación</strong>: mayor total de territorios en las últimas 3 rondas.</li>
+                      <li><strong>Desempate</strong>: más tropas en juego al final.</li>
+                    </ul>
+                  </section>
+
+              </div>
             }
 
             @case ('tratado') {
               <div class="pactos-panel">
 
-                <div class="pactos-section-title">Pactos activos</div>
-                @if (pactosActivos().length > 0) {
+                <div class="pactos-section-title">Mis tratados</div>
+                @if (misPactosActivos.length > 0) {
                   <div class="pactos-list">
-                    @for (p of pactosActivos(); track p.id) {
+                    @for (p of misPactosActivos; track p.id) {
                       <div class="pacto-item"
                         [class.pacto-pendiente]="esEnRevisionNatural(p)"
                         [class.pacto-roto]="esAcuerdoRoto(p)">
@@ -389,11 +516,129 @@
               <div class="mj-placeholder">Música</div>
             }
             @case ('configuracion') {
-              <div class="mj-placeholder">Configuración</div>
+              <div class="cfg-panel">
+                <div class="cfg-section-label">Audio</div>
+                <div class="cfg-audio-options">
+                  <button class="cfg-audio-btn" [class.cfg-audio-btn--sel]="modoAudio === 'sin_sonido'" (click)="setModoAudio('sin_sonido')">
+                    <span class="cfg-audio-icon">🔇</span>
+                    <div class="cfg-audio-text">
+                      <span class="cfg-audio-title">Sin ningún sonido</span>
+                      <span class="cfg-audio-desc">No se reproduce ningún audio</span>
+                    </div>
+                  </button>
+                  <button class="cfg-audio-btn" [class.cfg-audio-btn--sel]="modoAudio === 'sin_musica'" (click)="setModoAudio('sin_musica')">
+                    <span class="cfg-audio-icon">🔕</span>
+                    <div class="cfg-audio-text">
+                      <span class="cfg-audio-title">Sin música de fondo</span>
+                      <span class="cfg-audio-desc">Solo efectos de sonido</span>
+                    </div>
+                  </button>
+                  <button class="cfg-audio-btn" [class.cfg-audio-btn--sel]="modoAudio === 'musica_uniforme'" (click)="setModoAudio('musica_uniforme')">
+                    <span class="cfg-audio-icon">🎵</span>
+                    <div class="cfg-audio-text">
+                      <span class="cfg-audio-title">Música uniforme</span>
+                      <span class="cfg-audio-desc">Música de fondo fija sin cambios</span>
+                    </div>
+                  </button>
+                  <button class="cfg-audio-btn" [class.cfg-audio-btn--sel]="modoAudio === 'musica_lideres'" (click)="setModoAudio('musica_lideres')">
+                    <span class="cfg-audio-icon">🎭</span>
+                    <div class="cfg-audio-text">
+                      <span class="cfg-audio-title">Música por líder</span>
+                      <span class="cfg-audio-desc">Cambia según el jugador en turno</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            }
+
+            @case ('internacionales') {
+              <div class="intl-panel">
+
+                <!-- ── Tratados ───────────────────── -->
+                <div class="intl-section-label">
+                  Tratados
+                  @if (pactos.length > 0) { <span class="intl-count">{{ pactos.length }}</span> }
+                </div>
+                @if (pactos.length === 0) {
+                  <div class="intl-empty">Sin tratados</div>
+                } @else {
+                  @for (p of pactos; track p.id) {
+                    <div class="intl-pacto-card">
+                      <!-- Jugadores + tipo + estado -->
+                      <div class="intl-pacto-header">
+                        <span class="intl-dot" [style.background]="jugadorColores[p.jugador1Id]"></span>
+                        <span class="intl-name">{{ jugadorNombres[p.jugador1Id] }}</span>
+                        <span class="intl-sep">↔</span>
+                        <span class="intl-dot" [style.background]="jugadorColores[p.jugador2Id]"></span>
+                        <span class="intl-name">{{ jugadorNombres[p.jugador2Id] }}</span>
+                        <span class="intl-tag intl-tag--tipo">{{ p.tipo === 'alianza' ? 'Alianza' : 'No agresión' }}</span>
+                        @if (esAcuerdoRoto(p)) {
+                          <span class="intl-tag intl-tag--roto">Roto</span>
+                        } @else if (esPactoEnTransicion(p)) {
+                          <span class="intl-tag intl-tag--revision">Rev.</span>
+                        } @else {
+                          <span class="intl-tag intl-tag--vigente">OK</span>
+                        }
+                      </div>
+                      <!-- Territorios involucrados -->
+                      @if (p.territorioId1 || p.territorioId2 || p.territoriosId2?.length) {
+                        <div class="intl-pacto-terr">
+                          <span class="intl-pacto-terr-label">Territorios:</span>
+                          @if (p.territorioId1) {
+                            <span class="intl-terr-chip" [style.border-color]="jugadorColores[p.jugador1Id]">
+                              {{ nombreTerritorio(p.territorioId1) }}
+                            </span>
+                          }
+                          @if (p.territoriosId2?.length) {
+                            @for (tid of p.territoriosId2!; track tid) {
+                              <span class="intl-terr-chip" [style.border-color]="jugadorColores[p.jugador2Id]">
+                                {{ nombreTerritorio(tid) }}
+                              </span>
+                            }
+                          } @else if (p.territorioId2) {
+                            <span class="intl-terr-chip" [style.border-color]="jugadorColores[p.jugador2Id]">
+                              {{ nombreTerritorio(p.territorioId2) }}
+                            </span>
+                          }
+                        </div>
+                      }
+                    </div>
+                  }
+                }
+
+                <!-- ── Posturas ───────────────────── -->
+                <div class="intl-section-label intl-section-label--mt">Posturas</div>
+                @for (j of jugadores; track j.usuario_id) {
+                  @if (j.posturas && (j.posturas | keyvalue).length > 0) {
+                    <div class="intl-postura-block">
+                      <div class="intl-postura-from-row">
+                        <span class="intl-postura-from-bar" [style.background]="jugadorColores[j.usuario_id]"></span>
+                        <span class="intl-postura-from-name">{{ jugadorNombres[j.usuario_id] }}</span>
+                      </div>
+                      <div class="intl-postura-entries">
+                        @for (entry of (j.posturas | keyvalue); track entry.key) {
+                          <div class="intl-postura-entry intl-postura-entry--{{ entry.value }}">
+                            <span class="intl-postura-entry-dot" [style.background]="jugadorColores[entry.key]"></span>
+                            <span class="intl-postura-entry-name">{{ jugadorNombres[entry.key] }}</span>
+                            <span class="intl-postura-entry-badge intl-postura-entry-badge--{{ entry.value }}">
+                              {{ entry.value }}
+                            </span>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  }
+                }
+                @if (todasPosturasVacias) {
+                  <div class="intl-empty">Sin posturas declaradas</div>
+                }
+
+              </div>
             }
 
           }
         </app-menu-jugador>
+        }
 
         <div class="panel-divider"></div>
 
@@ -430,10 +675,16 @@
       <nav class="toolbar-vertical">
 
         <div class="tb-group-top">
+          <button class="tb-btn tb-repair-btn"
+            (click)="repararMapa()"
+            data-tooltip="REPARAR MAPA">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            </svg>
+          </button>
           <button class="tb-btn tb-music-btn"
             [class.muted]="musicaMuteada"
-            [class.tb-active]="panelActivo === 'musica'"
-            (click)="toggleMusica(); setPanelActivo('musica')"
+            (click)="toggleMusica()"
             [attr.data-tooltip]="musicaMuteada ? 'Activar música' : 'Silenciar música'">♪</button>
           <button class="tb-btn"
             [class.tb-active]="panelActivo === 'configuracion'"
@@ -469,12 +720,12 @@
           </button>
 
           <button class="tb-btn"
-            [class.tb-active]="panelActivo === 'notificaciones'"
-            (click)="setPanelActivo('notificaciones')"
-            data-tooltip="Notificaciones">
+            [class.tb-active]="panelActivo === 'internacionales'"
+            (click)="setPanelActivo('internacionales')"
+            data-tooltip="Internacionales">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
             </svg>
           </button>
 
@@ -499,15 +750,6 @@
             @if (hayPactosEnRevision) {
               <span class="tb-badge-alerta">!</span>
             }
-          </button>
-
-          <button class="tb-btn"
-            [class.tb-active]="panelActivo === 'chat'"
-            (click)="setPanelActivo('chat')"
-            data-tooltip="Chat">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
           </button>
 
           <button class="tb-btn"
@@ -693,7 +935,6 @@
           </button>
           @for (g of gruposMios; track g.id) {
             <button class="chat-tab" [class.chat-tab--active]="chatActivoId === g.id" (click)="chatActivoId = g.id">
-              <img class="chat-tab-bandera" [src]="'assets/KuboTeg/banderas/' + g.bandera" [alt]="g.nombre" />
               {{ g.nombre }}
             </button>
           }
@@ -860,11 +1101,27 @@
       </div>
 
       <div class="tratado-section-label">Jugador</div>
-      <select class="tratado-select" [ngModel]="modalPostura.jugadorId" (ngModelChange)="onPosturaJugadorChange($event)">
-        @for (e of enemigos; track e.usuario_id) {
-          <option [value]="e.usuario_id">{{ nombreJugador(e) }}</option>
+      <div class="player-select" [class.player-select--open]="openDropdownId === 'postura'">
+        <button type="button" class="player-select-trigger"
+          (click)="$event.stopPropagation(); openDropdownId = openDropdownId === 'postura' ? null : 'postura'">
+          <span class="player-select-dot" [style.background]="jugadorColores[modalPostura.jugadorId]"></span>
+          <span class="player-select-name">{{ nombreJugadorById(modalPostura.jugadorId) }}</span>
+          <span class="player-select-caret">▾</span>
+        </button>
+        @if (openDropdownId === 'postura') {
+          <div class="player-select-dropdown" (click)="$event.stopPropagation()">
+            @for (e of enemigos; track e.usuario_id) {
+              <div class="player-select-option"
+                [class.player-select-option--sel]="e.usuario_id === modalPostura.jugadorId"
+                [style.border-left-color]="jugadorColores[e.usuario_id]"
+                (click)="onPosturaJugadorChange(e.usuario_id); openDropdownId = null">
+                <span class="player-select-dot" [style.background]="jugadorColores[e.usuario_id]"></span>
+                {{ nombreJugador(e) }}
+              </div>
+            }
+          </div>
         }
-      </select>
+      </div>
 
       <div class="tratado-section-label">Postura</div>
       <div class="postura-opciones">
@@ -885,6 +1142,57 @@
       <div class="tratado-modal-actions">
         <button class="btn-tratado-cancelar" (click)="modalPostura = null">Cancelar</button>
         <button class="btn-tratado-confirmar btn-modal-proponer" (click)="confirmarPostura()">Confirmar postura →</button>
+      </div>
+
+    </div>
+  </div>
+}
+
+<!-- Popup: confirmación hostilidad -->
+@if (modalConfirmHostil) {
+  <div class="tratado-overlay">
+    <div class="tratado-modal confirm-hostil-modal" (click)="$event.stopPropagation()">
+
+      <div class="tratado-modal-header">
+        <div class="tratado-modal-icon">⚔️</div>
+        <div class="tratado-modal-titles">
+          <div class="tratado-modal-title">Declarar Hostilidad</div>
+          <div class="tratado-modal-sub">Esta acción tiene consecuencias inmediatas</div>
+        </div>
+      </div>
+
+      <p class="hostil-target">
+        Declarás hostilidad hacia
+        <strong [style.color]="jugadorColores[modalConfirmHostil.jugadorId]">{{ modalConfirmHostil.jugadorNombre }}</strong>.
+      </p>
+
+      <div class="hostil-consecuencias">
+        <div class="hostil-consec-titulo">Consecuencias:</div>
+        <ul class="hostil-consec-lista">
+          @if (modalConfirmHostil.pactosAfectados > 0) {
+            <li>
+              <span class="hostil-consec-icon">💔</span>
+              Se romperán <strong>{{ modalConfirmHostil.pactosAfectados }}</strong>
+              {{ modalConfirmHostil.pactosAfectados === 1 ? 'tratado' : 'tratados' }} con este jugador.
+            </li>
+          }
+          @if (modalConfirmHostil.gruposAfectados > 0) {
+            <li>
+              <span class="hostil-consec-icon">🗑️</span>
+              Se disolverán <strong>{{ modalConfirmHostil.gruposAfectados }}</strong>
+              {{ modalConfirmHostil.gruposAfectados === 1 ? 'grupo' : 'grupos' }} compartidos.
+            </li>
+          }
+          <li>
+            <span class="hostil-consec-icon">📢</span>
+            Todos los jugadores serán notificados de tu declaración.
+          </li>
+        </ul>
+      </div>
+
+      <div class="tratado-modal-actions">
+        <button class="btn-tratado-cancelar" (click)="modalConfirmHostil = null">Cancelar</button>
+        <button class="btn-hostil-confirmar" (click)="confirmarHostilidad()">Confirmar hostilidad ⚔️</button>
       </div>
 
     </div>
@@ -952,11 +1260,27 @@
 
       @if (modalPacto.tipo !== 'renovacion') {
         <div class="tratado-section-label">Jugador</div>
-        <select class="tratado-select" [(ngModel)]="modalPacto.receptorId" (ngModelChange)="onReceptorChange($event)">
-        @for (e of enemigos; track e.usuario_id) {
-          <option [value]="e.usuario_id">{{ nombreJugador(e) }}</option>
-        }
-      </select>
+        <div class="player-select" [class.player-select--open]="openDropdownId === 'pacto'">
+          <button type="button" class="player-select-trigger"
+            (click)="$event.stopPropagation(); openDropdownId = openDropdownId === 'pacto' ? null : 'pacto'">
+            <span class="player-select-dot" [style.background]="jugadorColores[modalPacto.receptorId]"></span>
+            <span class="player-select-name">{{ nombreJugadorById(modalPacto.receptorId) }}</span>
+            <span class="player-select-caret">▾</span>
+          </button>
+          @if (openDropdownId === 'pacto') {
+            <div class="player-select-dropdown" (click)="$event.stopPropagation()">
+              @for (e of enemigos; track e.usuario_id) {
+                <div class="player-select-option"
+                  [class.player-select-option--sel]="e.usuario_id === modalPacto.receptorId"
+                  [style.border-left-color]="jugadorColores[e.usuario_id]"
+                  (click)="modalPacto.receptorId = e.usuario_id; onReceptorChange(e.usuario_id); openDropdownId = null">
+                  <span class="player-select-dot" [style.background]="jugadorColores[e.usuario_id]"></span>
+                  {{ nombreJugador(e) }}
+                </div>
+              }
+            </div>
+          }
+        </div>
 
       @if (modalPacto.tipo === 'no_agresion') {
         <div class="tratado-section-label">Territorios involucrados</div>
@@ -1131,9 +1455,6 @@
         <span class="propuesta-badge-dot"></span>
       </div>
 
-      <div class="grupos-inv-bandera">
-        <img [src]="'assets/KuboTeg/banderas/' + invitacionGrupoEntrante.grupoBandera" [alt]="invitacionGrupoEntrante.grupoNombre" />
-      </div>
 
       <div class="propuesta-title">{{ invitacionGrupoEntrante.grupoNombre }}</div>
 
@@ -1343,15 +1664,38 @@
 
 <!-- Notificación in-game (reglas, diplomacia — NO errores de sistema) -->
 @if (gameNotif) {
-  <div class="game-notif" [class.game-notif--ok]="gameNotif.tipo === 'ok'" [class.game-notif--warn]="gameNotif.tipo === 'warn'">
+  <div class="game-notif"
+    [class.game-notif--ok]="gameNotif.tipo === 'ok'"
+    [class.game-notif--warn]="gameNotif.tipo === 'warn'"
+    [class.game-notif--error]="gameNotif.tipo === 'error'">
     <span class="game-notif-icon">
       @switch (gameNotif.tipo) {
-        @case ('ok')   { ✓ }
-        @case ('warn') { ⚠ }
-        @default       { ℹ }
+        @case ('ok')    { ✓ }
+        @case ('warn')  { ⚠ }
+        @case ('error') { ✕ }
+        @default        { ℹ }
       }
     </span>
     <span class="game-notif-msg">{{ gameNotif.msg }}</span>
+  </div>
+}
+
+<!-- Overlay pausa -->
+@if (enPausa) {
+  <div class="pausa-overlay">
+    <div class="pausa-popup">
+      <div class="pausa-icono">⏸</div>
+      <h2 class="pausa-titulo">Partida en pausa</h2>
+      @if (esPausador) {
+        <p class="pausa-msg">Pausaste la partida. Cuando estés listo, reanúdala.</p>
+        <button class="btn-reanudar" (click)="togglePausa()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+          Reanudar partida
+        </button>
+      } @else {
+        <p class="pausa-msg">{{ jugadorPausadorNombre || 'Un jugador' }} pausó la partida. Esperando que la reanude…</p>
+      }
+    </div>
   </div>
 }
 
@@ -1362,16 +1706,33 @@
       @if (esGanador) {
         <div class="fin-icon">🏆</div>
         <h2 class="fin-titulo fin-titulo--ganador">¡Victoria!</h2>
-        <p class="fin-sub">Completaste tu objetivo secreto</p>
+        <p class="fin-sub">
+          {{ rankingAcumulacion.length ? 'Dominaste el tablero en la fase final' : 'Completaste tu objetivo secreto' }}
+        </p>
       } @else {
         <div class="fin-icon">💀</div>
         <h2 class="fin-titulo fin-titulo--perdedor">Derrota</h2>
-        @if (ganador) {
+        @if (ganador && !rankingAcumulacion.length) {
           <p class="fin-sub">
             Ganó <strong [style.color]="jugadorColores[ganador.usuario_id]">{{ nombreJugador(ganador) }}</strong>
           </p>
         }
       }
+
+      @if (rankingAcumulacion.length) {
+        <div class="fin-ranking">
+          <div class="fin-ranking-titulo">Territorios acumulados (últimas 3 rondas)</div>
+          @for (item of rankingAcumulacion; track item.jugador.usuario_id; let i = $index) {
+            <div class="fin-ranking-row" [class.fin-ranking-row--ganador]="item.jugador.usuario_id === partida!.ganador_id">
+              <span class="fin-ranking-pos">{{ i + 1 }}</span>
+              <span class="fin-ranking-dot" [style.background]="jugadorColores[item.jugador.usuario_id]"></span>
+              <span class="fin-ranking-nombre">{{ nombreJugador(item.jugador) }}</span>
+              <span class="fin-ranking-total">{{ item.total }}</span>
+            </div>
+          }
+        </div>
+      }
+
       <button class="fin-btn" (click)="volver()">← Volver al inicio</button>
     </div>
   </div>
