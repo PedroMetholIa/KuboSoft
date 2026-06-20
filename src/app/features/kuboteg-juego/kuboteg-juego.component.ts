@@ -928,6 +928,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'partida' }, (payload) => {
         if (payload.new['id'] === this.partidaId) {
           const newPartida = payload.new as Partida;
+          console.log('[partida UPDATE] ultimo_combate=', (newPartida as any).ultimo_combate, 'lastTs=', this._lastCombateTs);
           if (newPartida.estado === 'En pausa' && this.partida?.estado !== 'En pausa') {
             clearInterval(this.timerInterval!);
             this.timerInterval = null;
@@ -954,6 +955,12 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
             );
             if (rupturaRecibida) this.playSfx('assets/KuboTeg/sonidos/ruptura-pacto.mp3');
             this.pactos = newPactos;
+          }
+          const uc = (newPartida as any).ultimo_combate as UltimoCombate | null;
+          if (uc?.ts && uc.ts !== this._lastCombateTs) {
+            this._lastCombateTs = uc.ts;
+            this.mostrarPopupCombate(uc);
+            this.pushNotifCombate(uc);
           }
           const prevFase = this.fase;
           const prevJugadorIdx = this.partida?.jugador_actual_index;
@@ -2351,6 +2358,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.modalPacto = null;
     this.channelEventos?.send({ type: 'broadcast', event: 'pacto_propuesta', payload: propuesta });
     this.cdr.markForCheck();
+    if (propuesta.receptorId === BOT_USER_ID) {
+      void this.botResponderPacto(propuesta);
+    }
   }
 
   async aceptarPropuesta() {
@@ -2445,6 +2455,67 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       type: 'broadcast', event: 'pacto_respuesta',
       payload: { id, accepted: false },
     });
+    this.cdr.markForCheck();
+  }
+
+  private async botResponderPacto(p: PropuestaPacto): Promise<void> {
+    await new Promise(r => setTimeout(r, 2000 + Math.random() * 1000));
+
+    const botTerrs          = Object.values(this.territorios).filter(t => t.usuario_id === BOT_USER_ID).length;
+    const humTerrs          = Object.values(this.territorios).filter(t => t.usuario_id === p.proponenteId).length;
+    const limiteBotAlcanzado = this.countPactosJugador(BOT_USER_ID) >= 2;
+    const accepted          = !limiteBotAlcanzado && (p.tipo === 'renovacion' || botTerrs < humTerrs);
+
+    if (!accepted) {
+      this.channelEventos?.send({ type: 'broadcast', event: 'pacto_respuesta', payload: { id: p.id, accepted: false } });
+      this.cdr.markForCheck();
+      return;
+    }
+
+    const rondaActual = this.partida?.ronda_actual ?? 1;
+
+    if (p.tipo === 'renovacion' && p.pactoId) {
+      this.pactos = this.pactos.map(pacto =>
+        pacto.id === p.pactoId
+          ? { ...pacto, estado: 'activo' as const, rondaInicio: rondaActual, rondaExpira: rondaActual + 3 }
+          : pacto
+      );
+      this.channelEventos?.send({
+        type: 'broadcast', event: 'pacto_respuesta',
+        payload: { id: p.id, accepted: true, pactoRenovadoId: p.pactoId, rondaExpira: rondaActual + 3 },
+      });
+      const tipoPacto = this.pactos.find(x => x.id === p.pactoId)?.tipo ?? 'alianza';
+      const renovPayload = {
+        jugador1Nombre: this.nombreJugadorById(p.proponenteId), jugador2Nombre: 'IA Bot',
+        tipo: tipoPacto, color: this.jugadorColores[p.proponenteId] ?? '#94a3b8',
+        ts: Date.now(), esRenovacion: true,
+      };
+      this.pushNotifPacto(renovPayload.jugador1Nombre, renovPayload.jugador2Nombre, tipoPacto, renovPayload.color, true, renovPayload.ts);
+      this.channelEventos?.send({ type: 'broadcast', event: 'pacto_aceptado', payload: renovPayload });
+      await this.service.setPactos(this.partidaId, this.pactos);
+      this.playSfx('assets/KuboTeg/sonidos/pacto.mp3');
+    } else {
+      const nuevoPacto: Pacto = {
+        id: p.id, tipo: p.tipo as 'alianza' | 'no_agresion',
+        jugador1Id: p.proponenteId, jugador2Id: BOT_USER_ID,
+        territorioId1: p.territorioId1, territorioId2: p.territorioId2, territoriosId2: p.territoriosId2,
+        rondaInicio: rondaActual, rondaExpira: rondaActual + 3,
+      };
+      this.pactos = [...this.pactos, nuevoPacto];
+      this.channelEventos?.send({
+        type: 'broadcast', event: 'pacto_respuesta',
+        payload: { id: p.id, accepted: true, pacto: nuevoPacto },
+      });
+      const nuevoPayload = {
+        jugador1Nombre: this.nombreJugadorById(p.proponenteId), jugador2Nombre: 'IA Bot',
+        tipo: nuevoPacto.tipo, color: this.jugadorColores[p.proponenteId] ?? '#94a3b8',
+        ts: Date.now(), esRenovacion: false,
+      };
+      this.pushNotifPacto(nuevoPayload.jugador1Nombre, nuevoPayload.jugador2Nombre, nuevoPacto.tipo, nuevoPayload.color, false, nuevoPayload.ts);
+      this.channelEventos?.send({ type: 'broadcast', event: 'pacto_aceptado', payload: nuevoPayload });
+      await this.service.setPactos(this.partidaId, this.pactos);
+      this.playSfx('assets/KuboTeg/sonidos/pacto.mp3');
+    }
     this.cdr.markForCheck();
   }
 

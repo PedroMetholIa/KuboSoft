@@ -160,18 +160,6 @@ function calcularBonusContinente(userId: string, ownerMap: Record<string, string
   return bonus
 }
 
-function botPrioridad(destinoId: string, defensorId: string | undefined, objetivo: any, jugadores: Jugador[]): number {
-  if (!objetivo) return 1
-  if (objetivo.tipo === 'continentes') {
-    return (objetivo.ids as string[])?.some(cid => CONTINENT_TERRITORIES[cid]?.includes(destinoId)) ? 10 : 1
-  }
-  if (objetivo.tipo === 'destruir') {
-    const target = jugadores.find(j => j.color === objetivo.color)
-    return (target && defensorId === target.usuario_id) ? 10 : 1
-  }
-  return 1
-}
-
 // Territorio fronterizo con más tropas; si no hay fronteras, el de más tropas
 function mejorTerritorioDeLista(lista: [string, { tropas: number }][], terrs: TerrsMap): [string, { tropas: number }] {
   const conEnemigos = lista.filter(([id]) =>
@@ -180,6 +168,76 @@ function mejorTerritorioDeLista(lista: [string, { tropas: number }][], terrs: Te
   )
   const candidatos = conEnemigos.length > 0 ? conEnemigos : lista
   return candidatos.reduce((a, b) => a[1].tropas >= b[1].tropas ? a : b)
+}
+
+// ── Estado evaluado del bot ───────────────────────────
+
+interface EstadoBot {
+  totalTerrs:           number
+  botCount:             number
+  pctTerrs:             number
+  fronteras:            string[]
+  amenaza:              Record<string, number>  // territorio propio → tropas enemigas adyacentes
+  continentesCompletos: string[]
+  continentesProgreso:  { id: string; propios: number; total: number; faltantes: string[] }[]
+  dominante:            string | null           // uid con >45% territorios
+  modoDefensivo:        boolean                 // bot tiene <20% territorios
+  tropasTotalesBot:     number
+}
+
+function evaluarEstado(terrs: TerrsMap, _jugadores: Jugador[], _objetivo: any): EstadoBot {
+  const totalTerrs = Object.keys(terrs).length
+  let botCount = 0
+  let tropasTotalesBot = 0
+  const ownerMap: Record<string, string> = {}
+
+  for (const [tid, e] of Object.entries(terrs)) {
+    ownerMap[tid] = e.usuario_id
+    if (e.usuario_id === BOT_USER_ID) { botCount++; tropasTotalesBot += e.tropas }
+  }
+
+  const pctTerrs = totalTerrs > 0 ? botCount / totalTerrs : 0
+
+  const fronteras: string[] = []
+  const amenaza: Record<string, number> = {}
+  for (const [tid, e] of Object.entries(terrs)) {
+    if (e.usuario_id !== BOT_USER_ID) continue
+    let enemigosTropas = 0
+    for (const v of TERRITORIES.find(t => t.id === tid)?.neighbors ?? []) {
+      const ev = terrs[v]
+      if (ev && ev.usuario_id !== BOT_USER_ID) enemigosTropas += ev.tropas
+    }
+    if (enemigosTropas > 0) { fronteras.push(tid); amenaza[tid] = enemigosTropas }
+  }
+
+  const continentesCompletos: string[] = []
+  const continentesProgreso: { id: string; propios: number; total: number; faltantes: string[] }[] = []
+  for (const cb of CONTINENT_BONUSES) {
+    const contTerrs = CONTINENT_TERRITORIES[cb.id] ?? []
+    const propios   = contTerrs.filter(tid => ownerMap[tid] === BOT_USER_ID).length
+    const faltantes = contTerrs.filter(tid => ownerMap[tid] !== BOT_USER_ID)
+    if (!faltantes.length) continentesCompletos.push(cb.id)
+    continentesProgreso.push({ id: cb.id, propios, total: contTerrs.length, faltantes })
+  }
+
+  const conteos: Record<string, number> = {}
+  for (const uid of Object.values(ownerMap)) conteos[uid] = (conteos[uid] ?? 0) + 1
+  const dominante = Object.entries(conteos)
+    .find(([uid, c]) => uid !== BOT_USER_ID && c / totalTerrs > 0.45)?.[0] ?? null
+
+  return {
+    totalTerrs, botCount, pctTerrs, fronteras, amenaza,
+    continentesCompletos, continentesProgreso, dominante,
+    modoDefensivo: pctTerrs < 0.20, tropasTotalesBot,
+  }
+}
+
+// Continente objetivo con mayor progreso que aún falta completar
+function continenteObjetivo(objetivo: any, estado: EstadoBot): { id: string; faltantes: string[] } | null {
+  if (objetivo?.tipo !== 'continentes') return null
+  return estado.continentesProgreso
+    .filter(c => (objetivo.ids as string[]).includes(c.id) && c.faltantes.length > 0)
+    .sort((a, b) => (b.propios / b.total) - (a.propios / a.total))[0] ?? null
 }
 
 // ── Pact helpers ──────────────────────────────────────
@@ -270,7 +328,7 @@ async function robarCartaBot(
   }
 
   await rtBroadcast(`kuboteg-eventos-${partidaId}`, 'carta_robada', {
-    jugadorId:   BOT_USER_ID,
+    jugadorId:     BOT_USER_ID,
     jugadorNombre: 'Bot',
     cartaNombre:   nombreTerritorio(cartaId),
     bonusNombre:   bonusCartaId ? nombreTerritorio(bonusCartaId) : null,
@@ -313,12 +371,18 @@ Deno.serve(async (req) => {
     const idx: number     = record.jugador_actual_index ?? 0
     if (orden[idx] !== BOT_USER_ID) return ok('not bot turn')
 
-    await delay(1500)
+    await delay(300)
 
     const fp = (await dbGet<any>(`partida?id=eq.${record.id}&select=*`))[0]
-    console.log(`[bot-turn] refetch fase=${fp?.fase_actual} idx=${fp?.jugador_actual_index} orden=${JSON.stringify(fp?.orden_jugadores)}`)
-    if (!fp || fp.estado !== 'En juego') return ok('state changed')
-    if ((fp.orden_jugadores ?? [])[fp.jugador_actual_index ?? 0] !== BOT_USER_ID) return ok('not bot after refetch')
+    console.log(`[bot-turn] refetch fp=${fp ? 'found' : 'null'} estado=${fp?.estado} idx=${fp?.jugador_actual_index} orden=${JSON.stringify(fp?.orden_jugadores)}`)
+    if (!fp || fp.estado !== 'En juego') { console.log('[bot-turn] exit: state changed'); return ok('state changed') }
+
+    // Usar el índice del record original — el refetch puede llegar con el turno ya avanzado
+    const ordenFinal: string[] = fp.orden_jugadores ?? record.orden_jugadores ?? []
+    const idxFinal: number = record.jugador_actual_index ?? 0
+    console.log(`[bot-turn] ordenFinal[${idxFinal}]=${ordenFinal[idxFinal]} BOT=${BOT_USER_ID}`)
+    if (ordenFinal[idxFinal] !== BOT_USER_ID) { console.log('[bot-turn] exit: not bot after refetch'); return ok('not bot after refetch') }
+    fp.jugador_actual_index = idxFinal
 
     console.log(`[bot-turn] partida=${fp.id} fase=${fp.fase_actual} ronda=${fp.ronda_actual}`)
 
@@ -348,33 +412,76 @@ async function botColocacion(partida: any) {
   if (tropas > 0) {
     const botTerrs = Object.entries(terrs).filter(([_, e]) => e.usuario_id === BOT_USER_ID)
     if (botTerrs.length > 0) {
+      const estado  = evaluarEstado(terrs, jugadores, botJ?.objetivo)
       const patches: Record<string, number> = {}
 
       if (partida.ronda_actual <= 1) {
-        // Ronda 1: sin sub-fase continental
+        // Ronda 1: sin sub-fase continental — todo a la mejor frontera
         const [tid] = mejorTerritorioDeLista(botTerrs, terrs)
         patches[tid] = tropas
       } else {
-        // Ronda 2+: igual que humano — bonus de continente va dentro del continente
         const ownerMap: Record<string, string> = {}
         for (const [tid, e] of Object.entries(terrs)) ownerMap[tid] = e.usuario_id
-
         let restantes = tropas
+
+        // 1. Bonus de continente completo → frontera más amenazada dentro de ese continente
         for (const cb of CONTINENT_BONUSES) {
           const contTerrs = CONTINENT_TERRITORIES[cb.id] ?? []
-          if (contTerrs.every(tid => ownerMap[tid] === BOT_USER_ID)) {
-            const contBotTerrs = botTerrs.filter(([id]) => contTerrs.includes(id))
-            if (contBotTerrs.length > 0) {
-              const [tid] = mejorTerritorioDeLista(contBotTerrs, terrs)
-              patches[tid] = (patches[tid] ?? 0) + cb.bonus
-              restantes   -= cb.bonus
+          if (!contTerrs.every(tid => ownerMap[tid] === BOT_USER_ID)) continue
+          const contBot   = botTerrs.filter(([id]) => contTerrs.includes(id))
+          if (!contBot.length) continue
+          const conFront  = contBot.filter(([id]) => estado.fronteras.includes(id))
+          const cands     = conFront.length > 0 ? conFront : contBot
+          const [tid]     = cands.reduce((a, b) =>
+            (estado.amenaza[a[0]] ?? 0) >= (estado.amenaza[b[0]] ?? 0) ? a : b
+          )
+          patches[tid] = (patches[tid] ?? 0) + cb.bonus
+          restantes   -= cb.bonus
+        }
+
+        // 2. Ningún territorio de continente propio queda con < 2 tropas
+        for (const cid of estado.continentesCompletos) {
+          for (const tid of CONTINENT_TERRITORIES[cid] ?? []) {
+            const actual = (terrs[tid]?.tropas ?? 0) + (patches[tid] ?? 0)
+            if (actual < 2 && restantes > 0) {
+              const add = Math.min(2 - actual, restantes)
+              patches[tid] = (patches[tid] ?? 0) + add
+              restantes   -= add
             }
           }
         }
 
+        // 3. Distribuir restantes por ratio de amenaza (enemigos / propias)
         if (restantes > 0) {
-          const [tid] = mejorTerritorioDeLista(botTerrs, terrs)
-          patches[tid] = (patches[tid] ?? 0) + restantes
+          const contObj = continenteObjetivo(botJ?.objetivo, estado)
+
+          const frontScored = estado.fronteras.map(fid => {
+            const propias = (terrs[fid]?.tropas ?? 1) + (patches[fid] ?? 0)
+            let   score   = (estado.amenaza[fid] ?? 0) / propias
+            // Bonus si este territorio puede avanzar hacia el continente objetivo
+            if (contObj) {
+              const vecinos = TERRITORIES.find(t => t.id === fid)?.neighbors ?? []
+              if (vecinos.some(v => contObj.faltantes.includes(v))) score += 1.5
+            }
+            return { id: fid, score }
+          }).sort((a, b) => b.score - a.score)
+
+          if (frontScored.length > 0) {
+            // 60% al más amenazado, 40% al segundo (o todo si solo hay uno)
+            const main = frontScored.length === 1
+              ? restantes
+              : Math.ceil(restantes * 0.6)
+            patches[frontScored[0].id] = (patches[frontScored[0].id] ?? 0) + main
+            restantes -= main
+            if (restantes > 0) {
+              const dest = frontScored[1]?.id ?? frontScored[0].id
+              patches[dest] = (patches[dest] ?? 0) + restantes
+            }
+          } else {
+            // Sin fronteras: reforzar el territorio con más tropas (reserva para expansión)
+            const [tid] = mejorTerritorioDeLista(botTerrs, terrs)
+            patches[tid] = (patches[tid] ?? 0) + restantes
+          }
         }
       }
 
@@ -406,6 +513,126 @@ async function botColocacion(partida: any) {
   }
 }
 
+// ── Diplomacia del bot ────────────────────────────────
+
+async function botConsiderarRomperPacto(
+  partida: any, jugadores: Jugador[], terrs: TerrsMap,
+  estado: EstadoBot, pactos: any[], ronda: number,
+): Promise<string | null> {
+  const pactoActivo = (pactos ?? []).find((p: any) =>
+    p.estado !== 'en_transicion' && (p.rondaExpira ?? 0) >= ronda &&
+    (p.jugador1Id === BOT_USER_ID || p.jugador2Id === BOT_USER_ID)
+  )
+  if (!pactoActivo) return null
+
+  const aliadoId  = pactoActivo.jugador1Id === BOT_USER_ID ? pactoActivo.jugador2Id : pactoActivo.jugador1Id
+  const botJ      = jugadores.find(j => j.usuario_id === BOT_USER_ID)
+  const objetivo  = botJ?.objetivo
+  let   debeRomper = false
+
+  if (estado.pctTerrs > 0.50) {
+    debeRomper = true
+    console.log(`[botRomperPacto] >50% territorios → rompiendo con ${aliadoId}`)
+  } else if (objetivo?.tipo === 'destruir') {
+    const targetJ = jugadores.find(j => j.color === objetivo.color)
+    if (targetJ?.usuario_id === aliadoId) {
+      // Oportunidad clara: ≥3 tropas propias en frontera con el aliado, más del doble que él
+      const oportunidad = Object.entries(terrs).some(([tid, e]) => {
+        if (e.usuario_id !== BOT_USER_ID || e.tropas < 3) return false
+        return (TERRITORIES.find(t => t.id === tid)?.neighbors ?? [])
+          .some(v => terrs[v]?.usuario_id === aliadoId && e.tropas > (terrs[v]?.tropas ?? 0) * 2)
+      })
+      if (oportunidad) {
+        debeRomper = true
+        console.log(`[botRomperPacto] objetivo destruir ${aliadoId} y hay oportunidad → rompiendo`)
+      }
+    }
+  }
+
+  if (!debeRomper) return null
+
+  const nuevosPactos = (pactos ?? []).map((p: any) =>
+    p.id === pactoActivo.id ? { ...p, estado: 'en_transicion', rondaExpira: ronda + 1 } : p
+  )
+  await dbPatch('partida', `id=eq.${partida.id}`, { pactos: nuevosPactos })
+  const aliadoJ = jugadores.find(j => j.usuario_id === aliadoId)
+  await rtBroadcast(`kuboteg-eventos-${partida.id}`, 'pacto_roto', {
+    rompedorId:      BOT_USER_ID,
+    rompedorNombre:  'IA Bot',
+    afectadoId:      aliadoId,
+    afectadoNombre:  aliadoJ ? 'Jugador' : aliadoId.slice(0, 6),
+    tipo:            pactoActivo.tipo,
+    ts:              Date.now(),
+  })
+  return aliadoId
+}
+
+async function botConsiderarPacto(
+  partida: any, jugadores: Jugador[], terrs: TerrsMap,
+  estado: EstadoBot, pactos: any[], ronda: number,
+): Promise<void> {
+  if (!estado.botCount) return
+  // Solo proponer si estamos en desventaja o hay un jugador dominante
+  if (estado.pctTerrs >= 0.35 && !estado.dominante) return
+
+  const pactosVigentes = (pactos ?? []).filter((p: any) =>
+    p.estado !== 'en_transicion' && (p.rondaExpira ?? 0) >= ronda &&
+    (p.jugador1Id === BOT_USER_ID || p.jugador2Id === BOT_USER_ID)
+  )
+  if (pactosVigentes.length >= 2) return
+
+  const botJ = jugadores.find(j => j.usuario_id === BOT_USER_ID)
+  let targetDestruirId: string | null = null
+  if (botJ?.objetivo?.tipo === 'destruir') {
+    const targetJ = jugadores.find(j => j.color === botJ.objetivo.color)
+    if (targetJ) targetDestruirId = targetJ.usuario_id
+  }
+
+  const yaConPacto = new Set(pactosVigentes.flatMap((p: any) => [p.jugador1Id, p.jugador2Id]))
+
+  // Calcular amenaza por jugador (tropas enemigas adyacentes a las fronteras del bot)
+  const amenazaPorJugador: Record<string, number> = {}
+  for (const fid of estado.fronteras) {
+    for (const v of TERRITORIES.find(t => t.id === fid)?.neighbors ?? []) {
+      const ev = terrs[v]
+      if (ev && ev.usuario_id !== BOT_USER_ID)
+        amenazaPorJugador[ev.usuario_id] = (amenazaPorJugador[ev.usuario_id] ?? 0) + ev.tropas
+    }
+  }
+
+  const candidatos = Object.entries(amenazaPorJugador)
+    .filter(([uid]) => uid !== BOT_USER_ID && uid !== targetDestruirId && !yaConPacto.has(uid))
+    .sort((a, b) => b[1] - a[1])
+
+  if (!candidatos.length) return
+  const [receptorId] = candidatos[0]
+
+  // Buscar territorios adyacentes para no_agresion
+  let territorioId1: string | undefined
+  let territorioId2: string | undefined
+  let tipo: 'no_agresion' | 'alianza' = 'no_agresion'
+
+  for (const fid of estado.fronteras) {
+    const vReceptor = (TERRITORIES.find(t => t.id === fid)?.neighbors ?? [])
+      .find(v => terrs[v]?.usuario_id === receptorId)
+    if (vReceptor) { territorioId1 = fid; territorioId2 = vReceptor; break }
+  }
+  if (!territorioId1 || !territorioId2) { tipo = 'alianza'; territorioId1 = undefined; territorioId2 = undefined }
+
+  const propuesta = {
+    id:           crypto.randomUUID(),
+    tipo,
+    proponenteId: BOT_USER_ID,
+    receptorId,
+    territorioId1,
+    territorioId2,
+    territoriosId2: territorioId2 ? [territorioId2] : undefined,
+    ts:           Date.now(),
+  }
+  console.log(`[botConsiderarPacto] proponiendo ${tipo} a ${receptorId}`)
+  await rtBroadcast(`kuboteg-eventos-${partida.id}`, 'pacto_propuesta', propuesta)
+}
+
 // ── Ataque ────────────────────────────────────────────
 
 async function botAtaque(partida: any) {
@@ -413,79 +640,147 @@ async function botAtaque(partida: any) {
   const jugadores = await getJugadores(partida.id)
   const botJ      = jugadores.find(j => j.usuario_id === BOT_USER_ID)
   const objetivo  = botJ?.objetivo ?? null
-  const pactos    = (partida.pactos as any[]) ?? []
+  let   pactos    = (partida.pactos as any[]) ?? []
   const ronda     = partida.ronda_actual ?? 1
 
-  let terrs         = await getTerritorios(partida.id)
+  let terrs  = await getTerritorios(partida.id)
+  let estado = evaluarEstado(terrs, jugadores, objetivo)
+
+  // 1. Considerar romper un pacto antes de atacar (ataque sorpresa)
+  const exAliadoId = await botConsiderarRomperPacto(partida, jugadores, terrs, estado, pactos, ronda)
+  if (exAliadoId) {
+    const freshPartida = (await dbGet<any>(`partida?id=eq.${partida.id}&select=pactos`))[0]
+    pactos = freshPartida?.pactos ?? pactos
+  }
+
+  // 2. Proponer pacto si es necesario (solo si no rompimos uno)
+  if (!exAliadoId) {
+    await botConsiderarPacto(partida, jugadores, terrs, estado, pactos, ronda)
+  }
+
+  // 3. Máximo de ataques adaptativo según posición territorial
+  const MAX = estado.pctTerrs > 0.40 ? 5 + Math.floor(Math.random() * 4)  // agresivo: 5-8
+            : estado.pctTerrs > 0.30 ? 3 + Math.floor(Math.random() * 3)  // moderado: 3-5
+            :                          2 + Math.floor(Math.random() * 2)   // conservador: 2-3
+
   let conquistoAlgo = false
   let ultimoConqId  = ''
+  const fallos: Record<string, number> = {}  // destinoId → fallos consecutivos
 
-  // Sin tope: ataca hasta agotar opciones válidas (igual que un humano)
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < MAX; i++) {
+    console.log(`[botAtaque] loop i=${i} MAX=${MAX} pct=${estado.pctTerrs.toFixed(2)} modo=${estado.modoDefensivo ? 'DEF' : 'ATK'}`)
     await delay(1500)
-    if (i > 0) terrs = await getTerritorios(partida.id)
+    if (i > 0) {
+      terrs  = await getTerritorios(partida.id)
+      estado = evaluarEstado(terrs, jugadores, objetivo)
+    }
 
-    const atacantes = Object.entries(terrs)
-      .filter(([_, e]) => e.usuario_id === BOT_USER_ID && e.tropas > 1)
-      .map(([id, e]) => ({
-        id,
-        tropas: e.tropas,
-        enemigos: (TERRITORIES.find(t => t.id === id)?.neighbors ?? [])
-          .filter(v => {
-            const ev = terrs[v]
-            if (!ev || ev.usuario_id === BOT_USER_ID) return false
-            // Respeta pactos igual que el humano
-            if (tieneAlianza(BOT_USER_ID, ev.usuario_id, pactos, ronda)) return false
-            if (tieneNoAgresion(id, v, pactos, ronda)) return false
-            return true
-          }),
-      }))
-      .filter(a => a.enemigos.length > 0)
-      .sort((a, b) => b.tropas - a.tropas)
+    // Modo defensivo: solo atacar si hay oportunista (enemigo con 1 tropa en nuestra frontera)
+    if (estado.modoDefensivo) {
+      const hayOportunista = Object.entries(terrs).some(([tid, e]) => {
+        if (e.usuario_id === BOT_USER_ID || e.tropas > 1) return false
+        return (TERRITORIES.find(t => t.id === tid)?.neighbors ?? [])
+          .some(v => terrs[v]?.usuario_id === BOT_USER_ID)
+      })
+      if (!hayOportunista) break
+    }
 
-    if (!atacantes[0]) break
+    // Evaluar todos los ataques posibles con score
+    const candidatos: {
+      origenId: string; destinoId: string; score: number
+      atkTropas: number; defTropas: number
+    }[] = []
 
-    const destinos = atacantes[0].enemigos
-      .map(eid => ({
-        id:       eid,
-        tropas:   terrs[eid]?.tropas ?? 999,
-        prioridad: botPrioridad(eid, terrs[eid]?.usuario_id, objetivo, jugadores),
-      }))
-      .sort((a, b) => b.prioridad - a.prioridad || a.tropas - b.tropas)
+    for (const [tid, e] of Object.entries(terrs)) {
+      if (e.usuario_id !== BOT_USER_ID || e.tropas < 3) continue  // mínimo 3 tropas para atacar
 
-    if (!destinos[0]) break
+      for (const v of TERRITORIES.find(t => t.id === tid)?.neighbors ?? []) {
+        const def = terrs[v]
+        if (!def || def.usuario_id === BOT_USER_ID) continue
+        if (tieneAlianza(BOT_USER_ID, def.usuario_id, pactos, ronda)) continue
+        if (tieneNoAgresion(tid, v, pactos, ronda)) continue
+        if (e.tropas <= def.tropas * 2) continue            // necesitamos más del doble
+        if ((fallos[v] ?? 0) >= 2) continue                 // saltamos si falló 2+ veces seguidas
+
+        let score = 0
+
+        // Ataque sorpresa al ex-aliado
+        if (exAliadoId && def.usuario_id === exAliadoId) score += 15
+
+        // Territorio en el continente objetivo
+        if (objetivo?.tipo === 'continentes') {
+          if ((objetivo.ids as string[]).some((cid: string) => CONTINENT_TERRITORIES[cid]?.includes(v)))
+            score += 10
+        }
+
+        // Esta conquista completa un continente
+        const contDest = TERRITORIES.find(t => t.id === v)?.continent
+        if (contDest) {
+          const faltanEnCont = (CONTINENT_TERRITORIES[contDest] ?? [])
+            .filter(t => terrs[t]?.usuario_id !== BOT_USER_ID).length
+          if (faltanEnCont === 1) score += 8
+        }
+
+        // Objetivo destruir al defensor
+        if (objetivo?.tipo === 'destruir') {
+          const targetJ = jugadores.find(j => j.color === objetivo.color)
+          if (targetJ && def.usuario_id === targetJ.usuario_id) score += 5
+        }
+
+        // Objetivo débil (≤2 tropas)
+        if (def.tropas <= 2) score += 3
+
+        // Penalizar si dejamos el origen expuesto (menos de la mitad de la amenaza que recibe)
+        const amenazaOrigen  = estado.amenaza[tid] ?? 0
+        const tropasDespues  = e.tropas - 3
+        if (tropasDespues < amenazaOrigen * 0.5) score -= 5
+
+        // Penalizar si reserva defensiva total es baja (<30% de tropas en fronteras)
+        if (estado.tropasTotalesBot > 0) {
+          const reserva = estado.fronteras.reduce((s, fid) => s + (terrs[fid]?.tropas ?? 0), 0)
+            / estado.tropasTotalesBot
+          if (reserva < 0.30) score -= 3
+        }
+
+        candidatos.push({ origenId: tid, destinoId: v, score, atkTropas: e.tropas, defTropas: def.tropas })
+      }
+    }
+
+    if (!candidatos.length) break
+    candidatos.sort((a, b) => b.score - a.score)
+    const mejor = candidatos[0]
 
     const { data: res, error } = await dbRpc('resolver_combate', {
       p_partida_id: partida.id,
-      p_origen_id:  atacantes[0].id,
-      p_destino_id: destinos[0].id,
+      p_origen_id:  mejor.origenId,
+      p_destino_id: mejor.destinoId,
       p_usuario_id: BOT_USER_ID,
     })
     if (error || res?.error) { console.error('resolver_combate:', error ?? res?.error); break }
 
-    const defUid = terrs[destinos[0].id]?.usuario_id
+    const defUid = terrs[mejor.destinoId]?.usuario_id
     const defJ   = jugadores.find(j => j.usuario_id === defUid)
 
-    if (!error && res && !res.error) {
-      await dbPatch('partida', `id=eq.${partida.id}`, {
-        ultimo_combate: {
-          dadosAtaque:      res.dados_ataque   ?? [],
-          dadosDefensa:     res.dados_defensa  ?? [],
-          bajasAtacante:    res.bajas_atacante ?? 0,
-          bajasDefensor:    res.bajas_defensor ?? 0,
-          conquista:        res.conquista      ?? false,
-          atacanteNombre:   'IA Bot',
-          defensorNombre:   '?',
-          origenNombre:     atacantes[0].id,
-          destinoNombre:    destinos[0].id,
-          colorAtacante:    'rgb(159, 3, 3)',
-          colorDefensor:    '#888',
-          liderAtacanteImg: '',
-          liderDefensorImg: '',
-          ts:               Date.now(),
-        }
-      })
-    }
+    // Persistir ultimo_combate para que Angular muestre el popup
+    const ucPatchErr = await dbPatch('partida', `id=eq.${partida.id}`, {
+      ultimo_combate: {
+        dadosAtaque:      res.dados_ataque   ?? [],
+        dadosDefensa:     res.dados_defensa  ?? [],
+        bajasAtacante:    res.bajas_atacante ?? 0,
+        bajasDefensor:    res.bajas_defensor ?? 0,
+        conquista:        res.conquista      ?? false,
+        atacanteNombre:   'IA Bot',
+        defensorNombre:   '?',
+        origenNombre:     mejor.origenId,
+        destinoNombre:    mejor.destinoId,
+        colorAtacante:    'rgb(159, 3, 3)',
+        colorDefensor:    '#888',
+        liderAtacanteImg: '',
+        liderDefensorImg: '',
+        ts:               Date.now(),
+      }
+    })
+    console.log(`[botAtaque] ultimo_combate patch err=${JSON.stringify(ucPatchErr)}`)
 
     await rtBroadcast(`kuboteg-eventos-${partida.id}`, 'combate', {
       dadosAtaque:      res.dados_ataque   ?? [],
@@ -495,8 +790,8 @@ async function botAtaque(partida: any) {
       conquista:        res.conquista      ?? false,
       atacanteNombre:   'Bot',
       defensorNombre:   defJ ? 'Jugador' : '?',
-      origenNombre:     nombreTerritorio(atacantes[0].id),
-      destinoNombre:    nombreTerritorio(destinos[0].id),
+      origenNombre:     nombreTerritorio(mejor.origenId),
+      destinoNombre:    nombreTerritorio(mejor.destinoId),
       colorAtacante:    botJ?.color  ?? '#cc0000',
       colorDefensor:    defJ?.color  ?? '#ddbb00',
       liderAtacanteImg: '',
@@ -505,45 +800,42 @@ async function botAtaque(partida: any) {
     })
 
     if (res?.conquista) {
-      // Mismo límite que el humano: máximo 3 tropas tras conquista
+      delete fallos[mejor.destinoId]
+
       const maxMovibles = Math.min(3, Math.max(0, (res.tropas_origen_final ?? 1) - 1))
-      const mover       = maxMovibles > 0 ? maxMovibles : 0
+      const mover       = maxMovibles
 
       if (mover > 0) {
         const { error: moveErr } = await dbRpc('mover_tropas_conquista', {
           p_partida_id: partida.id,
-          p_origen_id:  atacantes[0].id,
-          p_destino_id: destinos[0].id,
+          p_origen_id:  mejor.origenId,
+          p_destino_id: mejor.destinoId,
           p_tropas:     mover,
           p_usuario_id: BOT_USER_ID,
         })
         if (moveErr) break
       } else {
-        // Edge case: atacante quedó con 1 tropa sola — no puede mover ninguna sin dejar
-        // su territorio vacío. Transferimos directamente la soberanía con 1 tropa.
+        // Edge case: atacante quedó con 1 tropa — transferir soberanía directamente
         const patchErr = await dbPatch('territorio_estado',
-          `partida_id=eq.${partida.id}&territorio_id=eq.${destinos[0].id}`,
+          `partida_id=eq.${partida.id}&territorio_id=eq.${mejor.destinoId}`,
           { usuario_id: BOT_USER_ID, tropas: 1 }
         )
         if (patchErr) break
       }
 
-      // Actualizar mapa local sin esperar Realtime
-      const origen  = terrs[atacantes[0].id]
-      const destino = terrs[destinos[0].id]
-      if (origen)  terrs[atacantes[0].id] = { ...origen,  tropas: mover > 0 ? origen.tropas - mover : origen.tropas }
-      if (destino) terrs[destinos[0].id]  = { ...destino, tropas: mover > 0 ? destino.tropas + mover : 1, usuario_id: BOT_USER_ID }
+      const origen  = terrs[mejor.origenId]
+      const destino = terrs[mejor.destinoId]
+      if (origen)  terrs[mejor.origenId]  = { ...origen,  tropas: mover > 0 ? origen.tropas  - mover : origen.tropas }
+      if (destino) terrs[mejor.destinoId] = { ...destino, tropas: mover > 0 ? destino.tropas + mover : 1, usuario_id: BOT_USER_ID }
 
       conquistoAlgo = true
-      ultimoConqId  = destinos[0].id
+      ultimoConqId  = mejor.destinoId
 
-      const defQuedan = defUid
-        ? Object.values(terrs).filter(t => t.usuario_id === defUid).length
-        : 1
+      const defQuedan   = defUid ? Object.values(terrs).filter(t => t.usuario_id === defUid).length : 1
       const eliminadoId = defQuedan === 0 ? (defUid ?? null) : null
 
       await rtBroadcast(`kuboteg-eventos-${partida.id}`, 'conquista', {
-        territorioNombre: nombreTerritorio(destinos[0].id),
+        territorioNombre: nombreTerritorio(mejor.destinoId),
         atacanteNombre:   'Bot',
         defensorNombre:   defJ ? 'Jugador' : '?',
         colorAtacante:    botJ?.color ?? '#cc0000',
@@ -559,20 +851,21 @@ async function botAtaque(partida: any) {
         })
       }
 
-      // Verifica victoria igual que el humano
-      if (verificarVictoriaBot(destinos[0].id, eliminadoId, objetivo, jugadores, terrs)) {
+      if (verificarVictoriaBot(mejor.destinoId, eliminadoId, objetivo, jugadores, terrs)) {
         console.log(`[botAtaque] victoria detectada para Bot`)
-        // Actualiza la partida directamente con service key (declarar_ganador_objetivo usa auth.uid())
         await dbPatch('partida', `id=eq.${partida.id}`, { ganador_id: BOT_USER_ID, estado: 'Finalizada' })
         return
       }
 
       await delay(800)
+    } else {
+      // Ataque fallido: registrar para evitar reintentos infinitos
+      fallos[mejor.destinoId] = (fallos[mejor.destinoId] ?? 0) + 1
     }
+
     await delay(600)
   }
 
-  // Roba carta si conquistó al menos un territorio — igual que el humano en saltarReagrupacion
   if (conquistoAlgo && botJ) {
     terrs = await getTerritorios(partida.id)
     const freshBotJ = (await getJugadores(partida.id)).find(j => j.usuario_id === BOT_USER_ID) ?? botJ
@@ -585,31 +878,53 @@ async function botAtaque(partida: any) {
 // ── Reagrupacion ──────────────────────────────────────
 
 async function botReagrupacion(partida: any) {
-  const terrs    = await getTerritorios(partida.id)
+  const [terrs, jugadores] = await Promise.all([
+    getTerritorios(partida.id),
+    getJugadores(partida.id),
+  ])
+  const botJ   = jugadores.find(j => j.usuario_id === BOT_USER_ID)
+  const estado = evaluarEstado(terrs, jugadores, botJ?.objetivo)
   const botTerrs = Object.entries(terrs).filter(([_, e]) => e.usuario_id === BOT_USER_ID)
 
+  // Territorios interiores: todos sus vecinos son propios y tienen >1 tropa
   const interiores = botTerrs.filter(([id, e]) => {
     if (e.tropas <= 1) return false
     return (TERRITORIES.find(t => t.id === id)?.neighbors ?? [])
       .every(v => !terrs[v] || terrs[v].usuario_id === BOT_USER_ID)
   })
 
-  const fronteras = botTerrs.filter(([id]) =>
-    (TERRITORIES.find(t => t.id === id)?.neighbors ?? [])
-      .some(v => terrs[v] && terrs[v].usuario_id !== BOT_USER_ID)
-  )
+  if (interiores.length > 0 && estado.fronteras.length > 0) {
+    const [origenId, origenEst] = interiores.reduce((a, b) => a[1].tropas > b[1].tropas ? a : b)
+    const vecinosOrigen = TERRITORIES.find(t => t.id === origenId)?.neighbors ?? []
+    const contObj       = continenteObjetivo(botJ?.objetivo, estado)
 
-  if (interiores.length > 0 && fronteras.length > 0) {
-    const [origenId, origenEst]   = interiores.reduce((a, b) => a[1].tropas > b[1].tropas ? a : b)
-    const [destinoId, destinoEst] = fronteras.reduce((a, b)  => a[1].tropas < b[1].tropas ? a : b)
-    const vecinos = TERRITORIES.find(t => t.id === origenId)?.neighbors ?? []
-    if (origenId !== destinoId && vecinos.includes(destinoId)) {
-      const mover = origenEst.tropas - 1
+    // Elegir la frontera alcanzable con mayor score
+    let mejorFrontera: string | null = null
+    let mejorScore    = -Infinity
+
+    for (const fid of estado.fronteras) {
+      if (!vecinosOrigen.includes(fid)) continue  // debe ser adyacente al origen
+
+      let score = estado.amenaza[fid] ?? 0
+
+      // Bonus si desde aquí podemos avanzar al continente objetivo
+      if (contObj) {
+        const vecinosFront = TERRITORIES.find(t => t.id === fid)?.neighbors ?? []
+        if (vecinosFront.some(v => contObj.faltantes.includes(v))) score += 10
+      }
+
+      if (score > mejorScore) { mejorScore = score; mejorFrontera = fid }
+    }
+
+    if (mejorFrontera) {
+      const mover      = origenEst.tropas - 1
+      const destinoEst = terrs[mejorFrontera]
       if (mover > 0) {
         await Promise.all([
-          dbPatch('territorio_estado', `partida_id=eq.${partida.id}&territorio_id=eq.${origenId}`,  { tropas: origenEst.tropas  - mover }),
-          dbPatch('territorio_estado', `partida_id=eq.${partida.id}&territorio_id=eq.${destinoId}`, { tropas: destinoEst.tropas + mover }),
+          dbPatch('territorio_estado', `partida_id=eq.${partida.id}&territorio_id=eq.${origenId}`,      { tropas: origenEst.tropas  - mover }),
+          dbPatch('territorio_estado', `partida_id=eq.${partida.id}&territorio_id=eq.${mejorFrontera}`, { tropas: destinoEst.tropas + mover }),
         ])
+        console.log(`[botReagrupacion] ${mover} tropas de ${origenId} → ${mejorFrontera} (score=${mejorScore})`)
       }
     }
   }
