@@ -511,6 +511,7 @@
               } @else {
                 <div class="mj-placeholder">Objetivo no asignado aún</div>
               }
+              <button class="obj-historial-btn" (click)="abrirHistorial()">📜 Ver historial</button>
             }
             @case ('configuracion') {
               <div class="cfg-panel">
@@ -1743,7 +1744,84 @@
         </div>
       }
 
-      <button class="fin-btn" (click)="volver()">← Volver al inicio</button>
+      @if (esGanador) {
+        <button class="fin-btn fin-btn--primary" (click)="abrirDedicatoria()">✍ Ingresar dedicatoria</button>
+      } @else {
+        <button class="fin-btn" (click)="volver()">← Volver al inicio</button>
+      }
+    </div>
+  </div>
+}
+
+<!-- Modal dedicatoria -->
+@if (mostrarModalDedicatoria) {
+  <div class="ded-overlay">
+    <div class="ded-popup">
+      <h2 class="ded-titulo">Tu dedicatoria</h2>
+      <p class="ded-sub">{{ partida?.nombre }} · {{ fechaPartidaFormateada }}</p>
+      <textarea
+        class="ded-textarea"
+        [(ngModel)]="dedicatoriaTexto"
+        placeholder="Escribí tu dedicatoria (máx. 500 caracteres)…"
+        maxlength="500"
+        rows="5"
+      ></textarea>
+      <p class="ded-contador">{{ dedicatoriaTexto.length }}/500</p>
+      <div class="ded-acciones">
+        <button class="fin-btn" (click)="volver()" [disabled]="guardandoDedicatoria">Saltear</button>
+        <button
+          class="fin-btn fin-btn--primary"
+          (click)="guardarDedicatoria()"
+          [disabled]="guardandoDedicatoria || dedicatoriaTexto.trim().length === 0"
+        >
+          {{ guardandoDedicatoria ? 'Guardando…' : 'Confirmar y volver' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Modal historial dedicatorias -->
+@if (mostrarHistorial) {
+  <div class="hist-overlay" (click)="mostrarHistorial = false">
+    <div class="hist-popup" (click)="$event.stopPropagation()">
+      <div class="hist-header">
+        <h2 class="hist-titulo">📜 Historial de partidas</h2>
+        <button class="hist-cerrar" (click)="mostrarHistorial = false">✕</button>
+      </div>
+      <p class="hist-sub">Dedicatorias de partidas entre los mismos jugadores</p>
+
+      @if (cargandoHistorial) {
+        <div class="hist-loading">Cargando…</div>
+      } @else if (historialDedicatorias.length === 0) {
+        <div class="hist-empty">Todavía no hay partidas registradas entre estos jugadores.</div>
+      } @else {
+        <div class="hist-ranking">
+          @for (r of historialRanking; track r.nombre; let i = $index) {
+            <div class="hist-ranking-row">
+              <span class="hist-ranking-pos">{{ i + 1 }}</span>
+              <span class="hist-ranking-nombre">{{ r.nombre }}</span>
+              <span class="hist-ranking-victorias">{{ r.victorias }} {{ r.victorias === 1 ? 'victoria' : 'victorias' }}</span>
+            </div>
+          }
+        </div>
+
+        <div class="hist-divider"></div>
+
+        <div class="hist-lista">
+          @for (d of historialDedicatorias; track d.id) {
+            <div class="hist-item">
+              <div class="hist-ganador">
+                <span class="hist-ganador-nombre">🏆 {{ d.ganador_nombre }}</span>
+                @if (d.ganador_lider) {
+                  <span class="hist-lider-nombre">· {{ d.ganador_lider }}</span>
+                }
+              </div>
+              <p class="hist-dedicatoria">"{{ d.dedicatoria }}"</p>
+            </div>
+          }
+        </div>
+      }
     </div>
   </div>
 }

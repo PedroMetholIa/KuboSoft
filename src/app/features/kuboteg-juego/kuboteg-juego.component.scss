@@ -804,6 +804,183 @@
   font-variant-numeric: tabular-nums;
 }
 
+// Botón ver historial dentro del panel objetivo
+.obj-historial-btn {
+  width: 100%;
+  margin-top: 0.65rem;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  color: #ca8a04;
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover {
+    background: rgba(245, 158, 11, 0.16);
+    color: #fbbf24;
+    border-color: rgba(245, 158, 11, 0.45);
+  }
+}
+
+// ── Modal historial dedicatorias ──────────────────────
+.hist-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(0,0,0,.78);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.hist-popup {
+  background: #0c0a1a;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 18px;
+  padding: 1.5rem 1.75rem;
+  width: 100%;
+  max-width: 520px;
+  max-height: 80dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  animation: fin-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.hist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hist-titulo {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #e2d9ff;
+}
+
+.hist-cerrar {
+  background: none;
+  border: none;
+  color: #475569;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  transition: color 0.15s;
+  &:hover { color: #fff; }
+}
+
+.hist-sub {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.hist-loading,
+.hist-empty {
+  text-align: center;
+  color: #475569;
+  font-size: 0.9rem;
+  padding: 2rem 0;
+}
+
+.hist-ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+}
+
+.hist-ranking-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.75rem;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 8px;
+}
+
+.hist-ranking-pos {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #475569;
+  width: 1rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.hist-ranking-nombre {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  flex: 1;
+}
+
+.hist-ranking-victorias {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #fbbf24;
+}
+
+.hist-divider {
+  height: 1px;
+  background: rgba(255,255,255,.07);
+  margin: 0.25rem 0;
+}
+
+.hist-lista {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-right: 0.25rem;
+
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 2px; }
+}
+
+.hist-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.hist-ganador {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.hist-ganador-nombre {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.hist-lider-nombre {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+.hist-dedicatoria {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  line-height: 1.5;
+  font-style: italic;
+  border-left: 2px solid rgba(124, 58, 237, 0.4);
+  padding-left: 0.65rem;
+}
+
 // ── Cartas (panel Inicio) ───────────────────────────────
 .cartas-section {
   margin-top: 1.2rem;
@@ -2227,6 +2404,84 @@
   cursor: pointer;
   transition: all 0.2s;
   &:hover { color: #fff; border-color: rgba(255,255,255,.3); }
+  &:disabled { opacity: 0.45; cursor: not-allowed; }
+  &--primary {
+    background: linear-gradient(135deg, #7c3aed, #4f46e5);
+    border-color: transparent;
+    color: #fff;
+    &:hover:not(:disabled) { filter: brightness(1.15); }
+  }
+}
+
+// ── Modal dedicatoria ─────────────────────────────────
+.ded-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(0,0,0,.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.ded-popup {
+  background: #0f0c1e;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 20px;
+  padding: 2rem 2.25rem;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  animation: fin-pop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.ded-titulo {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #e2d9ff;
+  text-align: center;
+}
+
+.ded-sub {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #64748b;
+  text-align: center;
+}
+
+.ded-textarea {
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  color: #e2e8f0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  padding: 0.75rem 1rem;
+  resize: vertical;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s;
+  &::placeholder { color: #475569; }
+  &:focus { border-color: rgba(124,58,237,.6); }
+}
+
+.ded-contador {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #475569;
+  text-align: right;
+}
+
+.ded-acciones {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
 }
 
 @keyframes fin-pop {

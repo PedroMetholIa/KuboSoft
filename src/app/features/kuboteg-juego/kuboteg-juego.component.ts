@@ -204,6 +204,12 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   reagrupacionLimites: Record<string, number> = {};
   reagrupacionMovidos: Record<string, number> = {};
   panelActivo = 'jugadores';
+  mostrarModalDedicatoria = false;
+  dedicatoriaTexto = '';
+  guardandoDedicatoria = false;
+  mostrarHistorial = false;
+  historialDedicatorias: any[] = [];
+  cargandoHistorial = false;
   modoAudio: 'sin_sonido' | 'sin_musica' | 'musica_uniforme' | 'musica_lideres' = 'musica_lideres';
   private ultimoModoActivo: 'musica_uniforme' | 'musica_lideres' = 'musica_lideres';
   get musicaMuteada(): boolean {
@@ -2835,6 +2841,77 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       this.rebuildMaps();
     }
     return true;
+  }
+
+  async abrirHistorial(): Promise<void> {
+    this.mostrarHistorial = true;
+    this.cargandoHistorial = true;
+    this.cdr.markForCheck();
+    const currentIds = new Set(this.jugadores.map(j => j.usuario_id));
+    const { data, error } = await this.service.getDedicatorias();
+    if (error || !data) { this.cargandoHistorial = false; this.cdr.markForCheck(); return; }
+    this.historialDedicatorias = data.filter(d => {
+      const ids: string[] = (d.jugadores as any[]).map((j: any) => j.usuario_id).filter(Boolean);
+      if (ids.length !== currentIds.size) return false;
+      return ids.every(id => currentIds.has(id));
+    });
+    this.cargandoHistorial = false;
+    this.cdr.markForCheck();
+  }
+
+  get historialRanking(): { nombre: string; victorias: number }[] {
+    const conteo: Record<string, number> = {};
+    for (const j of this.jugadores) conteo[this.nombreJugador(j)] = 0;
+    for (const d of this.historialDedicatorias) {
+      const n = d.ganador_nombre as string;
+      conteo[n] = (conteo[n] ?? 0) + 1;
+    }
+    return Object.entries(conteo)
+      .map(([nombre, victorias]) => ({ nombre, victorias }))
+      .sort((a, b) => b.victorias - a.victorias);
+  }
+
+  formatearFecha(iso: string): string {
+    const [y, m, d] = iso.slice(0, 10).split('-');
+    return `${d}/${m}/${y}`;
+  }
+
+  get fechaPartidaFormateada(): string {
+    const s = this.partida?.created_at;
+    if (!s) return '';
+    const [y, m, d] = s.slice(0, 10).split('-');
+    return `${d}/${m}/${y}`;
+  }
+
+  abrirDedicatoria() {
+    this.dedicatoriaTexto = '';
+    this.mostrarModalDedicatoria = true;
+  }
+
+  async guardarDedicatoria(): Promise<void> {
+    const texto = this.dedicatoriaTexto.trim();
+    if (!texto || !this.partida || !this.userId || this.guardandoDedicatoria) return;
+    this.guardandoDedicatoria = true;
+    const ganadorJ = this.jugadores.find(j => j.usuario_id === this.userId) ?? null;
+    const jugadoresData = this.jugadores.map(j => ({
+      usuario_id: j.usuario_id,
+      nombre: this.nombreJugador(j),
+      color:  this.jugadorColores[j.usuario_id] ?? '',
+      lider:  this.jugadorLideres[j.usuario_id] ?? null,
+    }));
+    const { error } = await this.service.insertDedicatoria({
+      partida_id:     this.partida.id,
+      nombre_partida: this.partida.nombre,
+      fecha_partida:  this.partida.created_at,
+      jugadores:      jugadoresData,
+      ganador_id:     this.userId,
+      ganador_nombre: this.nombreJugador(ganadorJ),
+      ganador_lider:  this.jugadorLideres[this.userId] ?? null,
+      dedicatoria:    texto,
+    });
+    this.guardandoDedicatoria = false;
+    if (error) { this.showGameNotif('Error al guardar la dedicatoria', 'error'); return; }
+    this.volver();
   }
 
   volver() { this.router.navigate(['/kuboteg']); }

@@ -567,6 +567,27 @@ initTerritorios(territorios: Omit<TerritorioEstado, 'id'>[]) {
       .then(r => ({ ...r, data: r.data as JugadorDePartida[] | null }));
   }
 
+  getDedicatorias() {
+    return this.supabase
+      .from('dedicatorias')
+      .select('id, partida_id, nombre_partida, fecha_partida, jugadores, ganador_nombre, ganador_lider, dedicatoria, created_at')
+      .order('created_at', { ascending: false })
+      .limit(200);
+  }
+
+  insertDedicatoria(data: {
+    partida_id: string;
+    nombre_partida: string;
+    fecha_partida: string;
+    jugadores: unknown[];
+    ganador_id: string;
+    ganador_nombre: string;
+    ganador_lider: string | null;
+    dedicatoria: string;
+  }) {
+    return this.supabase.from('dedicatorias').insert(data);
+  }
+
   // ── Categorias ────────────────────────────────────────
   getCategorias() {
     return this.supabase.from('categoria').select('*').order('nombre');
