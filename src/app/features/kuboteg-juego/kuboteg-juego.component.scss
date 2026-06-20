@@ -1460,6 +1460,17 @@
   letter-spacing: 0.03em;
 }
 
+.player-bot-badge {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(56,189,248,.1);
+  border: 1px solid rgba(56,189,248,.25);
+  border-radius: 4px;
+  padding: 1px 5px;
+  letter-spacing: 0.03em;
+}
+
 // ── Score item estados ─────────────────────────────────
 .score-item-clickable {
   cursor: pointer;

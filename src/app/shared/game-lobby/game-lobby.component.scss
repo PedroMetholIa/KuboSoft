@@ -86,9 +86,8 @@
 // ── Base ───────────────────────────────────────────────
 .partida {
   min-height: 100vh;
-  background:
-    linear-gradient(rgba(4,6,16,.45), rgba(4,6,16,.45)),
-    url('/assets/KuboTeg/MundoFondoNegro.png') center / cover fixed;
+  background: linear-gradient(rgba(4,6,16,.45), rgba(4,6,16,.45)) center / cover fixed;
+  background-color: #04060f;
   color: #fff;
   display: flex;
   flex-direction: column;

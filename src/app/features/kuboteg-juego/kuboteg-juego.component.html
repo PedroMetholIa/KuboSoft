@@ -229,7 +229,9 @@
                       <div class="player-info">
                         <div class="player-name-row">
                           <span class="player-name">{{ nombreJugador(j) }}</span>
-                          @if (fase && !estaVivo(j.usuario_id)) {
+                          @if (j.usuario_id === BOT_USER_ID) {
+                            <span class="player-bot-badge">🤖 IA</span>
+                          } @else if (fase && !estaVivo(j.usuario_id)) {
                             <span class="player-muerto-badge">☠ eliminado</span>
                           } @else if (jugadorLideres[j.usuario_id]) {
                             <span class="player-lider" [style.color]="jugadorColores[j.usuario_id]">{{ jugadorLideres[j.usuario_id] }}</span>

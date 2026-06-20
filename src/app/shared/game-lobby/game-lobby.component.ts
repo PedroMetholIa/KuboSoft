@@ -6,7 +6,7 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 import { filter, take } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
 import {
-  SupabaseService, Partida, PartidaJugador, Producto, Profile, Notificacion
+  SupabaseService, Partida, PartidaJugador, Producto, Profile, Notificacion, BOT_USER_ID
 } from '../../core/services/supabase.service';
 import { ToastService } from '../../core/services/toast.service';
 import { JugadoresChatComponent } from '../jugadores-chat/jugadores-chat.component';
@@ -45,7 +45,7 @@ interface PartidaFinalizada {
   standalone: true,
   imports: [FormsModule, JugadoresChatComponent],
   template: `
-    <div class="partida">
+    <div class="partida" style="background-image: linear-gradient(rgba(4,6,16,.45), rgba(4,6,16,.45)), url('/assets/KuboTeg/MundoFondoNegro.webp'); background-size: cover; background-position: center; background-attachment: fixed;">
 
       @if (notificacionActiva) {
         <div class="notif-overlay">
@@ -302,11 +302,21 @@ interface PartidaFinalizada {
                 <div class="field field-narrow">
                   <label>Límite de jugadores</label>
                   <div class="num-stepper">
-                    <button type="button" class="step-btn" [disabled]="form.limite_jugadores <= 2" (click)="form.limite_jugadores = form.limite_jugadores - 1">−</button>
+                    <button type="button" class="step-btn" [disabled]="form.limite_jugadores <= 2" (click)="reducirLimiteJugadores()">−</button>
                     <span class="step-value">{{ form.limite_jugadores }}</span>
                     <button type="button" class="step-btn" [disabled]="form.limite_jugadores >= 8" (click)="form.limite_jugadores = form.limite_jugadores + 1">+</button>
                   </div>
                 </div>
+                <div class="field field-narrow">
+                  <label>🤖 Jugadores IA</label>
+                  <div class="num-stepper">
+                    <button type="button" class="step-btn" [disabled]="form.cantBots <= 0" (click)="form.cantBots = form.cantBots - 1">−</button>
+                    <span class="step-value">{{ form.cantBots }}</span>
+                    <button type="button" class="step-btn" [disabled]="form.cantBots >= 1 || form.cantBots >= form.limite_jugadores - 1" (click)="form.cantBots = form.cantBots + 1">+</button>
+                  </div>
+                </div>
+              </div>
+              <div class="form-row">
                 <div class="field-check field-check-inline">
                   <label>
                     <input type="checkbox" [(ngModel)]="form.requiere_contrasena" />
@@ -428,6 +438,7 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     nombre: '',
     producto_id: '',
     limite_jugadores: 2,
+    cantBots: 0,
     tropas_iniciales: 5,
     limite_rondas: 30,
     requiere_contrasena: false,
@@ -646,12 +657,20 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  reducirLimiteJugadores() {
+    this.form.limite_jugadores--;
+    if (this.form.cantBots >= this.form.limite_jugadores) {
+      this.form.cantBots = this.form.limite_jugadores - 1;
+    }
+  }
+
   cancelarForm() {
     this.showCreateForm = false;
     this.form = {
       nombre: '',
       producto_id: this.config.showProductSelector ? '' : this.autoProductoId,
       limite_jugadores: 2,
+      cantBots: 0,
       tropas_iniciales: 5,
       limite_rondas: 30,
       requiere_contrasena: false,
@@ -678,7 +697,12 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       limite_rondas: this.form.limite_rondas
     });
     if (nuevaPartida) {
-      await this.supabaseService.insertPartidaJugador(nuevaPartida.id, this.userId, 0);
+      const hostResult = await this.supabaseService.insertPartidaJugador(nuevaPartida.id, this.userId, 0);
+      console.log('[insertHost] resultado:', JSON.stringify(hostResult));
+      for (let i = 0; i < this.form.cantBots; i++) {
+        const botResult = await this.supabaseService.agregarBotAPartida(nuevaPartida.id);
+        console.log('[agregarBot] resultado:', JSON.stringify(botResult));
+      }
       this.misPartidasIds.add(nuevaPartida.id);
     }
     this.cancelarForm();
@@ -696,6 +720,7 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     const pjs = jugadores ?? [];
     if (pjs.length === 0) { this.comenzando = false; return; }
     for (const j of pjs) {
+      if (j.usuario_id === BOT_USER_ID) continue;
       await this.supabaseService.crearNotificacion(
         j.usuario_id, p.id, `¡La partida "${p.nombre}" comenzó! Hacé clic para jugar.`
       );

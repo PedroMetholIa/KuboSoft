@@ -1,4 +1,6 @@
 import { Injectable } from '@angular/core';
+
+export const BOT_USER_ID = '9ee14107-478e-4a24-bec4-aceb9f550884';
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { environment } from '../../../environments/environment';
 import { BehaviorSubject, Observable } from 'rxjs';
@@ -307,14 +309,14 @@ export class SupabaseService {
   }
 
   // ── PartidaJugador ────────────────────────────────────
-  insertPartidaJugador(partidaId: string, usuarioId: string, orden: number) {
+  insertPartidaJugador(partidaId: string, usuarioId: string, orden: number, estaDentro = false) {
     return this.supabase.from('partida_jugador')
-      .insert({ partida_id: partidaId, usuario_id: usuarioId, orden_turno: orden });
+      .insert({ partida_id: partidaId, usuario_id: usuarioId, orden_turno: orden, esta_dentro: estaDentro });
   }
 
   getPartidaJugadores(partidaId: string) {
     return this.supabase.from('partida_jugador')
-      .select('id, usuario_id, orden_turno, puntos, esta_dentro, tropas_por_colocar, color, lider, objetivo, posturas, usuario(nombre, apellido, email)')
+      .select('id, usuario_id, orden_turno, puntos, esta_dentro, tropas_por_colocar, color, lider, objetivo, posturas, usuario!left(nombre, apellido, email)')
       .eq('partida_id', partidaId)
       .order('orden_turno')
       .then(r => ({ ...r, data: r.data as unknown as PartidaJugador[] | null }));
@@ -330,17 +332,23 @@ export class SupabaseService {
   // ── RPCs de juego ─────────────────────────────────────
   // Usa fetch directo con el token explícito para evitar race conditions
   // del GoTrueClient al obtener el header de Authorization internamente.
-  private async _rpc(fn: string, params: Record<string, unknown>) {
+  private async _authHeaders() {
     const { data: { session } } = await this.supabase.auth.getSession();
-    if (!session) return { data: null, error: { message: 'Sesión expirada. Recargá la página.' } };
+    if (!session) return null;
+    return {
+      'Content-Type': 'application/json',
+      'apikey': environment.supabase.anonKey,
+      'Authorization': `Bearer ${session.access_token}`,
+    };
+  }
+
+  private async _rpc(fn: string, params: Record<string, unknown>) {
+    const headers = await this._authHeaders();
+    if (!headers) return { data: null, error: { message: 'Sesión expirada. Recargá la página.' } };
 
     const res = await fetch(`${environment.supabase.url}/rest/v1/rpc/${fn}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': environment.supabase.anonKey,
-        'Authorization': `Bearer ${session.access_token}`,
-      },
+      headers,
       body: JSON.stringify(params),
     });
 
@@ -350,6 +358,47 @@ export class SupabaseService {
       return { data: null, error: body ?? { message: `HTTP ${res.status}` } };
     }
     return { data: body, error: null };
+  }
+
+  private async _insert(table: string, rows: unknown[]) {
+    const headers = await this._authHeaders();
+    if (!headers) return { data: null, error: { message: 'Sesión expirada. Recargá la página.' } };
+
+    const res = await fetch(`${environment.supabase.url}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { ...headers, 'Prefer': 'return=minimal' },
+      body: JSON.stringify(rows),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      console.error(`[INSERT ${table}] HTTP ${res.status}`, body);
+      return { data: null, error: body ?? { message: `HTTP ${res.status}` } };
+    }
+    return { data: null, error: null };
+  }
+
+  private async _patch(table: string, where: Record<string, string>, data: Record<string, unknown>) {
+    const headers = await this._authHeaders();
+    if (!headers) return { data: null, error: { message: 'Sesión expirada. Recargá la página.' } };
+
+    const params = Object.entries(where).map(([k, v]) => `${k}=eq.${encodeURIComponent(v)}`).join('&');
+    const res = await fetch(`${environment.supabase.url}/rest/v1/${table}?${params}`, {
+      method: 'PATCH',
+      headers: { ...headers, 'Prefer': 'return=minimal' },
+      body: JSON.stringify(data),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      console.error(`[PATCH ${table}] HTTP ${res.status}`, body);
+      return { data: null, error: body ?? { message: `HTTP ${res.status}` } };
+    }
+    return { data: null, error: null };
+  }
+
+  agregarBotAPartida(partidaId: string) {
+    return this._rpc('agregar_bot_a_partida', { p_partida_id: partidaId });
   }
 
   resolverCombate(partidaId: string, origenId: string, destinoId: string) {
@@ -452,9 +501,10 @@ export class SupabaseService {
       .then(r => ({ ...r, data: r.data as unknown as TerritorioEstado[] | null }));
   }
 
-  initTerritorios(territorios: Omit<TerritorioEstado, 'id'>[]) {
-    return this.supabase.from('territorio_estado').insert(territorios);
-  }
+initTerritorios(territorios: Omit<TerritorioEstado, 'id'>[]) {
+  return this.supabase.from('territorio_estado')
+    .upsert(territorios, { onConflict: 'partida_id,territorio_id' });
+}
 
   updateTerritorioEstado(partidaId: string, territorioId: string, data: Partial<Pick<TerritorioEstado, 'usuario_id' | 'tropas'>>) {
     return this.supabase.from('territorio_estado')
@@ -465,31 +515,29 @@ export class SupabaseService {
 
   // ── Fases ─────────────────────────────────────────────
   iniciarFaseColocacion(partidaId: string, ordenJugadores: string[], ronda: number, indexInicio: number) {
-    return this.supabase.from('partida').update({
+    return this._patch('partida', { id: partidaId }, {
       fase_actual: 'colocacion',
       orden_jugadores: ordenJugadores,
       jugador_actual_index: indexInicio,
       ronda_actual: ronda,
-    }).eq('id', partidaId);
+    });
   }
 
   setFase(partidaId: string, fase: 'colocacion' | 'ataque' | 'reagrupacion', jugadorIndex?: number) {
-    const payload: Partial<Partida> = { fase_actual: fase };
-    if (jugadorIndex !== undefined) payload.jugador_actual_index = jugadorIndex;
-    return this.supabase.from('partida').update(payload).eq('id', partidaId);
+    const data: Record<string, unknown> = { fase_actual: fase };
+    if (jugadorIndex !== undefined) data['jugador_actual_index'] = jugadorIndex;
+    return this._patch('partida', { id: partidaId }, data);
   }
 
   avanzarJugador(partidaId: string, nuevoIndex: number) {
-    return this.supabase.from('partida')
-      .update({ jugador_actual_index: nuevoIndex })
-      .eq('id', partidaId);
+    return this._patch('partida', { id: partidaId }, { jugador_actual_index: nuevoIndex });
   }
 
   setTropasPorColocar(partidaId: string, usuarioId: string, tropas: number) {
-    return this.supabase.from('partida_jugador')
-      .update({ tropas_por_colocar: tropas })
-      .eq('partida_id', partidaId)
-      .eq('usuario_id', usuarioId);
+    return this._patch('partida_jugador',
+      { partida_id: partidaId, usuario_id: usuarioId },
+      { tropas_por_colocar: tropas }
+    );
   }
 
   // ── Notificaciones ────────────────────────────────────

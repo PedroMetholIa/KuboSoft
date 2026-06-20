@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { KeyValuePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { SupabaseService, Partida, PartidaJugador, TerritorioEstado, Lider, UltimoCombate, UltimaConquista } from '../../core/services/supabase.service';
+import { SupabaseService, Partida, PartidaJugador, TerritorioEstado, Lider, UltimoCombate, UltimaConquista, BOT_USER_ID } from '../../core/services/supabase.service';
 import { ToastService } from '../../core/services/toast.service';
 import { MapComponent } from './map/map.component';
 import { NotificacionesComponent, NotifItem } from './notificaciones/notificaciones.component';
@@ -136,6 +136,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   declarando = false;
   procesandoTurno = false;
   panelAbierto = true;
+  private botEjecutando = false;
+  readonly BOT_USER_ID = BOT_USER_ID;
 
   // ── Color / Lider modal ────────────────────────────────
   readonly coloresDisponibles = [
@@ -474,9 +476,11 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   get esMiTurno(): boolean { return !!this.jugadorActualId && this.jugadorActualId === this.userId; }
   get esHost(): boolean { return this.partida?.host_id === this.userId; }
+  get esTurnoBot(): boolean { return this.jugadorActualId === BOT_USER_ID; }
 
   get todosAdentro(): boolean {
-    return this.jugadores.length > 0 && this.jugadores.every(j => j.esta_dentro);
+    return this.jugadores.length > 0 &&
+      this.jugadores.every(j => j.usuario_id === BOT_USER_ID || j.esta_dentro);
   }
 
   get territoriosOwnerMap(): Record<string, string> { return this._territoriosOwnerMap; }
@@ -649,6 +653,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
       this.partida   = partida;
       this.jugadores = jugadores ?? [];
+      console.log('[loadGame] jugadores:', JSON.stringify((jugadores ?? []).map(j => ({ uid: j.usuario_id, dentro: j.esta_dentro, color: j.color }))));
       this.lideres   = lideres ?? [];
       if (Array.isArray(partida?.pactos)) this.pactos = partida.pactos as Pacto[];
       if (gruposDb) {
@@ -969,6 +974,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
             if (this.esMiTurno && prevJugadorIdx !== newPartida.jugador_actual_index) {
               this.playSfx('assets/KuboTeg/sonidos/confirma-seleccion.mp3');
             }
+            // Bot turns handled by Edge Function (Option B)
           }
           this.cdr.markForCheck();
         }
@@ -1080,10 +1086,34 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     }
   }
 
+  private async asignarColorLiderBot() {
+    const botIdx = this.jugadores.findIndex(j => j.usuario_id === BOT_USER_ID);
+    if (botIdx === -1) return;
+    const bot = this.jugadores[botIdx];
+    if (bot.color && bot.lider) return;
+
+    const coloresUsados = new Set(this.jugadores.filter(j => j.usuario_id !== BOT_USER_ID).map(j => j.color));
+    const color = this.coloresDisponibles.find(c => !coloresUsados.has(c.hex))?.hex
+      ?? this.coloresDisponibles[0].hex;
+
+    const lideresUsados = new Set(this.jugadores.filter(j => j.usuario_id !== BOT_USER_ID).map(j => j.lider));
+    const lider = this.lideres.find(l => !lideresUsados.has(l.nombre))?.nombre
+      ?? this.lideres[0]?.nombre ?? 'Mujica';
+
+    await this.service.marcarEstaDentroConColor(this.partidaId, BOT_USER_ID, color, lider);
+    // Actualizar local para que generarYAsignarObjetivos vea el color del bot
+    this.jugadores = this.jugadores.map((j, i) =>
+      i === botIdx ? { ...j, color, lider, esta_dentro: true } : j
+    );
+  }
+
   // ── Host: distribuir territorios ─────────────────────
   async distribuirTerritorios() {
     if (this.distribuyendoTerritorios || !this.partida) return;
     this.distribuyendoTerritorios = true;
+
+    // Auto-asignar color y líder al bot si no los tiene
+    await this.asignarColorLiderBot();
 
     const ids = this.jugadores.map(j => j.usuario_id);
     this.ordenGenerado = this.randomShuffle(ids);
@@ -1127,6 +1157,19 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     );
 
     await this.generarYAsignarObjetivos();
+
+    const { count: terrCount } = await this.service.client
+      .from('territorio_estado')
+      .select('*', { count: 'exact', head: true })
+      .eq('partida_id', this.partidaId);
+
+    if ((terrCount ?? 0) < TERRITORIES.length) {
+      this.toast.show('Error: los territorios no están listos. Intentá de nuevo.', 'error');
+      this.iniciandoJuego = false;
+      this.distribuyendoTerritorios = false;
+      this.cdr.markForCheck();
+      return;
+    }
 
     const { error: errFase } = await this.service.iniciarFaseColocacion(this.partidaId, orden, 1, 0);
     if (errFase) {
@@ -3143,6 +3186,286 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   get objetivoTerritoriosActuales(): number {
     return Object.values(this.territorios).filter(t => t.usuario_id === this.userId).length;
+  }
+
+  // ── IA Bot ────────────────────────────────────────────
+
+  private botTerritorios(): [string, TerritorioEstado][] {
+    return Object.entries(this.territorios).filter(([_, e]) => e.usuario_id === BOT_USER_ID);
+  }
+
+  private botObjetivo(): ObjetivoSecreto | null {
+    const botJ = this.jugadores.find(j => j.usuario_id === BOT_USER_ID);
+    return botJ?.objetivo ? botJ.objetivo as ObjetivoSecreto : null;
+  }
+
+  private botVecinosEnemigos(territorioId: string): string[] {
+    return (TERRITORIES.find(t => t.id === territorioId)?.neighbors ?? [])
+      .filter(v => { const e = this.territorios[v]; return e && e.usuario_id !== BOT_USER_ID; });
+  }
+
+  private botPrioridad(destinoId: string): number {
+    const obj = this.botObjetivo();
+    if (!obj) return 1;
+    const defId = this.territorios[destinoId]?.usuario_id;
+    if (obj.tipo === 'continentes') {
+      const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
+      return obj.ids.some(cid => (CONT[cid] ?? []).includes(destinoId)) ? 10 : 1;
+    }
+    if (obj.tipo === 'destruir') {
+      const targetJ = this.jugadores.find(j => j.color === obj.color);
+      return (targetJ && defId === targetJ.usuario_id) ? 10 : 1;
+    }
+    return 1;
+  }
+
+  private verificarVictoriaBot(conquistadoId: string, eliminadoId: string | null): boolean {
+    const obj = this.botObjetivo();
+    if (!obj) return false;
+    const esBotMio = (tid: string) =>
+      tid === conquistadoId || this.territorios[tid]?.usuario_id === BOT_USER_ID;
+    if (obj.tipo === 'continentes') {
+      const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
+      return obj.ids.every(cid => (CONT[cid] ?? []).every(tid => esBotMio(tid)));
+    }
+    if (obj.tipo === 'destruir') {
+      const targetJ = this.jugadores.find(j => j.color === obj.color);
+      if (!targetJ) return Object.values(this.territorios).filter(t => esBotMio(t.territorio_id)).length >= 24;
+      const quedan = Object.values(this.territorios)
+        .filter(t => t.usuario_id === targetJ.usuario_id && t.territorio_id !== conquistadoId).length;
+      if (quedan === 0) {
+        if (eliminadoId === targetJ.usuario_id) return true;
+        return Object.values(this.territorios).filter(t => esBotMio(t.territorio_id)).length >= 24;
+      }
+    }
+    return false;
+  }
+
+  private async ejecutarTurnoBot() {
+    if (!this.partida || this.botEjecutando) return;
+    this.botEjecutando = true;
+    try {
+      const fase = this.fase;
+      if      (fase === 'colocacion')    await this.botColocacion();
+      else if (fase === 'ataque')        await this.botAtaques();
+      else if (fase === 'reagrupacion')  await this.botReagrupacion();
+    } finally {
+      this.botEjecutando = false;
+    }
+  }
+
+  private async botColocacion() {
+    if (!this.partida) return;
+    const botJ   = this.jugadores.find(j => j.usuario_id === BOT_USER_ID);
+    const tropas = botJ?.tropas_por_colocar ?? 0;
+
+    if (tropas > 0) {
+      const botTerrs = this.botTerritorios();
+      if (botTerrs.length > 0) {
+        const patches: Record<string, number> = {};
+
+        if ((this.partida.ronda_actual ?? 1) <= 1) {
+          const [tid, estado] = this.mejorTerritorioBotDeLista(botTerrs);
+          patches[tid] = tropas;
+        } else {
+          // Sub-fase continental: igual que humano — bonus va dentro del continente
+          const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
+          let restantes = tropas;
+          for (const cb of KuboTegJuegoComponent.CONTINENT_BONUSES) {
+            if (CONT[cb.id].every(tid => this.territorios[tid]?.usuario_id === BOT_USER_ID)) {
+              const contBotTerrs = botTerrs.filter(([id]) => CONT[cb.id].includes(id));
+              if (contBotTerrs.length > 0) {
+                const [tid] = this.mejorTerritorioBotDeLista(contBotTerrs);
+                patches[tid] = (patches[tid] ?? 0) + cb.bonus;
+                restantes   -= cb.bonus;
+              }
+            }
+          }
+          if (restantes > 0) {
+            const [tid, estado] = this.mejorTerritorioBotDeLista(botTerrs);
+            patches[tid] = (patches[tid] ?? 0) + restantes;
+          }
+        }
+
+        for (const [tid, add] of Object.entries(patches)) {
+          const estado = this.territorios[tid];
+          if (estado) await this.updateTerritorio(tid, { tropas: estado.tropas + add });
+        }
+      }
+      await this.service.setTropasPorColocar(this.partidaId, BOT_USER_ID, 0);
+    }
+
+    const orden    = this.partida.orden_jugadores!;
+    const n        = orden.length;
+    const ronda    = this.partida.ronda_actual!;
+    const startIdx = this.primerVivoDesde((ronda - 1) % n, orden);
+    const currIdx  = this.partida.jugador_actual_index!;
+    const nextIdx  = this.siguienteVivoIdx(currIdx, orden);
+    if (nextIdx === startIdx) {
+      await this.service.setFase(this.partidaId, 'ataque', startIdx);
+    } else {
+      await this.service.avanzarJugador(this.partidaId, nextIdx);
+    }
+  }
+
+  private mejorTerritorioBotDeLista(lista: [string, TerritorioEstado][]): [string, TerritorioEstado] {
+    const conEnemigos = lista.filter(([id]) => this.botVecinosEnemigos(id).length > 0);
+    const candidatos  = conEnemigos.length > 0 ? conEnemigos : lista;
+    return candidatos.reduce((a, b) => a[1].tropas >= b[1].tropas ? a : b);
+  }
+
+  private async botAtaques() {
+    const botJ      = this.jugadores.find(j => j.usuario_id === BOT_USER_ID);
+    const botNombre = botJ ? this.nombreJugador(botJ) : 'IA';
+
+    // Sin tope de ataques — igual que un humano, ataca hasta agotar opciones válidas
+    for (let i = 0; i < 50; i++) {
+      const atacantes = this.botTerritorios()
+        .filter(([_, e]) => e.tropas > 1)
+        .map(([id, e]) => ({
+          id, tropas: e.tropas,
+          enemigos: this.botVecinosEnemigos(id).filter(vid => {
+            const defId = this.territorios[vid]?.usuario_id ?? '';
+            return !this.tieneAlianza(BOT_USER_ID, defId) && !this.tieneNoAgresion(id, vid);
+          }),
+        }))
+        .filter(t => t.enemigos.length > 0);
+
+      if (atacantes.length === 0) break;
+
+      atacantes.sort((a, b) => b.tropas - a.tropas);
+      const atacante = atacantes[0];
+
+      const destinos = atacante.enemigos
+        .map(eid => ({ id: eid, tropas: this.territorios[eid]?.tropas ?? 999, prioridad: this.botPrioridad(eid) }))
+        .sort((a, b) => b.prioridad - a.prioridad || a.tropas - b.tropas);
+
+      if (!destinos[0]) break;
+
+      await this.botAtacarUno(atacante.id, destinos[0].id, botNombre);
+      await new Promise(r => setTimeout(r, 700));
+    }
+
+    await this.terminarAtaque();
+  }
+
+  private async botAtacarUno(origenId: string, destinoId: string, botNombre: string) {
+    const defensorId = this.territorios[destinoId]?.usuario_id ?? '';
+    const defensorJ  = this.jugadores.find(j => j.usuario_id === defensorId);
+
+    const { data: rpcData, error } = await this.service.resolverCombate(this.partidaId, origenId, destinoId);
+    if (error || !rpcData) return;
+    const res = rpcData as CombateRpc;
+    if (res.error) return;
+
+    const conquista = res.conquista ?? false;
+    const ts = Date.now();
+    const popupData: UltimoCombate = {
+      dadosAtaque:      res.dados_ataque   ?? [],
+      dadosDefensa:     res.dados_defensa  ?? [],
+      bajasAtacante:    res.bajas_atacante ?? 0,
+      bajasDefensor:    res.bajas_defensor ?? 0,
+      conquista,
+      atacanteNombre:   botNombre,
+      defensorNombre:   defensorJ ? this.nombreJugador(defensorJ) : '?',
+      origenNombre:     this.nombreTerritorio(origenId),
+      destinoNombre:    this.nombreTerritorio(destinoId),
+      colorAtacante:    this.jugadorColores[BOT_USER_ID] ?? '#94a3b8',
+      colorDefensor:    this.jugadorColores[defensorId]  ?? '#fff',
+      liderAtacanteImg: this.getLiderImgByUserId(BOT_USER_ID),
+      liderDefensorImg: this.getLiderImgByNombre(this.jugadorLideres[defensorId] ?? ''),
+      ts,
+    };
+    this._lastCombateTs = ts;
+    this.mostrarPopupCombate(popupData);
+    this.pushNotifCombate(popupData);
+    this.channelEventos?.send({ type: 'broadcast', event: 'combate', payload: popupData });
+
+    if (!conquista) return;
+
+    // Mismo límite que el humano: máximo 3 tropas tras conquista
+    const maxMovibles   = Math.min(3, Math.max(0, (res.tropas_origen_final ?? 1) - 1));
+    const tropasAMover  = Math.max(1, maxMovibles);
+    const { error: moveErr } = await this.service.moverTropasConquista(this.partidaId, origenId, destinoId, tropasAMover);
+    if (moveErr) return;
+
+    this.conquistoEnEsteTurno = true;
+    this.ultimoTerritorioConquistadoId = destinoId;
+
+    // Patch local sin esperar Realtime
+    const origenEstado  = this.territorios[origenId];
+    const destinoEstado = this.territorios[destinoId];
+    const patch: Record<string, TerritorioEstado> = {};
+    if (origenEstado)  patch[origenId]  = { ...origenEstado,  tropas: origenEstado.tropas - tropasAMover };
+    if (destinoEstado) patch[destinoId] = { ...destinoEstado, tropas: destinoEstado.tropas + tropasAMover, usuario_id: BOT_USER_ID };
+    this.territorios = { ...this.territorios, ...patch };
+    this.rebuildMaps();
+
+    const defQuedan = defensorId
+      ? Object.values(this.territorios).filter(t => t.usuario_id === defensorId && t.territorio_id !== destinoId).length
+      : 1;
+    const eliminadoId = defQuedan === 0 ? defensorId : null;
+    this.disolverPactosTerritorio(destinoId, eliminadoId);
+
+    const conquistaData: UltimaConquista = {
+      territorioNombre: this.nombreTerritorio(destinoId),
+      atacanteNombre:   botNombre,
+      defensorNombre:   defensorJ ? this.nombreJugador(defensorJ) : '?',
+      colorAtacante:    this.jugadorColores[BOT_USER_ID] ?? '#94a3b8',
+      ts: Date.now(),
+    };
+    this._lastConquistaTs = conquistaData.ts;
+    this.mostrarNotifConquista(conquistaData);
+    this.pushNotifConquista(conquistaData);
+    this.channelEventos?.send({ type: 'broadcast', event: 'conquista', payload: conquistaData });
+
+    if (eliminadoId) {
+      const eliminadoNombre = this.nombreJugadorById(eliminadoId);
+      const tsElim = Date.now();
+      this.addNotif({ tipo: 'conquista', icono: '☠', linea1: `${eliminadoNombre} fue eliminado`, linea2: `por ${botNombre}`, color: '#f87171', ts: tsElim });
+      this.playSfx('assets/KuboTeg/sonidos/muerte-jugador.mp3');
+      this.channelEventos?.send({
+        type: 'broadcast', event: 'jugador_eliminado',
+        payload: { jugadorId: eliminadoId, jugadorNombre: eliminadoNombre, eliminadoPorNombre: botNombre, ts: tsElim },
+      });
+    }
+
+    if (this.verificarVictoriaBot(destinoId, eliminadoId)) {
+      await this.declararGanadorPorObjetivo();
+    }
+  }
+
+  private async botReagrupacion() {
+    if (this.partida) {
+      const botTerrs = this.botTerritorios();
+
+      // Territorios interiores: vecinos todos propios y con tropas sobrantes
+      const interiores = botTerrs.filter(([id, e]) => {
+        if (e.tropas <= 1) return false;
+        const vecinos = TERRITORIES.find(t => t.id === id)?.neighbors ?? [];
+        return vecinos.every(v => !this.territorios[v] || this.territorios[v]?.usuario_id === BOT_USER_ID);
+      });
+
+      // Territorios fronterizos: tienen vecino enemigo
+      const fronteras = botTerrs.filter(([id]) => {
+        const vecinos = TERRITORIES.find(t => t.id === id)?.neighbors ?? [];
+        return vecinos.some(v => { const e = this.territorios[v]; return e && e.usuario_id !== BOT_USER_ID; });
+      });
+
+      if (interiores.length > 0 && fronteras.length > 0) {
+        const [origenId, origenEst]  = interiores.reduce((a, b) => a[1].tropas > b[1].tropas ? a : b);
+        const [destinoId, destinoEst] = fronteras.reduce((a, b) => a[1].tropas < b[1].tropas ? a : b);
+        const vecinos = TERRITORIES.find(t => t.id === origenId)?.neighbors ?? [];
+        if (origenId !== destinoId && vecinos.includes(destinoId)) {
+          const mover = origenEst.tropas - 1;
+          if (mover > 0) {
+            await this.updateTerritorio(origenId,  { tropas: origenEst.tropas  - mover });
+            await this.updateTerritorio(destinoId, { tropas: destinoEst.tropas + mover });
+          }
+        }
+      }
+    }
+    await this.saltarReagrupacion();
   }
 
 }
