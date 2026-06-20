@@ -215,19 +215,23 @@
                       [class.active]="j.usuario_id === jugadorActualId && !!fase"
                       [class.me]="j.usuario_id === userId"
                       [class.fuera]="!j.esta_dentro"
+                      [class.muerto]="fase && !estaVivo(j.usuario_id)"
                       [class.score-item-clickable]="j.usuario_id !== userId"
                       (click)="j.usuario_id !== userId && abrirChatPrivado(j.usuario_id)">
                       <span class="pos">{{ i + 1 }}</span>
                       @if (getLiderImgByUserId(j.usuario_id)) {
                         <img [src]="getLiderImgByUserId(j.usuario_id)"
                              class="score-lider-img"
+                             [class.score-lider-img--muerto]="fase && !estaVivo(j.usuario_id)"
                              [style.border-color]="jugadorColores[j.usuario_id]"
                              alt="">
                       }
                       <div class="player-info">
                         <div class="player-name-row">
                           <span class="player-name">{{ nombreJugador(j) }}</span>
-                          @if (jugadorLideres[j.usuario_id]) {
+                          @if (fase && !estaVivo(j.usuario_id)) {
+                            <span class="player-muerto-badge">☠ eliminado</span>
+                          } @else if (jugadorLideres[j.usuario_id]) {
                             <span class="player-lider" [style.color]="jugadorColores[j.usuario_id]">{{ jugadorLideres[j.usuario_id] }}</span>
                           }
                         </div>
@@ -334,9 +338,6 @@
 
             }
 
-            @case ('notificaciones') {
-              <div class="mj-placeholder">Notificaciones</div>
-            }
             @case ('informacion') {
               <div class="info-rules">
 
@@ -468,9 +469,6 @@
               </div>
             }
 
-            @case ('chat') {
-              <div class="mj-placeholder">Chat</div>
-            }
             @case ('objetivo') {
               @if (miObjetivo) {
                 <div class="obj-card">
@@ -511,9 +509,6 @@
               } @else {
                 <div class="mj-placeholder">Objetivo no asignado aún</div>
               }
-            }
-            @case ('musica') {
-              <div class="mj-placeholder">Música</div>
             }
             @case ('configuracion') {
               <div class="cfg-panel">
@@ -1695,6 +1690,19 @@
       } @else {
         <p class="pausa-msg">{{ jugadorPausadorNombre || 'Un jugador' }} pausó la partida. Esperando que la reanude…</p>
       }
+    </div>
+  </div>
+}
+
+<!-- Popup eliminado -->
+@if (mostrarPopupEliminado && partida?.estado !== 'Finalizada') {
+  <div class="eliminado-overlay">
+    <div class="eliminado-popup">
+      <div class="eliminado-icon">☠</div>
+      <h2 class="eliminado-titulo">Fuiste eliminado</h2>
+      <p class="eliminado-sub">{{ eliminadoPorNombre }} conquistó tu último territorio</p>
+      <p class="eliminado-desc">Podés seguir observando la partida hasta que finalice.</p>
+      <button class="eliminado-btn" (click)="mostrarPopupEliminado = false">Seguir observando</button>
     </div>
   </div>
 }

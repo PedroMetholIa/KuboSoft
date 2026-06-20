@@ -1,6 +1,6 @@
 ﻿import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef, NgZone, ViewChild, HostListener } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { KeyValuePipe, UpperCasePipe } from '@angular/common';
+import { KeyValuePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { SupabaseService, Partida, PartidaJugador, TerritorioEstado, Lider, UltimoCombate, UltimaConquista } from '../../core/services/supabase.service';
@@ -89,7 +89,7 @@ interface CombateRpc {
 @Component({
   selector: 'app-kuboteg-juego',
   standalone: true,
-  imports: [FormsModule, KeyValuePipe, UpperCasePipe, MapComponent, NotificacionesComponent, CombatePanelComponent, KubotegChatComponent, PartidaInfoComponent, MenuJugadorComponent],
+  imports: [FormsModule, KeyValuePipe, MapComponent, NotificacionesComponent, CombatePanelComponent, KubotegChatComponent, PartidaInfoComponent, MenuJugadorComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './kuboteg-juego.component.html',
   styleUrl: './kuboteg-juego.component.scss'
@@ -191,6 +191,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   conquistaTropasAMover = 1;
   miObjetivo: ObjetivoSecreto | null = null;
   mostrarObjetivoPopup = false;
+  mostrarPopupEliminado = false;
+  eliminadoPorNombre = '';
   gameNotif: { msg: string; tipo: 'ok' | 'info' | 'warn' | 'error' } | null = null;
   private gameNotifTimer: ReturnType<typeof setTimeout> | null = null;
   modalPostura: { jugadorId: string; postura: 'amigable' | 'neutral' | 'hostil' } | null = null;
@@ -209,7 +211,6 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   private audio!: HTMLAudioElement;
   private audioCtx: AudioContext | null = null;
   private gainNode: GainNode | null = null;
-  private sourceConnected = false;
   private readonly BASE_VOLUME = 0.4;
   private sfxPool = new Map<string, HTMLAudioElement>();
   private timerInterval: ReturnType<typeof setInterval> | null = null;
@@ -342,6 +343,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     if (this.timerInterval)        clearInterval(this.timerInterval);
     if (this.notifConquistaTimer)  clearTimeout(this.notifConquistaTimer);
     if (this.cartaPopupTimer)      clearTimeout(this.cartaPopupTimer);
+    if (this.gameNotifTimer)       clearTimeout(this.gameNotifTimer);
   }
 
   private removeAllChannels() {
@@ -430,7 +432,6 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
     const source = this.audioCtx.createMediaElementSource(this.audio);
     source.connect(compressor);
-    this.sourceConnected = true;
   }
 
   private cambiarMusicaLider() {
@@ -747,6 +748,18 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
           this.cdr.markForCheck();
         }
       })
+      .on('broadcast', { event: 'jugador_eliminado' }, ({ payload }) => {
+        const e = payload as { jugadorId: string; jugadorNombre: string; eliminadoPorNombre: string; ts: number };
+        this.addNotif({ tipo: 'conquista', icono: '☠', linea1: `${e.jugadorNombre} fue eliminado`, linea2: `por ${e.eliminadoPorNombre}`, color: '#f87171', ts: e.ts });
+        if (e.jugadorId === this.userId) {
+          this.eliminadoPorNombre = e.eliminadoPorNombre;
+          this.mostrarPopupEliminado = true;
+          this.playSfx('assets/KuboTeg/sonidos/perdedor.mp3');
+        } else {
+          this.playSfx('assets/KuboTeg/sonidos/muerte-jugador.mp3');
+        }
+        this.cdr.markForCheck();
+      })
       .on('broadcast', { event: 'pacto_propuesta' }, ({ payload }) => {
         const p = payload as PropuestaPacto;
         if (p.receptorId === this.userId) {
@@ -764,9 +777,11 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
                 ? { ...p, estado: 'activo' as const, rondaExpira: r.rondaExpira! }
                 : p
             );
+            this.playSfx('assets/KuboTeg/sonidos/pacto.mp3');
             this.showGameNotif('¡Pacto renovado!', 'ok');
           } else if (r.accepted && r.pacto) {
             this.pactos = [...this.pactos, r.pacto];
+            this.playSfx('assets/KuboTeg/sonidos/pacto.mp3');
             this.showGameNotif('¡Pacto aceptado!', 'ok');
           } else if (!r.accepted) {
             this.showGameNotif('Tu propuesta fue rechazada.', 'warn');
@@ -880,6 +895,15 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         this.pushNotifPacto(e.jugador1Nombre, e.jugador2Nombre, e.tipo, e.color, e.esRenovacion, e.ts);
         this.cdr.markForCheck();
       })
+      .on('broadcast', { event: 'pacto_roto' }, ({ payload }) => {
+        const e = payload as { rompedorId: string; rompedorNombre: string; afectadoId: string; afectadoNombre: string; tipo: 'alianza' | 'no_agresion'; ts: number };
+        const label = e.tipo === 'alianza' ? 'Alianza' : 'No agresión';
+        this.addNotif({ tipo: 'pacto', icono: '💔', linea1: `Ruptura: ${e.rompedorNombre} & ${e.afectadoNombre}`, linea2: `${label} rota`, color: '#ef4444', ts: e.ts });
+        if (e.afectadoId === this.userId) {
+          this.showGameNotif(`${e.rompedorNombre} rompió el pacto contigo.`, 'warn');
+        }
+        this.cdr.markForCheck();
+      })
       .on('broadcast', { event: 'carta_robada' }, ({ payload }) => {
         const e = payload as { jugadorId: string; jugadorNombre: string; cartaNombre: string; bonusNombre: string | null; ts: number };
         if (e.jugadorId !== this.userId) {
@@ -916,7 +940,16 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
               this.playSfx('assets/KuboTeg/sonidos/perdedor.mp3');
             }
           }
-          if (Array.isArray(newPartida.pactos)) this.pactos = newPartida.pactos as Pacto[];
+          if (Array.isArray(newPartida.pactos)) {
+            const newPactos = newPartida.pactos as Pacto[];
+            const rupturaRecibida = newPactos.find(np =>
+              np.estado === 'en_transicion' &&
+              (np.jugador1Id === this.userId || np.jugador2Id === this.userId) &&
+              this.pactos.find(op => op.id === np.id)?.estado !== 'en_transicion'
+            );
+            if (rupturaRecibida) this.playSfx('assets/KuboTeg/sonidos/ruptura-pacto.mp3');
+            this.pactos = newPactos;
+          }
           const prevFase = this.fase;
           const prevJugadorIdx = this.partida?.jugador_actual_index;
           this.partida = newPartida;
@@ -1195,10 +1228,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     const orden      = this.partida.orden_jugadores!;
     const n          = orden.length;
     const ronda      = this.partida.ronda_actual!;
-    const startIdx   = (ronda - 1) % n;
+    const startIdx   = this.primerVivoDesde((ronda - 1) % n, orden);
     const currentIdx = this.partida.jugador_actual_index!;
-    const numPlaced  = ((currentIdx - startIdx + n) % n) + 1;
-    const nextIdx    = (currentIdx + 1) % n;
+    const nextIdx    = this.siguienteVivoIdx(currentIdx, orden);
 
     const allPlaced: Record<string, number> = {};
     for (const [tid, n] of Object.entries(this.tropasColocadasContinentes)) {
@@ -1222,7 +1254,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.subFaseColocacion = 'base';
     this.rebuildTropasMap();
 
-    if (numPlaced >= n) {
+    if (nextIdx === startIdx) {
       await this.service.setFase(this.partidaId, 'ataque', startIdx);
     } else {
       await this.service.avanzarJugador(this.partidaId, nextIdx);
@@ -1369,6 +1401,17 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       this.pushNotifConquista(conquistaData);
       this.channelEventos?.send({ type: 'broadcast', event: 'conquista', payload: conquistaData });
 
+      if (eliminadoId) {
+        const eliminadoNombre = this.nombreJugadorById(eliminadoId);
+        const tsElim = Date.now();
+        this.addNotif({ tipo: 'conquista', icono: '☠', linea1: `${eliminadoNombre} fue eliminado`, linea2: `por ${this.jugadorActualNombre}`, color: '#f87171', ts: tsElim });
+        this.playSfx('assets/KuboTeg/sonidos/muerte-jugador.mp3');
+        this.channelEventos?.send({
+          type: 'broadcast', event: 'jugador_eliminado',
+          payload: { jugadorId: eliminadoId, jugadorNombre: eliminadoNombre, eliminadoPorNombre: this.jugadorActualNombre, ts: tsElim },
+        });
+      }
+
       this.conquistaPendiente = null;
       this.cdr.markForCheck();
 
@@ -1383,11 +1426,14 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   async terminarAtaque() {
     if (!this.partida || this.conquistaPendiente || this.procesandoTurno) return;
     this.procesandoTurno = true;
-    this.territorioAtacanteId = null;
-    this.iniciarFaseReagrupacion();
-    await this.service.setFase(this.partidaId, 'reagrupacion', this.partida.jugador_actual_index!);
-    this.procesandoTurno = false;
-    this.cdr.markForCheck();
+    try {
+      this.territorioAtacanteId = null;
+      this.iniciarFaseReagrupacion();
+      await this.service.setFase(this.partidaId, 'reagrupacion', this.partida.jugador_actual_index!);
+    } finally {
+      this.procesandoTurno = false;
+      this.cdr.markForCheck();
+    }
   }
 
   // ── Inicio de sub-fase de colocación ─────────────────
@@ -1552,6 +1598,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.misCartas = nuevasCartas;
     this.cartasRobadasTotal++;
     localStorage.setItem(`teg_cartas_total_${this.partidaId}_${this.userId}`, String(this.cartasRobadasTotal));
+    this.playSfx(esMio
+      ? 'assets/KuboTeg/sonidos/acierta-carta.mp3'
+      : 'assets/KuboTeg/sonidos/noacierta-carta.mp3');
     this.mostrarNotifCarta(cartaId, bonusCarta, tropasBonus);
 
     await this.service.setCartas(this.partidaId, this.userId, nuevasCartas);
@@ -1753,6 +1802,31 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     }, 3500);
   }
 
+  // ── Jugadores muertos ─────────────────────────────────
+  estaVivo(jugadorId: string): boolean {
+    return Object.values(this.territorios).some(t => t.usuario_id === jugadorId);
+  }
+
+  private siguienteVivoIdx(fromIdx: number, orden: string[]): number {
+    const n = orden.length;
+    let idx = (fromIdx + 1) % n;
+    for (let i = 0; i < n; i++) {
+      if (this.estaVivo(orden[idx])) return idx;
+      idx = (idx + 1) % n;
+    }
+    return fromIdx;
+  }
+
+  private primerVivoDesde(fromIdx: number, orden: string[]): number {
+    const n = orden.length;
+    let idx = ((fromIdx % n) + n) % n;
+    for (let i = 0; i < n; i++) {
+      if (this.estaVivo(orden[idx])) return idx;
+      idx = (idx + 1) % n;
+    }
+    return fromIdx;
+  }
+
   // ── Rotación de turnos ────────────────────────────────
   async avanzarTurno() {
     if (!this.partida || this.procesandoTurno) return;
@@ -1760,8 +1834,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     try {
       const orden    = this.partida.orden_jugadores!;
       const ronda    = this.partida.ronda_actual!;
-      const startIdx = (ronda - 1) % orden.length;
-      const nextIdx  = (this.partida.jugador_actual_index! + 1) % orden.length;
+      const startIdx = this.primerVivoDesde((ronda - 1) % orden.length, orden);
+      const nextIdx  = this.siguienteVivoIdx(this.partida.jugador_actual_index!, orden);
 
       if (nextIdx === startIdx) {
         await this.iniciarNuevaRonda();
@@ -1780,7 +1854,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     const rondaActual = this.partida.ronda_actual!;
     const limite      = this.partida.limite_rondas ?? null;
     const newRonda    = rondaActual + 1;
-    const newStart    = (newRonda - 1) % orden.length;
+    const newStart    = this.primerVivoDesde((newRonda - 1) % orden.length, orden);
 
     this.expirarPactos(newRonda);
 
@@ -1795,6 +1869,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
     const divisor = newRonda >= 2 ? 2 : 3;
     await Promise.all(this.jugadores.map(j => {
+      if (!this.estaVivo(j.usuario_id)) {
+        return this.service.setTropasPorColocar(this.partidaId, j.usuario_id, 0);
+      }
       const misTerritorios = Object.values(this.territorios).filter(t => t.usuario_id === j.usuario_id);
       const tropasBase = Math.max(3, Math.floor(misTerritorios.length / divisor));
       const bonus      = this.calcularBonusContinente(j.usuario_id);
@@ -2033,12 +2110,27 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   async romperPacto(pactoId: string) {
     const rondaActual = this.partida?.ronda_actual ?? 0;
+    const pacto = this.pactos.find(p => p.id === pactoId);
     this.pactos = this.pactos.map(p =>
       p.id === pactoId
         ? { ...p, estado: 'en_transicion' as const, rondaExpira: rondaActual + 1 }
         : p
     );
     await this.service.setPactos(this.partidaId, this.pactos);
+
+    if (pacto) {
+      const otroId = pacto.jugador1Id === this.userId ? pacto.jugador2Id : pacto.jugador1Id;
+      const otroNombre = this.nombreJugadorById(otroId);
+      const label = pacto.tipo === 'alianza' ? 'Alianza' : 'No agresión';
+      const ts = Date.now();
+      this.addNotif({ tipo: 'pacto', icono: '💔', linea1: `Ruptura: ${this.jugadorActualNombre} & ${otroNombre}`, linea2: `${label} rota`, color: '#ef4444', ts });
+      this.channelEventos?.send({
+        type: 'broadcast', event: 'pacto_roto',
+        payload: { rompedorId: this.userId, rompedorNombre: this.jugadorActualNombre, afectadoId: otroId, afectadoNombre: otroNombre, tipo: pacto.tipo, ts },
+      });
+    }
+
+    this.playSfx('assets/KuboTeg/sonidos/ruptura-pacto.mp3');
     if (this.pactosRompibles().length === 0) this.modalRomperPacto = false;
     this.cdr.markForCheck();
   }
@@ -2269,6 +2361,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       this.pushNotifPacto(renovPayload.jugador1Nombre, renovPayload.jugador2Nombre, tipoPacto, renovPayload.color, true, renovPayload.ts);
       this.channelEventos?.send({ type: 'broadcast', event: 'pacto_aceptado', payload: renovPayload });
       await this.service.setPactos(this.partidaId, this.pactos);
+      this.playSfx('assets/KuboTeg/sonidos/pacto.mp3');
       this.showGameNotif('¡Pacto renovado!', 'ok');
       this.cdr.markForCheck();
       return;
@@ -2297,6 +2390,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.pushNotifPacto(nuevoPayload.jugador1Nombre, nuevoPayload.jugador2Nombre, nuevoPacto.tipo, nuevoPayload.color, false, nuevoPayload.ts);
     this.channelEventos?.send({ type: 'broadcast', event: 'pacto_aceptado', payload: nuevoPayload });
     await this.service.setPactos(this.partidaId, this.pactos);
+    this.playSfx('assets/KuboTeg/sonidos/pacto.mp3');
     this.cdr.markForCheck();
   }
 

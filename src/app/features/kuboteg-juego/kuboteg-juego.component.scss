@@ -1271,6 +1271,12 @@
     object-position: top;
     border: 2px solid transparent;
     flex-shrink: 0;
+    transition: filter .3s, opacity .3s;
+
+    &--muerto {
+      filter: grayscale(1);
+      opacity: 0.45;
+    }
   }
 
   .player-info {
@@ -1433,6 +1439,25 @@
   color: #444;
   margin: 0;
   text-align: center;
+}
+
+// ── Jugador muerto ─────────────────────────────────────
+.score-item.muerto {
+  opacity: 0.5;
+  background: rgba(0,0,0,.2) !important;
+  border-color: rgba(255,255,255,.04) !important;
+  pointer-events: none;
+}
+
+.player-muerto-badge {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #64748b;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 4px;
+  padding: 1px 5px;
+  letter-spacing: 0.03em;
 }
 
 // ── Score item estados ─────────────────────────────────
@@ -1928,6 +1953,73 @@
   }
 
   &:active { transform: scale(0.97); }
+}
+
+// ── Overlay eliminado ──────────────────────────────────
+.eliminado-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  animation: fadeIn .3s ease;
+}
+
+.eliminado-popup {
+  background: linear-gradient(145deg, #1a0a0a, #0f0505);
+  border: 1px solid rgba(239,68,68,.3);
+  border-radius: 18px;
+  padding: 2.5rem 3rem;
+  text-align: center;
+  max-width: 380px;
+  width: 90%;
+  box-shadow: 0 0 60px rgba(239,68,68,.25), 0 20px 60px rgba(0,0,0,.7);
+  animation: popupIn .35s cubic-bezier(.34,1.56,.64,1);
+}
+
+.eliminado-icon {
+  font-size: 3.5rem;
+  margin-bottom: 0.8rem;
+  filter: grayscale(.3);
+}
+
+.eliminado-titulo {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #f87171;
+  margin: 0 0 0.5rem;
+  letter-spacing: 0.02em;
+}
+
+.eliminado-sub {
+  font-size: 0.9rem;
+  color: #94a3b8;
+  margin: 0 0 0.4rem;
+}
+
+.eliminado-desc {
+  font-size: 0.78rem;
+  color: #475569;
+  margin: 0 0 1.8rem;
+}
+
+.eliminado-btn {
+  background: rgba(239,68,68,.12);
+  border: 1px solid rgba(239,68,68,.3);
+  color: #f87171;
+  border-radius: 9px;
+  padding: 0.6rem 1.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+
+  &:hover {
+    background: rgba(239,68,68,.2);
+    border-color: rgba(239,68,68,.5);
+  }
 }
 
 // ── Overlay pausa ──────────────────────────────────────
