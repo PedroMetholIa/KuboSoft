@@ -15,7 +15,9 @@ import { TERRITORIES } from './map/territories.data';
 
 type ObjetivoSecreto =
   | { tipo: 'continentes'; ids: [string, string] }
-  | { tipo: 'destruir'; color: string };
+  | { tipo: 'destruir'; color: string; fallback?: true }
+  | { tipo: 'mayorias_continente'; mayoriaIds: [string, string]; continenteId: string }
+  | { tipo: 'cuatro_mayorias' };
 
 interface ConquistaPendiente {
   origenId: string;
@@ -95,13 +97,22 @@ interface CombateRpc {
   styleUrl: './kuboteg-juego.component.scss'
 })
 export class KuboTegJuegoComponent implements OnInit, OnDestroy {
-  private static readonly CONTINENT_BONUSES = [
+  private static readonly CONTINENT_MAJORITY = [
     { id: 'north_america', bonus: 5 },
-    { id: 'south_america', bonus: 3 },
+    { id: 'south_america', bonus: 2 },
     { id: 'europe',        bonus: 5 },
-    { id: 'africa',        bonus: 4 },
+    { id: 'africa',        bonus: 3 },
     { id: 'asia',          bonus: 7 },
     { id: 'oceania',       bonus: 2 },
+  ] as const;
+
+  private static readonly CONTINENT_BONUSES = [
+    { id: 'north_america', bonus: 7 },
+    { id: 'south_america', bonus: 3 },
+    { id: 'europe',        bonus: 7 },
+    { id: 'africa',        bonus: 4 },
+    { id: 'asia',          bonus: 10 },
+    { id: 'oceania',       bonus: 3 },
   ] as const;
 
   private static readonly CONTINENT_TERRITORIES: Record<string, string[]> = (() => {
@@ -176,7 +187,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   tropasColocadasBase: Record<string, number> = {};
   subFaseColocacion: 'continentes' | 'base' = 'base';
   continentesColocacion: Array<{
-    id: string; nombre: string; bonus: number; colocadas: number; territoriosPermitidos: string[];
+    id: string; nombre: string; bonus: number; colocadas: number; territoriosPermitidos: string[]; tipo: 'mayoria' | 'totalidad';
   }> = [];
   continenteColocacionIdx = 0;
   territorioAtacanteId: string | null = null;
@@ -185,6 +196,16 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   popupCombate: UltimoCombate | null = null;
   private _lastCombateTs = 0;
   private lastAttack: { origenId: string; destinoId: string } | null = null;
+  private _combateHighlightIds: string[] = [];
+  private _combateHighlightTimer: ReturnType<typeof setTimeout> | null = null;
+  private _popupCombateTimer: ReturnType<typeof setTimeout> | null = null;
+  private _colocacionHighlightId: string | null = null;
+  private _colocacionHighlightTimer: ReturnType<typeof setTimeout> | null = null;
+  private _quitarHighlightId: string | null = null;
+  private _quitarHighlightTimer: ReturnType<typeof setTimeout> | null = null;
+  private _movilizacionHighlightId: string | null = null;
+  private _movilizacionHighlightTimer: ReturnType<typeof setTimeout> | null = null;
+  private _tropasPreviewMap: Record<string, number> = {};
   notifConquista: UltimaConquista | null = null;
   private notifConquistaTimer: ReturnType<typeof setTimeout> | null = null;
   private _lastConquistaTs = 0;
@@ -349,9 +370,14 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.removeAllChannels();
     if (this.reconnectTimer)       clearTimeout(this.reconnectTimer);
     if (this.timerInterval)        clearInterval(this.timerInterval);
-    if (this.notifConquistaTimer)  clearTimeout(this.notifConquistaTimer);
-    if (this.cartaPopupTimer)      clearTimeout(this.cartaPopupTimer);
-    if (this.gameNotifTimer)       clearTimeout(this.gameNotifTimer);
+    if (this.notifConquistaTimer)        clearTimeout(this.notifConquistaTimer);
+    if (this._combateHighlightTimer)     clearTimeout(this._combateHighlightTimer);
+    if (this._popupCombateTimer)         clearTimeout(this._popupCombateTimer);
+    if (this._colocacionHighlightTimer)   clearTimeout(this._colocacionHighlightTimer);
+    if (this._quitarHighlightTimer)        clearTimeout(this._quitarHighlightTimer);
+    if (this._movilizacionHighlightTimer)  clearTimeout(this._movilizacionHighlightTimer);
+    if (this.cartaPopupTimer)            clearTimeout(this.cartaPopupTimer);
+    if (this.gameNotifTimer)             clearTimeout(this.gameNotifTimer);
   }
 
   private removeAllChannels() {
@@ -514,6 +540,22 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   get territorioSeleccionado(): string | null {
     return this.territorioAtacanteId ?? this.territorioOrigenId;
+  }
+
+  get territoriosCombate(): string[] {
+    return this._combateHighlightIds;
+  }
+
+  get territorioColocandose(): string | null {
+    return this._colocacionHighlightId;
+  }
+
+  get territorioQuitandose(): string | null {
+    return this._quitarHighlightId;
+  }
+
+  get territorioMovilizandose(): string | null {
+    return this._movilizacionHighlightId;
   }
 
   get territoriosDestacados(): string[] {
@@ -927,6 +969,26 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
           this.cdr.markForCheck();
         }
       })
+      .on('broadcast', { event: 'colocacion_tropa' }, ({ payload }) => {
+        const e = payload as { territorioId: string; jugadorId: string; accion: 'colocar' | 'quitar'; tropasTotales: number };
+        if (e.jugadorId === this.userId) return;
+        const sfx = e.accion === 'colocar'
+          ? 'assets/KuboTeg/sonidos/colocar-ficha.mp3'
+          : 'assets/KuboTeg/sonidos/quitar-ficha.mp3';
+        this.playSfx(sfx);
+        this._tropasPreviewMap[e.territorioId] = e.tropasTotales;
+        this.rebuildTropasMap();
+        if (e.accion === 'colocar') this.activarHighlightColocacion(e.territorioId);
+        else this.activarHighlightQuitar(e.territorioId);
+        this.cdr.markForCheck();
+      })
+      .on('broadcast', { event: 'movilizacion_tropa' }, ({ payload }) => {
+        const e = payload as { origenId: string; destinoId: string; jugadorId: string };
+        if (e.jugadorId === this.userId) return;
+        this.playSfx('assets/KuboTeg/sonidos/movimiento.mp3');
+        this.activarHighlightMovilizacion(e.destinoId);
+        this.cdr.markForCheck();
+      })
       .subscribe();
 
     this.channelPartida = this.service.client
@@ -1037,6 +1099,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         if (t.partida_id === this.partidaId) {
           const prevOwner = this.territorios[t.territorio_id]?.usuario_id;
           const newOwner  = t.usuario_id;
+          delete this._tropasPreviewMap[t.territorio_id];
           this.territorios = { ...this.territorios, [t.territorio_id]: t };
           this.rebuildMaps();
           if (newOwner && newOwner !== prevOwner) {
@@ -1235,6 +1298,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       cont.colocadas++;
       this.rebuildTropasMap();
       this.playSfx('assets/KuboTeg/sonidos/colocar-ficha.mp3');
+      this.activarHighlightColocacion(territorioId);
+      this.channelEventos?.send({ type: 'broadcast', event: 'colocacion_tropa', payload: { territorioId, jugadorId: this.userId, accion: 'colocar', tropasTotales: this._tropasMap[territorioId] ?? 0 } });
 
       if (cont.colocadas >= cont.bonus) {
         this.continenteColocacionIdx++;
@@ -1251,6 +1316,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       };
       this.rebuildTropasMap();
       this.playSfx('assets/KuboTeg/sonidos/colocar-ficha.mp3');
+      this.activarHighlightColocacion(territorioId);
+      this.channelEventos?.send({ type: 'broadcast', event: 'colocacion_tropa', payload: { territorioId, jugadorId: this.userId, accion: 'colocar', tropasTotales: this._tropasMap[territorioId] ?? 0 } });
       this.cdr.markForCheck();
     }
   }
@@ -1265,6 +1332,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       cont.colocadas--;
       this.rebuildTropasMap();
       this.playSfx('assets/KuboTeg/sonidos/quitar-ficha.mp3');
+      this.activarHighlightQuitar(territorioId);
+      this.channelEventos?.send({ type: 'broadcast', event: 'colocacion_tropa', payload: { territorioId, jugadorId: this.userId, accion: 'quitar', tropasTotales: this._tropasMap[territorioId] ?? 0 } });
       this.cdr.markForCheck();
     } else {
       const added = this.tropasColocadasBase[territorioId] ?? 0;
@@ -1272,6 +1341,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       this.tropasColocadasBase = { ...this.tropasColocadasBase, [territorioId]: added - 1 };
       this.rebuildTropasMap();
       this.playSfx('assets/KuboTeg/sonidos/quitar-ficha.mp3');
+      this.activarHighlightQuitar(territorioId);
+      this.channelEventos?.send({ type: 'broadcast', event: 'colocacion_tropa', payload: { territorioId, jugadorId: this.userId, accion: 'quitar', tropasTotales: this._tropasMap[territorioId] ?? 0 } });
       this.cdr.markForCheck();
     }
   }
@@ -1383,6 +1454,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         liderAtacanteImg: this.getLiderImgByNombre(liderAtacante),
         liderDefensorImg: this.getLiderImgByNombre(liderDefensor),
         ts:               Date.now(),
+        origenId,
+        destinoId,
       };
       this._lastCombateTs = popupData.ts;
       this.mostrarPopupCombate(popupData);
@@ -1507,24 +1580,43 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     }
 
     const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
-    const conquistados = KuboTegJuegoComponent.CONTINENT_BONUSES.filter(cb =>
-      CONT[cb.id].every(tid => this.territorios[tid]?.usuario_id === this.userId)
-    );
+    const entries: typeof this.continentesColocacion = [];
 
-    if (conquistados.length === 0) {
+    for (const cb of KuboTegJuegoComponent.CONTINENT_BONUSES) {
+      const terrs    = CONT[cb.id];
+      const ownedIds = terrs.filter(tid => this.territorios[tid]?.usuario_id === this.userId);
+      const threshold = Math.floor(terrs.length / 2) + 1;
+
+      if (ownedIds.length === terrs.length) {
+        entries.push({
+          id: cb.id,
+          nombre: this.getNombreContinente(cb.id),
+          bonus: cb.bonus,
+          colocadas: 0,
+          territoriosPermitidos: [...terrs],
+          tipo: 'totalidad',
+        });
+      } else if (ownedIds.length >= threshold) {
+        const maj = KuboTegJuegoComponent.CONTINENT_MAJORITY.find(m => m.id === cb.id)!;
+        entries.push({
+          id: cb.id,
+          nombre: this.getNombreContinente(cb.id),
+          bonus: maj.bonus,
+          colocadas: 0,
+          territoriosPermitidos: ownedIds,
+          tipo: 'mayoria',
+        });
+      }
+    }
+
+    if (entries.length === 0) {
       this.subFaseColocacion = 'base';
       this.continentesColocacion = [];
       this.cdr.markForCheck();
       return;
     }
 
-    this.continentesColocacion = conquistados.map(cb => ({
-      id:                   cb.id,
-      nombre:               this.getNombreContinente(cb.id),
-      bonus:                cb.bonus,
-      colocadas:            0,
-      territoriosPermitidos: [...CONT[cb.id]],
-    }));
+    this.continentesColocacion = entries;
     this.subFaseColocacion = 'continentes';
     this.cdr.markForCheck();
   }
@@ -1611,6 +1703,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.territorioOrigenId    = null;
     this.reagrupacionDestinoId = null;
     this.reagrupacionTropasAMover = 1;
+    this.playSfx('assets/KuboTeg/sonidos/movimiento.mp3');
+    this.activarHighlightMovilizacion(destinoId);
+    this.channelEventos?.send({ type: 'broadcast', event: 'movilizacion_tropa', payload: { origenId, destinoId, jugadorId: this.userId } });
     this.cdr.markForCheck();
   }
 
@@ -1982,8 +2077,13 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
     for (const cb of KuboTegJuegoComponent.CONTINENT_BONUSES) {
       const terrs = CONT[cb.id];
-      if (terrs.every(tid => this.territorios[tid]?.usuario_id === userId)) {
+      const owned = terrs.filter(tid => this.territorios[tid]?.usuario_id === userId).length;
+      const threshold = Math.floor(terrs.length / 2) + 1;
+      if (owned === terrs.length) {
         bonus += cb.bonus;
+      } else if (owned >= threshold) {
+        const maj = KuboTegJuegoComponent.CONTINENT_MAJORITY.find(m => m.id === cb.id)!;
+        bonus += maj.bonus;
       }
     }
     return bonus;
@@ -2767,7 +2867,10 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     Object.values(this.territorios).forEach(t => {
       const cont = this.tropasColocadasContinentes[t.territorio_id] ?? 0;
       const base = this.tropasColocadasBase[t.territorio_id] ?? 0;
-      map[t.territorio_id] = t.tropas + cont + base;
+      const localPending = cont + base;
+      map[t.territorio_id] = localPending > 0
+        ? t.tropas + localPending
+        : (this._tropasPreviewMap[t.territorio_id] ?? t.tropas);
     });
     this._tropasMap = map;
   }
@@ -3178,18 +3281,25 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
     const continentes = KuboTegJuegoComponent.CONTINENT_BONUSES.map(cb => {
       const terrsTotal = CONT[cb.id];
-      const misTerr = terrsTotal.filter(tid => this.territorios[tid]?.usuario_id === this.userId).length;
-      return {
-        nombre:     this.getNombreContinente(cb.id),
-        bonus:      cb.bonus,
-        controlado: misTerr === terrsTotal.length,
-        misTerr,
-        totalTerr:  terrsTotal.length,
-      };
+      const misTerr    = terrsTotal.filter(tid => this.territorios[tid]?.usuario_id === this.userId).length;
+      const threshold  = Math.floor(terrsTotal.length / 2) + 1;
+      const maj        = KuboTegJuegoComponent.CONTINENT_MAJORITY.find(m => m.id === cb.id)!;
+
+      let tipo: 'totalidad' | 'mayoria' | null = null;
+      let bonus = 0;
+      if (misTerr === terrsTotal.length) {
+        tipo  = 'totalidad';
+        bonus = cb.bonus;
+      } else if (misTerr >= threshold) {
+        tipo  = 'mayoria';
+        bonus = maj.bonus;
+      }
+
+      return { nombre: this.getNombreContinente(cb.id), bonus, tipo, misTerr, totalTerr: terrsTotal.length };
     });
 
     const bonusContinentes = continentes
-      .filter(c => c.controlado)
+      .filter(c => c.tipo !== null)
       .reduce((sum, c) => sum + c.bonus, 0);
 
     return { cantTerritorios, tropasBase, continentes, bonusContinentes, total: tropasBase + bonusContinentes };
@@ -3197,6 +3307,13 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   getNombreContinente(id: string): string {
     return KuboTegJuegoComponent.CONTINENT_NAMES[id] ?? id;
+  }
+
+  get tablaBonusContinentes() {
+    return KuboTegJuegoComponent.CONTINENT_BONUSES.map(cb => {
+      const maj = KuboTegJuegoComponent.CONTINENT_MAJORITY.find(m => m.id === cb.id)!;
+      return { nombre: this.getNombreContinente(cb.id), mayoria: maj.bonus, totalidad: cb.bonus };
+    });
   }
 
   private pushNotifContinente(jugador: string, continente: string, color: string) {
@@ -3216,9 +3333,53 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   private mostrarPopupCombate(data: UltimoCombate) {
+    if (this._popupCombateTimer) clearTimeout(this._popupCombateTimer);
     this.popupCombate = data;
+    if (data.origenId && data.destinoId) {
+      this.activarHighlightCombate(data.origenId, data.destinoId);
+    }
     this.reproducirSonidoCombate();
+    this._popupCombateTimer = setTimeout(() => {
+      this.popupCombate = null;
+      this.cdr.markForCheck();
+    }, 5000);
     this.cdr.markForCheck();
+  }
+
+  private activarHighlightCombate(origenId: string, destinoId: string) {
+    if (this._combateHighlightTimer) clearTimeout(this._combateHighlightTimer);
+    this._combateHighlightIds = [origenId, destinoId];
+    this._combateHighlightTimer = setTimeout(() => {
+      this._combateHighlightIds = [];
+      this.cdr.markForCheck();
+    }, 3000);
+  }
+
+  private activarHighlightColocacion(territorioId: string) {
+    if (this._colocacionHighlightTimer) clearTimeout(this._colocacionHighlightTimer);
+    this._colocacionHighlightId = territorioId;
+    this._colocacionHighlightTimer = setTimeout(() => {
+      this._colocacionHighlightId = null;
+      this.cdr.markForCheck();
+    }, 1800);
+  }
+
+  private activarHighlightQuitar(territorioId: string) {
+    if (this._quitarHighlightTimer) clearTimeout(this._quitarHighlightTimer);
+    this._quitarHighlightId = territorioId;
+    this._quitarHighlightTimer = setTimeout(() => {
+      this._quitarHighlightId = null;
+      this.cdr.markForCheck();
+    }, 1800);
+  }
+
+  private activarHighlightMovilizacion(territorioId: string) {
+    if (this._movilizacionHighlightTimer) clearTimeout(this._movilizacionHighlightTimer);
+    this._movilizacionHighlightId = territorioId;
+    this._movilizacionHighlightTimer = setTimeout(() => {
+      this._movilizacionHighlightId = null;
+      this.cdr.markForCheck();
+    }, 1800);
   }
 
   private reproducirSonidoCombate() {
@@ -3240,6 +3401,22 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     for (const j of this.jugadores) {
       if (j.color) pool.push({ tipo: 'destruir', color: j.color });
     }
+
+    // 2 mayorías + 1 totalidad
+    const mayoriaCombos: Array<{ mayoriaIds: [string, string]; continenteId: string }> = [
+      { mayoriaIds: ['north_america', 'south_america'], continenteId: 'europe'        },
+      { mayoriaIds: ['europe',        'africa'        ], continenteId: 'asia'          },
+      { mayoriaIds: ['asia',          'oceania'       ], continenteId: 'north_america' },
+      { mayoriaIds: ['africa',        'south_america' ], continenteId: 'oceania'       },
+      { mayoriaIds: ['north_america', 'asia'          ], continenteId: 'africa'        },
+      { mayoriaIds: ['europe',        'oceania'       ], continenteId: 'south_america' },
+    ];
+    for (const combo of mayoriaCombos) {
+      pool.push({ tipo: 'mayorias_continente', ...combo });
+    }
+
+    // Mayoría en 4 continentes
+    pool.push({ tipo: 'cuatro_mayorias' });
 
     const shuffled = this.randomShuffle([...pool]);
     const assignments: Array<{ userId: string; obj: ObjetivoSecreto }> = [];
@@ -3270,6 +3447,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     }
 
     if (this.miObjetivo.tipo === 'destruir') {
+      if (this.miObjetivo.fallback) {
+        return Object.values(this.territorios).filter(t => esMio(t.territorio_id)).length >= 24;
+      }
       const color = this.miObjetivo.color;
       const targetJ = this.jugadores.find(j => j.color === color);
       if (!targetJ) {
@@ -3282,6 +3462,24 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         if (eliminadoId === targetJ.usuario_id) return true;
         return Object.values(this.territorios).filter(t => esMio(t.territorio_id)).length >= 24;
       }
+    }
+
+    if (this.miObjetivo.tipo === 'mayorias_continente') {
+      const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
+      const tieneMayoria = (cid: string) => {
+        const terrs = CONT[cid];
+        return terrs.filter(tid => esMio(tid)).length >= Math.floor(terrs.length / 2) + 1;
+      };
+      return this.miObjetivo.mayoriaIds.every(cid => tieneMayoria(cid))
+        && CONT[this.miObjetivo.continenteId].every(tid => esMio(tid));
+    }
+
+    if (this.miObjetivo.tipo === 'cuatro_mayorias') {
+      const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
+      const count = Object.entries(CONT).filter(([, terrs]) => {
+        return terrs.filter(tid => esMio(tid)).length >= Math.floor(terrs.length / 2) + 1;
+      }).length;
+      return count >= 4;
     }
 
     return false;
@@ -3523,6 +3721,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       liderAtacanteImg: this.getLiderImgByUserId(BOT_USER_ID),
       liderDefensorImg: this.getLiderImgByNombre(this.jugadorLideres[defensorId] ?? ''),
       ts,
+      origenId,
+      destinoId,
     };
     this._lastCombateTs = ts;
     this.mostrarPopupCombate(popupData);

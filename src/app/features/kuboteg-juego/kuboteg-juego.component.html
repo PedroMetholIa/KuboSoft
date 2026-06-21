@@ -273,9 +273,14 @@
                     <div class="tr-sep"></div>
 
                     @for (c of resumenTropas.continentes; track c.nombre) {
-                      @if (c.controlado) {
-                        <div class="tr-cont-row tr-controlado">
-                          <span class="tr-cont-nombre">{{ c.nombre }}</span>
+                      @if (c.tipo !== null) {
+                        <div class="tr-cont-row" [class.tr-controlado]="c.tipo === 'totalidad'" [class.tr-mayoria]="c.tipo === 'mayoria'">
+                          <span class="tr-cont-nombre">
+                            {{ c.nombre }}
+                            @if (c.tipo === 'mayoria') {
+                              <span class="cont-tipo-badge">(Mayoría)</span>
+                            }
+                          </span>
                           <span class="tr-cont-bonus">+{{ c.bonus }}</span>
                         </div>
                       }
@@ -343,6 +348,22 @@
             @case ('informacion') {
               <div class="info-rules">
 
+                  <div class="bonus-tabla">
+                    <div class="bonus-tabla-title">Bonus por continente</div>
+                    <div class="bonus-tabla-header">
+                      <span class="bonus-col-cont">Continente</span>
+                      <span class="bonus-col-val">Mayoría</span>
+                      <span class="bonus-col-val">Totalidad</span>
+                    </div>
+                    @for (row of tablaBonusContinentes; track row.nombre) {
+                      <div class="bonus-tabla-row">
+                        <span class="bonus-col-cont">{{ row.nombre }}</span>
+                        <span class="bonus-col-val bonus-mayoria">+{{ row.mayoria }}</span>
+                        <span class="bonus-col-val bonus-totalidad">+{{ row.totalidad }}</span>
+                      </div>
+                    }
+                  </div>
+
                   <section class="info-section">
                     <h3 class="info-section-title">🎯 Objetivo</h3>
                     <p>Cada jugador tiene un <strong>objetivo secreto</strong>. Si lo cumplís, ganás de inmediato. Si nadie lo cumple, gana quien acumule más territorios en las <strong>últimas 3 rondas</strong>. En caso de empate, gana quien tenga más tropas en juego.</p>
@@ -368,7 +389,8 @@
                     <p>Las tropas que recibís por ronda se calculan así:</p>
                     <ul class="info-list">
                       <li>La tercera parte de tus territorios (mínimo 3).</li>
-                      <li><strong>Bonus de continente</strong>: si controlás todos los territorios de un continente, recibís tropas extra según su valor.</li>
+                      <li><strong>Mayoría de continente</strong>: controlás más de la mitad de sus territorios.</li>
+                      <li><strong>Totalidad de continente</strong>: controlás todos los territorios.</li>
                       <li><strong>Canje de cartas</strong>: canjeando sets de 3 cartas obtenés tropas adicionales.</li>
                     </ul>
                   </section>
@@ -790,10 +812,21 @@
           [territorioSeleccionado]="territorioSeleccionado"
           [territoriosDestacados]="territoriosDestacados"
           [territoriosBloqueadosMsgs]="territoriosBloqueadosMsgs"
+          [territoriosCombate]="territoriosCombate"
+          [territorioColocandose]="territorioColocandose"
+          [territorioQuitandose]="territorioQuitandose"
+          [territorioMovilizandose]="territorioMovilizandose"
           (territorioClick)="onMapTerritoryClick($event)"
           (territorioRightClick)="onMapTerritoryRightClick($event)"
           (deseleccionar)="onMapDeseleccionar()"
         />
+        <div class="combate-overlay">
+          <app-combate-panel
+            [combate]="popupCombate"
+            [mostrarContinuar]="puedeReataque"
+            (continuarAtacando)="onContinuarAtacando()">
+          </app-combate-panel>
+        </div>
       </main>
 
       <!-- Panel derecho -->
@@ -812,11 +845,17 @@
                 <p class="phase-sub">
                   Continente <strong>{{ continenteColocacionIdx + 1 }}</strong> de <strong>{{ continentesColocacion.length }}</strong>
                 </p>
-                <p class="phase-sub"><strong>{{ cont.nombre }}</strong> — +{{ cont.bonus }}</p>
+                <p class="phase-sub">
+                  <strong>{{ cont.nombre }}</strong>
+                  @if (cont.tipo === 'mayoria') {
+                    <span class="cont-tipo-badge">(Mayoría)</span>
+                  }
+                  — +{{ cont.bonus }}
+                </p>
                 <p class="phase-sub">
                   Tropas a colocar: <strong>{{ cont.bonus - cont.colocadas }}</strong>
                 </p>
-                <p class="phase-hint">Solo podés colocar en territorios de este continente</p>
+                <p class="phase-hint">{{ cont.tipo === 'totalidad' ? 'Podés colocar en cualquier territorio de este continente' : 'Solo podés colocar en tus territorios de este continente' }}</p>
               }
 
               <!-- Sub-fase: tropas base -->
@@ -1014,18 +1053,12 @@
     </div>
   }
 
+
   <!-- Footer del juego — Campo de batalla -->
   @if (!loading && partida) {
     <footer class="game-footer">
       <div class="footer-left">
         <span class="footer-players">{{ jugadoresEnOrden.length }} jugadores</span>
-      </div>
-      <div class="footer-center">
-        <app-combate-panel
-          [combate]="popupCombate"
-          [mostrarContinuar]="puedeReataque"
-          (continuarAtacando)="onContinuarAtacando()">
-        </app-combate-panel>
       </div>
       <div class="footer-right">
         <span class="footer-brand">KuboSoft</span>

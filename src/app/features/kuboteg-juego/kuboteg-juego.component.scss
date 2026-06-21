@@ -156,8 +156,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 1.25rem;
-  min-height: 52px;
+  padding: 0.2rem 1rem;
+  min-height: 28px;
   flex-shrink: 0;
   border-top: 1px solid rgba(255,255,255,.07);
   background: #111213;
@@ -804,6 +804,52 @@
   font-variant-numeric: tabular-nums;
 }
 
+// Tabla de bonus por continente
+.bonus-tabla {
+  margin: 0.75rem 0 0.5rem;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.75rem;
+}
+
+.bonus-tabla-title {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.bonus-tabla-header {
+  display: flex;
+  padding: 0.3rem 0.75rem;
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bonus-tabla-row {
+  display: flex;
+  padding: 0.28rem 0.75rem;
+  color: #94a3b8;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+
+  &:last-child { border-bottom: none; }
+}
+
+.bonus-col-cont  { flex: 1; min-width: 0; }
+.bonus-col-val   { width: 4.5rem; flex-shrink: 0; text-align: center; font-weight: 600; }
+.bonus-mayoria   { color: #34d399; }
+.bonus-totalidad { color: #fbbf24; }
+
 // Botón ver historial dentro del panel objetivo
 .obj-historial-btn {
   width: 100%;
@@ -1294,7 +1340,11 @@
 
   &.tr-controlado {
     color: #cbd5e1;
+    .tr-cont-bonus { color: #34d399; }
+  }
 
+  &.tr-mayoria {
+    color: #94a3b8;
     .tr-cont-bonus { color: #34d399; }
   }
 }
@@ -1531,6 +1581,21 @@
     color: #94a3b8;
     line-height: 1.3;
   }
+}
+
+// ── Combate overlay (centrado al fondo del mapa) ───────
+.combate-overlay {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 12px;
+  backdrop-filter: blur(4px);
+
+  app-combate-panel { pointer-events: auto; display: block; }
 }
 
 // ── Game area ──────────────────────────────────────────
@@ -2911,6 +2976,16 @@
   color: #94a3b8;
   margin: 0;
   strong { color: #f1f5f9; }
+}
+
+.cont-tipo-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: 4px;
+  color: #34d399;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
 }
 
 .btn-phase-action {

@@ -22,6 +22,40 @@
 
     <g id="map-content">
 
+      <!-- Puentes transoceánicos (debajo de territorios) -->
+      <g id="bridges" pointer-events="none" stroke="rgba(255,255,255,0.35)" stroke-dasharray="5,4" stroke-width="1.5" stroke-linecap="round">
+        <!-- América del Norte -->
+        <line x1="232" y1="154" x2="0"    y2="154"/><!-- Alaska → borde izq    -->
+        <line x1="351" y1="411" x2="0"    y2="411"/><!-- Perú  → borde izq     -->
+        <line x1="302" y1="157" x2="435" y2="130"/><!-- N.W.Territory–Groenlandia-->
+        <line x1="388" y1="204" x2="435" y2="130"/><!-- Quebec – Groenlandia   -->
+        <line x1="493" y1="178" x2="435" y2="130"/><!-- Islandia – Groenlandia -->
+        <!-- Europa -->
+        <line x1="502" y1="294" x2="485" y2="233"/><!-- España – Inglaterra     -->
+        <line x1="555" y1="175" x2="485" y2="233"/><!-- Suecia – Inglaterra    -->
+        <line x1="493" y1="178" x2="485" y2="233"/><!-- Islandia – Inglaterra  -->
+        <line x1="493" y1="178" x2="555" y2="175"/><!-- Islandia – Suecia      -->
+        <line x1="580" y1="360" x2="557" y2="290"/><!-- Egipto – Italia        -->
+        <!-- Cuba -->
+        <line x1="370" y1="310" x2="304" y2="310"/><!-- Cuba – México          -->
+        <line x1="370" y1="310" x2="355" y2="264"/><!-- Cuba – Nueva York      -->
+        <line x1="370" y1="310" x2="356" y2="351"/><!-- Cuba – Venezuela       -->
+        <!-- África -->
+        <line x1="408" y1="405" x2="526" y2="388"/><!-- Brasil – Argelia       -->
+        <line x1="582" y1="510" x2="646" y2="510"/><!-- Sudáfrica – Madagascar -->
+        <line x1="618" y1="420" x2="646" y2="510"/><!-- Etiopía – Madagascar   -->
+        <!-- Asia / Pacífico -->
+        <line x1="721" y1="344" x2="794" y2="434"/><!-- India – Indonesia      -->
+        <line x1="778" y1="359" x2="854" y2="415"/><!-- Vietnam – Nueva Guinea -->
+        <line x1="785" y1="247" x2="854" y2="255"/><!-- Mongolia – Japón       -->
+        <line x1="836" y1="151" x2="854" y2="255"/><!-- Kamchatka – Japón      -->
+        <line x1="836" y1="151" x2="1100" y2="151"/><!-- Kamchatka → borde der -->
+        <!-- Oceanía -->
+        <line x1="794" y1="434" x2="818" y2="510"/><!-- Indonesia – Perth      -->
+        <line x1="854" y1="415" x2="874" y2="490"/><!-- Nueva Guinea – Sydney  -->
+        <line x1="874" y1="490" x2="1100" y2="490"/><!-- Sydney → borde der    -->
+      </g>
+
       <!-- Halo costero -->
       <g id="coastal-glow-layer" pointer-events="none" filter="url(#coastal-glow)" opacity="0.5">
         @for (t of territories; track t.id) {
@@ -42,6 +76,10 @@
             class="terr"
             [class.selected]="isSelected(t)"
             [class.highlighted]="isHighlighted(t)"
+            [class.en-combate]="isCombate(t)"
+            [class.en-colocacion]="isColocandose(t)"
+            [class.en-quitar]="isQuitandose(t)"
+            [class.en-movilizacion]="isMovilizandose(t)"
             (click)="onTerritoryClick(t); $event.stopPropagation()"
             (contextmenu)="onTerritoryRightClick(t, $event); $event.stopPropagation()"
             (mouseenter)="onTerritoryHover(t, $event)"

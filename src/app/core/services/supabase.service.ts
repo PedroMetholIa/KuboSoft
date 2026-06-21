@@ -36,6 +36,8 @@ export interface UltimoCombate {
   liderAtacanteImg: string;
   liderDefensorImg: string;
   ts: number;
+  origenId?: string;
+  destinoId?: string;
 }
 
 export interface UltimaConquista {
