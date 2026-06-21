@@ -4,6 +4,7 @@ const PANEL_LABELS: Record<string, string> = {
   jugadores:      'Jugadores',
   inicio:         'Inicio',
   notificaciones: 'Notificaciones',
+  noticias:       'Noticias',
   informacion:    'Información',
   tratado:        'Tratado',
   chat:           'Chat',

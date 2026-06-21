@@ -205,6 +205,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   private _quitarHighlightTimer: ReturnType<typeof setTimeout> | null = null;
   private _movilizacionHighlightId: string | null = null;
   private _movilizacionHighlightTimer: ReturnType<typeof setTimeout> | null = null;
+  private _cartaAciertaId: string | null = null;
+  private _cartaAciertaTimer: ReturnType<typeof setTimeout> | null = null;
   private _tropasPreviewMap: Record<string, number> = {};
   notifConquista: UltimaConquista | null = null;
   private notifConquistaTimer: ReturnType<typeof setTimeout> | null = null;
@@ -227,6 +229,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   panelActivo = 'jugadores';
   mostrarModalDedicatoria = false;
   dedicatoriaTexto = '';
+  dedicatoriaGuardada = false;
   guardandoDedicatoria = false;
   mostrarHistorial = false;
   historialDedicatorias: any[] = [];
@@ -321,6 +324,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   // ── Notificaciones de eventos ─────────────────────────
   notifItems: NotifItem[] = [];
+  notifNoVistas = 0;
 
   @ViewChild(MapComponent) private mapRef!: MapComponent;
 
@@ -376,6 +380,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     if (this._colocacionHighlightTimer)   clearTimeout(this._colocacionHighlightTimer);
     if (this._quitarHighlightTimer)        clearTimeout(this._quitarHighlightTimer);
     if (this._movilizacionHighlightTimer)  clearTimeout(this._movilizacionHighlightTimer);
+    if (this._cartaAciertaTimer)           clearTimeout(this._cartaAciertaTimer);
     if (this.cartaPopupTimer)            clearTimeout(this.cartaPopupTimer);
     if (this.gameNotifTimer)             clearTimeout(this.gameNotifTimer);
   }
@@ -422,6 +427,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   setPanelActivo(panel: string) {
     this.panelActivo = panel;
+    if (panel === 'noticias') this.notifNoVistas = 0;
     this.cdr.markForCheck();
   }
 
@@ -810,6 +816,14 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
           this.playSfx('assets/KuboTeg/sonidos/perdedor.mp3');
         } else {
           this.playSfx('assets/KuboTeg/sonidos/muerte-jugador.mp3');
+          // Si mi objetivo era destruir a este jugador y fue eliminado por otro → fallback a 24 territorios
+          const obj = this.miObjetivo;
+          if (obj?.tipo === 'destruir' && !obj.fallback) {
+            const targetJ = this.jugadores.find(j => j.color === obj.color);
+            if (targetJ?.usuario_id === e.jugadorId) {
+              this.miObjetivo = { tipo: 'destruir', color: obj.color, fallback: true };
+            }
+          }
         }
         this.cdr.markForCheck();
       })
@@ -987,6 +1001,13 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         if (e.jugadorId === this.userId) return;
         this.playSfx('assets/KuboTeg/sonidos/movimiento.mp3');
         this.activarHighlightMovilizacion(e.destinoId);
+        this.cdr.markForCheck();
+      })
+      .on('broadcast', { event: 'carta_acierta' }, ({ payload }) => {
+        const e = payload as { cartaId: string; jugadorId: string };
+        if (e.jugadorId === this.userId) return;
+        this.playSfx('assets/KuboTeg/sonidos/acierta-carta.mp3');
+        this.activarHighlightCartaAcierta(e.cartaId);
         this.cdr.markForCheck();
       })
       .subscribe();
@@ -1752,6 +1773,13 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.playSfx(esMio
       ? 'assets/KuboTeg/sonidos/acierta-carta.mp3'
       : 'assets/KuboTeg/sonidos/noacierta-carta.mp3');
+    if (esMio) {
+      this.activarHighlightCartaAcierta(cartaId);
+      this.channelEventos?.send({
+        type: 'broadcast', event: 'carta_acierta',
+        payload: { cartaId, jugadorId: this.userId },
+      });
+    }
     this.mostrarNotifCarta(cartaId, bonusCarta, tropasBonus);
 
     await this.service.setCartas(this.partidaId, this.userId, nuevasCartas);
@@ -2425,13 +2453,13 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     if (!this.modalPacto || this.propuestaSaliente) return;
     const { tipo, receptorId, territorioId1 } = this.modalPacto;
     if (tipo !== 'renovacion') {
-      if (this.countPactosJugador(this.userId) >= 2) {
-        this.showGameNotif('Ya tenés 2 tratados activos, en revisión o en ruptura. No podés proponer otro.', 'error');
+      if (this.countPactosJugador(this.userId) >= 4) {
+        this.showGameNotif('Ya tenés 4 tratados activos, en revisión o en ruptura. No podés proponer otro.', 'error');
         return;
       }
       const nombreReceptor = this.nombreJugadorById(receptorId);
-      if (this.countPactosJugador(receptorId) >= 2) {
-        this.showGameNotif(`${nombreReceptor} ya tiene 2 tratados activos, en revisión o en ruptura. No puede recibir otro.`, 'error');
+      if (this.countPactosJugador(receptorId) >= 4) {
+        this.showGameNotif(`${nombreReceptor} ya tiene 4 tratados activos, en revisión o en ruptura. No puede recibir otro.`, 'error');
         return;
       }
       if (this.hayHostilidadEntre(this.userId, receptorId)) {
@@ -2987,7 +3015,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   abrirDedicatoria() {
-    this.dedicatoriaTexto = '';
+    // Si ya había texto guardado lo deja para que pueda modificarse
+    if (!this.dedicatoriaGuardada) this.dedicatoriaTexto = '';
     this.mostrarModalDedicatoria = true;
   }
 
@@ -3014,7 +3043,11 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     });
     this.guardandoDedicatoria = false;
     if (error) { this.showGameNotif('Error al guardar la dedicatoria', 'error'); return; }
-    this.volver();
+    this.dedicatoriaGuardada = true;
+    this.mostrarModalDedicatoria = false;
+    this.cdr.markForCheck();
+    // Publicar la dedicatoria como mensaje en el chat global
+    await this.onChatSendFin(`✍ ${texto}`);
   }
 
   volver() { this.router.navigate(['/kuboteg']); }
@@ -3028,6 +3061,57 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   // ── Chat ──────────────────────────────────────────────
   get miNombre(): string {
     return this.jugadorNombres[this.userId] || 'Yo';
+  }
+
+  get chatMensajesGlobales(): ChatMensaje[] {
+    return this.chatMensajes.filter(m => !m.grupoId);
+  }
+
+  get objetivosRevelados() {
+    return this.jugadores
+      .filter(j => j.objetivo && j.usuario_id !== BOT_USER_ID)
+      .map(j => ({
+        nombre:      this.nombreJugador(j),
+        color:       this.jugadorColores[j.usuario_id] ?? '#94a3b8',
+        descripcion: this.describirObjetivo(j.objetivo as ObjetivoSecreto),
+        esGanador:   j.usuario_id === this.partida?.ganador_id,
+        esMio:       j.usuario_id === this.userId,
+      }));
+  }
+
+  private describirObjetivo(obj: ObjetivoSecreto): string {
+    if (obj.tipo === 'continentes') {
+      return `Totalidad de ${obj.ids.map(id => this.getNombreContinente(id)).join(' y ')}`;
+    }
+    if (obj.tipo === 'destruir') {
+      const targetJ = this.jugadores.find(j => j.color === obj.color);
+      const targetName = targetJ ? this.nombreJugador(targetJ) : obj.color;
+      if (obj.fallback) {
+        return `Conquistar 24 territorios (orig.: destruir a ${targetName})`;
+      }
+      return `Destruir a ${targetName}`;
+    }
+    if (obj.tipo === 'mayorias_continente') {
+      const mays = obj.mayoriaIds.map(id => this.getNombreContinente(id)).join(' y ');
+      return `Mayoría en ${mays} + Totalidad de ${this.getNombreContinente(obj.continenteId)}`;
+    }
+    if (obj.tipo === 'cuatro_mayorias') {
+      return 'Mayoría en 4 continentes';
+    }
+    return '—';
+  }
+
+  async onChatSendFin(texto: string) {
+    if (!this.channelChat) return;
+    const msg: ChatMensaje = {
+      userId: this.userId,
+      nombre: this.miNombre,
+      texto,
+      color: this.jugadorColores[this.userId] ?? '#ffffff',
+      ts: Date.now(),
+    };
+    this.chatMensajes = [...this.chatMensajes, msg];
+    await this.channelChat.send({ type: 'broadcast', event: 'chat', payload: msg });
   }
 
   async onChatSend(texto: string) {
@@ -3103,7 +3187,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   // ── Grupos ──────────────────────────────────────────────
   abrirModalGrupos() {
-    this.modalGrupos = { nombre: '', bandera: this.BANDERAS[0], jugadoresIds: [] };
+    this.modalGrupos = { nombre: '', bandera: '', jugadoresIds: [] };
     this.cdr.markForCheck();
   }
 
@@ -3123,6 +3207,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   async crearGrupo() {
     if (!this.modalGrupos || !this.modalGrupos.nombre.trim()) return;
+    if (!this.modalGrupos.bandera) return;
     if (this.errorCrearGrupo) return;
     const id = crypto.randomUUID();
     const grupo: GrupoChat = {
@@ -3211,6 +3296,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   private addNotif(item: NotifItem) {
     this.notifItems = [item, ...this.notifItems].slice(0, 3);
+    if (this.panelActivo !== 'noticias') this.notifNoVistas++;
   }
 
   private pushNotifCombate(data: UltimoCombate) {
@@ -3382,6 +3468,18 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     }, 1800);
   }
 
+  get territorioCartaAcierta(): string | null { return this._cartaAciertaId; }
+
+  private activarHighlightCartaAcierta(territorioId: string) {
+    if (this._cartaAciertaTimer) clearTimeout(this._cartaAciertaTimer);
+    this._cartaAciertaId = territorioId;
+    this.cdr.markForCheck();
+    this._cartaAciertaTimer = setTimeout(() => {
+      this._cartaAciertaId = null;
+      this.cdr.markForCheck();
+    }, 2200);
+  }
+
   private reproducirSonidoCombate() {
     const n = Math.floor(Math.random() * 7) + 1;
     this.playSfx(`assets/KuboTeg/sonidos/combate${n}.mp3`);
@@ -3395,11 +3493,16 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
     for (let i = 0; i < CONTS.length; i++) {
       for (let j = i + 1; j < CONTS.length; j++) {
+        const par = [CONTS[i], CONTS[j]];
+        if (par.includes('south_america') && par.includes('oceania')) continue;
         pool.push({ tipo: 'continentes', ids: [CONTS[i], CONTS[j]] as [string, string] });
       }
     }
     for (const j of this.jugadores) {
-      if (j.color) pool.push({ tipo: 'destruir', color: j.color });
+      if (j.color) {
+        pool.push({ tipo: 'destruir', color: j.color });
+        pool.push({ tipo: 'destruir', color: j.color }); // doble peso
+      }
     }
 
     // 2 mayorías + 1 totalidad
@@ -3498,6 +3601,50 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   get objetivoColor(): string | null {
     return this.miObjetivo?.tipo === 'destruir' ? this.miObjetivo.color : null;
+  }
+
+  get objetivoFallbackActivo(): boolean {
+    return this.miObjetivo?.tipo === 'destruir' && !!this.miObjetivo.fallback;
+  }
+
+  get objetivoMayoriasContinente() {
+    return this.miObjetivo?.tipo === 'mayorias_continente' ? this.miObjetivo : null;
+  }
+
+  get objetivoCuatroMayorias(): boolean {
+    return this.miObjetivo?.tipo === 'cuatro_mayorias';
+  }
+
+  get cuatroMayoriasActuales(): number {
+    const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
+    return Object.entries(CONT).filter(([, terrs]) => {
+      const owned = terrs.filter(tid => this.territorios[tid]?.usuario_id === this.userId).length;
+      return owned >= Math.floor(terrs.length / 2) + 1;
+    }).length;
+  }
+
+  private mayoriaEnContinente(cid: string): boolean {
+    const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
+    const terrs = CONT[cid];
+    return terrs.filter(tid => this.territorios[tid]?.usuario_id === this.userId).length
+      >= Math.floor(terrs.length / 2) + 1;
+  }
+
+  get mayoriasContinenteA(): boolean {
+    const obj = this.objetivoMayoriasContinente;
+    return obj ? this.mayoriaEnContinente(obj.mayoriaIds[0]) : false;
+  }
+
+  get mayoriasContinenteB(): boolean {
+    const obj = this.objetivoMayoriasContinente;
+    return obj ? this.mayoriaEnContinente(obj.mayoriaIds[1]) : false;
+  }
+
+  get mayoriasContinenteTotalidad(): boolean {
+    const obj = this.objetivoMayoriasContinente;
+    if (!obj) return false;
+    const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
+    return CONT[obj.continenteId].every(tid => this.territorios[tid]?.usuario_id === this.userId);
   }
 
   get objetivoTargetJugador(): PartidaJugador | null {

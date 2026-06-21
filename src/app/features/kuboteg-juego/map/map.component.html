@@ -1,6 +1,6 @@
 <div class="map-wrapper" (click)="deseleccionar.emit()">
 
-  <svg class="teg-map" viewBox="0 50 1100 550" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+  <svg class="teg-map" viewBox="0 50 1100 550" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
 
     <defs>
       <radialGradient id="badge-grad" cx="38%" cy="32%" r="70%" gradientUnits="objectBoundingBox">
@@ -17,8 +17,6 @@
         <feGaussianBlur in="colored" stdDeviation="10"/>
       </filter>
     </defs>
-
-    <image href="assets/KuboTeg/FondoOceano.webp" x="0" y="50" width="1100" height="550" preserveAspectRatio="xMidYMid slice"/>
 
     <g id="map-content">
 
@@ -80,6 +78,7 @@
             [class.en-colocacion]="isColocandose(t)"
             [class.en-quitar]="isQuitandose(t)"
             [class.en-movilizacion]="isMovilizandose(t)"
+            [class.en-carta-acierta]="isCartaAcierta(t)"
             (click)="onTerritoryClick(t); $event.stopPropagation()"
             (contextmenu)="onTerritoryRightClick(t, $event); $event.stopPropagation()"
             (mouseenter)="onTerritoryHover(t, $event)"

@@ -332,8 +332,8 @@
                         <span class="grupos-inicio-nombre">{{ g.nombre }}</span>
                         <div class="grupos-inicio-miembros">
                           @for (uid of g.jugadoresIds; track uid) {
-                            <span class="grupos-inicio-dot" [style.background]="jugadorColores[uid] ?? '#94a3b8'"
-                                  [title]="jugadorNombres[uid] ?? uid"></span>
+                            <span class="grupos-inicio-dot" [style.background]="jugadorColores[uid] || '#94a3b8'"
+                                  [title]="jugadorNombres[uid] || uid"></span>
                           }
                           <span class="grupos-inicio-cant">{{ g.jugadoresIds.length }} miembros</span>
                         </div>
@@ -504,6 +504,8 @@
                     <span class="obj-card-title">Objetivo Secreto</span>
                   </div>
                   <div class="obj-card-body">
+
+                    <!-- Tipo: totalidad de 2 continentes -->
                     @if (objetivoContinentes; as ids) {
                       <div class="obj-item" [class.obj-done]="objetivoContinenteA">
                         <span class="obj-mark">{{ objetivoContinenteA ? '✓' : '○' }}</span>
@@ -514,12 +516,49 @@
                         <span>{{ getNombreContinente(ids[1]) }}</span>
                       </div>
                     }
+
+                    <!-- Tipo: 2 mayorías + 1 totalidad -->
+                    @if (objetivoMayoriasContinente; as obj) {
+                      <p class="obj-sub-label">Mayoría en:</p>
+                      <div class="obj-item" [class.obj-done]="mayoriasContinenteA">
+                        <span class="obj-mark">{{ mayoriasContinenteA ? '✓' : '◑' }}</span>
+                        <span>{{ getNombreContinente(obj.mayoriaIds[0]) }}</span>
+                      </div>
+                      <div class="obj-item" [class.obj-done]="mayoriasContinenteB">
+                        <span class="obj-mark">{{ mayoriasContinenteB ? '✓' : '◑' }}</span>
+                        <span>{{ getNombreContinente(obj.mayoriaIds[1]) }}</span>
+                      </div>
+                      <p class="obj-sub-label">Totalidad en:</p>
+                      <div class="obj-item" [class.obj-done]="mayoriasContinenteTotalidad">
+                        <span class="obj-mark">{{ mayoriasContinenteTotalidad ? '✓' : '○' }}</span>
+                        <span>{{ getNombreContinente(obj.continenteId) }}</span>
+                      </div>
+                    }
+
+                    <!-- Tipo: mayoría en 4 continentes -->
+                    @if (objetivoCuatroMayorias) {
+                      <div class="obj-item" [class.obj-done]="cuatroMayoriasActuales >= 4">
+                        <span class="obj-mark">{{ cuatroMayoriasActuales >= 4 ? '✓' : '◑' }}</span>
+                        <span>Mayoría en 4 continentes</span>
+                        <span class="obj-prog">{{ cuatroMayoriasActuales }}/4</span>
+                      </div>
+                    }
+
+                    <!-- Tipo: destruir -->
                     @if (objetivoColor) {
-                      @if (objetivoDestruyeActivo) {
+                      @if (objetivoFallbackActivo) {
+                        <div class="obj-item obj-alt">
+                          <span class="obj-mark">○</span>
+                          <span>Conquistar 24 territorios</span>
+                          <span class="obj-prog">{{ objetivoTerritoriosActuales }}/24</span>
+                        </div>
+                        <p class="obj-fallback-note">Tu objetivo original cambió: el jugador fue eliminado por otro.</p>
+                      } @else if (objetivoDestruyeActivo) {
                         <div class="obj-item">
                           <span class="obj-color-dot" [style.background]="objetivoColor!"></span>
                           <span>Destruir a {{ objetivoTargetNombre }}</span>
                         </div>
+                        <p class="obj-fallback-note">⚠ Si este jugador es eliminado por otro, tu objetivo cambia automáticamente a conquistar 24 territorios.</p>
                       } @else {
                         <div class="obj-item obj-alt">
                           <span class="obj-mark">○</span>
@@ -528,6 +567,7 @@
                         </div>
                       }
                     }
+
                   </div>
                 </div>
               } @else {
@@ -656,6 +696,10 @@
               </div>
             }
 
+            @case ('noticias') {
+              <app-notificaciones [items]="notifItems"></app-notificaciones>
+            }
+
           }
         </app-menu-jugador>
         }
@@ -750,6 +794,19 @@
           </button>
 
           <button class="tb-btn"
+            [class.tb-active]="panelActivo === 'noticias'"
+            (click)="setPanelActivo('noticias')"
+            data-tooltip="Noticias">
+            @if (notifNoVistas > 0) {
+              <span class="tb-badge-alerta">{{ notifNoVistas }}</span>
+            }
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/>
+              <path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/>
+            </svg>
+          </button>
+
+          <button class="tb-btn"
             [class.tb-active]="panelActivo === 'informacion'"
             (click)="setPanelActivo('informacion')"
             data-tooltip="Información">
@@ -816,6 +873,7 @@
           [territorioColocandose]="territorioColocandose"
           [territorioQuitandose]="territorioQuitandose"
           [territorioMovilizandose]="territorioMovilizandose"
+          [territorioCartaAcierta]="territorioCartaAcierta"
           (territorioClick)="onMapTerritoryClick($event)"
           (territorioRightClick)="onMapTerritoryRightClick($event)"
           (deseleccionar)="onMapDeseleccionar()"
@@ -899,7 +957,7 @@
               }
               <button class="btn-phase-action btn-end-attack"
                 [disabled]="procesandoTurno || !!conquistaPendiente" (click)="terminarAtaque()">
-                {{ procesandoTurno ? 'Procesando...' : 'Finalizar turno →' }}
+                {{ procesandoTurno ? 'Procesando...' : 'Finalizar y reagrupar →' }}
               </button>
             </div>
           }
@@ -942,29 +1000,6 @@
 
         </div>
 
-        <!-- Tratados -->
-        @if (fase) {
-          <div class="tratados-panel">
-            <div class="tratados-header">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="2" y1="12" x2="22" y2="12"/>
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-              </svg>
-              Política Internacional
-            </div>
-            <div class="politica-acciones">
-              <button class="btn-politica-icono btn-politica-gris" (click)="abrirPropuestaCompleta()"><span class="btn-pi-icon">🕊️</span><span class="btn-pi-label">Pactar</span></button>
-              <button class="btn-politica-icono btn-politica-rojo" (click)="abrirRomperPacto()"><span class="btn-pi-icon">✂️</span><span class="btn-pi-label">Romper</span></button>
-              <button class="btn-politica-icono btn-politica-azul" (click)="abrirModalPostura()"><span class="btn-pi-icon">📢</span><span class="btn-pi-label">Postura</span></button>
-              <button class="btn-politica-icono btn-politica-verde" (click)="abrirModalGrupos()"><span class="btn-pi-icon">👥</span><span class="btn-pi-label">Grupos</span></button>
-            </div>
-          </div>
-        }
-
-        <!-- Notificaciones -->
-        <app-notificaciones [items]="notifItems"></app-notificaciones>
-
         <!-- Chat tabs -->
         <div class="chat-tabs">
           <button class="chat-tab" [class.chat-tab--active]="chatActivoId === 'global'" (click)="chatActivoId = 'global'">
@@ -983,6 +1018,30 @@
           [userId]="userId"
           (sendMessage)="onChatSend($event)">
         </app-kuboteg-chat>
+
+        <!-- Tratados -->
+        @if (fase) {
+          <div class="tratados-panel">
+            <div class="politica-grid">
+              <button class="pol-btn pol-btn--pactar" (click)="abrirPropuestaCompleta()">
+                <span class="pol-btn-icon">🕊️</span>
+                <span class="pol-btn-nombre">Proponer un pacto</span>
+              </button>
+              <button class="pol-btn pol-btn--romper" (click)="abrirRomperPacto()">
+                <span class="pol-btn-icon">✂️</span>
+                <span class="pol-btn-nombre">Romper un pacto</span>
+              </button>
+              <button class="pol-btn pol-btn--postura" (click)="abrirModalPostura()">
+                <span class="pol-btn-icon">📢</span>
+                <span class="pol-btn-nombre">Declarar postura</span>
+              </button>
+              <button class="pol-btn pol-btn--grupos" (click)="abrirModalGrupos()">
+                <span class="pol-btn-icon">👥</span>
+                <span class="pol-btn-nombre">Crear un grupo</span>
+              </button>
+            </div>
+          </div>
+        }
       </aside>
 
       <!-- Popup: mover tropas en reagrupación -->
@@ -1445,7 +1504,7 @@
             <button class="grupos-jugador-btn"
               [class.grupos-jugador-btn--sel]="modalGrupos.jugadoresIds.includes(e.usuario_id)"
               (click)="toggleJugadorGrupo(e.usuario_id)">
-              <span class="grupos-jugador-dot" [style.background]="jugadorColores[e.usuario_id] ?? '#94a3b8'"></span>
+              <span class="grupos-jugador-dot" [style.background]="jugadorColores[e.usuario_id] || '#94a3b8'"></span>
               {{ nombreJugador(e) }}
               @if (modalGrupos.jugadoresIds.includes(e.usuario_id)) {
                 <span class="grupos-jugador-check">✓</span>
@@ -1458,6 +1517,8 @@
       <div class="grupos-campo-hint">
         @if (errorCrearGrupo) {
           <span class="grupos-hint-warn">{{ errorCrearGrupo }}</span>
+        } @else if (!modalGrupos.bandera) {
+          <span class="grupos-hint-warn">Seleccioná una bandera para continuar</span>
         } @else {
           <span class="grupos-hint-ok">{{ modalGrupos.jugadoresIds.length }} jugadores invitados · {{ modalGrupos.jugadoresIds.length + 1 }} en total</span>
         }
@@ -1466,7 +1527,7 @@
       <div class="grupos-modal-actions">
         <button class="btn-grupos-cancelar" (click)="modalGrupos = null">Cancelar</button>
         <button class="btn-grupos-crear" (click)="crearGrupo()"
-          [disabled]="!modalGrupos.nombre.trim() || !!errorCrearGrupo">
+          [disabled]="!modalGrupos.nombre.trim() || !modalGrupos.bandera || !!errorCrearGrupo">
           Crear grupo
         </button>
       </div>
@@ -1747,67 +1808,97 @@
 @if (partida?.estado === 'Finalizada') {
   <div class="fin-overlay">
     <div class="fin-popup">
-      @if (esGanador) {
-        <div class="fin-icon">🏆</div>
-        <h2 class="fin-titulo fin-titulo--ganador">¡Victoria!</h2>
-        <p class="fin-sub">
-          {{ rankingAcumulacion.length ? 'Dominaste el tablero en la fase final' : 'Completaste tu objetivo secreto' }}
-        </p>
-      } @else {
-        <div class="fin-icon">💀</div>
-        <h2 class="fin-titulo fin-titulo--perdedor">Derrota</h2>
-        @if (ganador && !rankingAcumulacion.length) {
+
+      <div class="fin-content">
+        @if (esGanador) {
+          <div class="fin-icon">🏆</div>
+          <h2 class="fin-titulo fin-titulo--ganador">¡Victoria!</h2>
           <p class="fin-sub">
-            Ganó <strong [style.color]="jugadorColores[ganador.usuario_id]">{{ nombreJugador(ganador) }}</strong>
+            {{ rankingAcumulacion.length ? 'Dominaste el tablero en la fase final' : 'Completaste tu objetivo secreto' }}
           </p>
-        }
-      }
-
-      @if (rankingAcumulacion.length) {
-        <div class="fin-ranking">
-          <div class="fin-ranking-titulo">Territorios acumulados (últimas 3 rondas)</div>
-          @for (item of rankingAcumulacion; track item.jugador.usuario_id; let i = $index) {
-            <div class="fin-ranking-row" [class.fin-ranking-row--ganador]="item.jugador.usuario_id === partida!.ganador_id">
-              <span class="fin-ranking-pos">{{ i + 1 }}</span>
-              <span class="fin-ranking-dot" [style.background]="jugadorColores[item.jugador.usuario_id]"></span>
-              <span class="fin-ranking-nombre">{{ nombreJugador(item.jugador) }}</span>
-              <span class="fin-ranking-total">{{ item.total }}</span>
-            </div>
+        } @else {
+          <div class="fin-icon">💀</div>
+          <h2 class="fin-titulo fin-titulo--perdedor">Derrota</h2>
+          @if (ganador && !rankingAcumulacion.length) {
+            <p class="fin-sub">
+              Ganó <strong [style.color]="jugadorColores[ganador.usuario_id]">{{ nombreJugador(ganador) }}</strong>
+            </p>
           }
-        </div>
-      }
+        }
 
-      @if (esGanador) {
-        <button class="fin-btn fin-btn--primary" (click)="abrirDedicatoria()">✍ Ingresar dedicatoria</button>
-      } @else {
+        @if (rankingAcumulacion.length) {
+          <div class="fin-ranking">
+            <div class="fin-ranking-titulo">Territorios acumulados (últimas 3 rondas)</div>
+            @for (item of rankingAcumulacion; track item.jugador.usuario_id; let i = $index) {
+              <div class="fin-ranking-row" [class.fin-ranking-row--ganador]="item.jugador.usuario_id === partida!.ganador_id">
+                <span class="fin-ranking-pos">{{ i + 1 }}</span>
+                <span class="fin-ranking-dot" [style.background]="jugadorColores[item.jugador.usuario_id]"></span>
+                <span class="fin-ranking-nombre">{{ nombreJugador(item.jugador) }}</span>
+                <span class="fin-ranking-total">{{ item.total }}</span>
+              </div>
+            }
+          </div>
+        }
+
+        @if (esGanador) {
+          <button class="fin-btn fin-btn--primary" (click)="abrirDedicatoria()">
+            {{ dedicatoriaGuardada ? '✏ Modificar dedicatoria' : '✍ Ingresar dedicatoria' }}
+          </button>
+        }
         <button class="fin-btn" (click)="volver()">← Volver al inicio</button>
-      }
+
+        @if (objetivosRevelados.length) {
+          <div class="fin-obj-section">
+            <div class="fin-obj-titulo">Objetivos revelados</div>
+            @for (o of objetivosRevelados; track o.nombre) {
+              <div class="fin-obj-row" [class.fin-obj-row--ganador]="o.esGanador" [class.fin-obj-row--mio]="o.esMio">
+                <span class="fin-obj-dot" [style.background]="o.color"></span>
+                <div class="fin-obj-info">
+                  <span class="fin-obj-nombre" [style.color]="o.color">{{ o.nombre }}</span>
+                  <span class="fin-obj-desc">{{ o.descripcion }}</span>
+                </div>
+                <span class="fin-obj-badge" [class.fin-obj-badge--ok]="o.esGanador">
+                  {{ o.esGanador ? '✓' : '✕' }}
+                </span>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="fin-chat">
+        <div class="fin-chat-label">Chat global</div>
+        <app-kuboteg-chat
+          [messages]="chatMensajesGlobales"
+          [userId]="userId"
+          (sendMessage)="onChatSendFin($event)">
+        </app-kuboteg-chat>
+      </div>
+
     </div>
   </div>
 }
 
 <!-- Modal dedicatoria -->
 @if (mostrarModalDedicatoria) {
-  <div class="ded-overlay">
-    <div class="ded-popup">
-      <h2 class="ded-titulo">Tu dedicatoria</h2>
-      <p class="ded-sub">{{ partida?.nombre }} · {{ fechaPartidaFormateada }}</p>
+  <div class="ded-overlay" (click)="mostrarModalDedicatoria = false">
+    <div class="ded-popup" (click)="$event.stopPropagation()">
       <textarea
         class="ded-textarea"
         [(ngModel)]="dedicatoriaTexto"
         placeholder="Escribí tu dedicatoria (máx. 500 caracteres)…"
         maxlength="500"
-        rows="5"
+        rows="6"
+        autofocus
       ></textarea>
-      <p class="ded-contador">{{ dedicatoriaTexto.length }}/500</p>
-      <div class="ded-acciones">
-        <button class="fin-btn" (click)="volver()" [disabled]="guardandoDedicatoria">Saltear</button>
+      <div class="ded-footer">
+        <span class="ded-contador">{{ dedicatoriaTexto.length }}/500</span>
         <button
           class="fin-btn fin-btn--primary"
           (click)="guardarDedicatoria()"
           [disabled]="guardandoDedicatoria || dedicatoriaTexto.trim().length === 0"
         >
-          {{ guardandoDedicatoria ? 'Guardando…' : 'Confirmar y volver' }}
+          {{ guardandoDedicatoria ? 'Guardando…' : 'Confirmar' }}
         </button>
       </div>
     </div>

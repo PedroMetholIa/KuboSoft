@@ -28,6 +28,7 @@ export interface ChatMensaje {
       }
       @for (m of messages; track m.ts) {
         <div class="chat-msg" [class.chat-msg-mine]="m.userId === userId">
+          <span class="chat-msg-from" [style.color]="m.color">{{ m.nombre }}</span>
           <span
             class="chat-msg-texto"
             [style.background-color]="bubbleBg(m.color)"

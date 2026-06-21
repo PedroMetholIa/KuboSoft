@@ -71,6 +71,29 @@
   }
 }
 
+.chat-msg-from {
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0 0.4rem;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: max-height 0.15s ease, opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.chat-msg:hover .chat-msg-from {
+  max-height: 1.2rem;
+  opacity: 1;
+}
+
+.chat-msg.chat-msg-mine .chat-msg-from {
+  text-align: right;
+}
+
 .chat-msg-texto {
   background: rgba(255,255,255,.05);
   border: 1px solid rgba(255,255,255,.07);

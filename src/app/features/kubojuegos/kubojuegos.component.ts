@@ -121,10 +121,11 @@ export class KuboJuegosComponent implements OnInit {
 
   async goToSubscription() {
     if (!this.selectedJuego) return;
-    const ok = await this.doSuscribir(this.selectedJuego);
+    const juego = this.selectedJuego;
+    const ok = await this.doSuscribir(juego);
     if (ok) {
       this.closePopup();
-      const slug = this.selectedJuego.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const slug = juego.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
       this.router.navigate([`/${slug}`]);
     }
   }

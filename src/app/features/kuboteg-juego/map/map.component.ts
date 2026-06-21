@@ -28,6 +28,7 @@ export class MapComponent implements OnInit, AfterViewInit {
   @Input() territorioColocandose:   string | null = null;
   @Input() territorioQuitandose:    string | null = null;
   @Input() territorioMovilizandose: string | null = null;
+  @Input() territorioCartaAcierta:  string | null = null;
 
   @Input() territoriosBloqueadosMsgs: Record<string, string> = {};
 
@@ -131,6 +132,10 @@ export class MapComponent implements OnInit, AfterViewInit {
 
   isMovilizandose(t: Territory): boolean {
     return t.id === this.territorioMovilizandose;
+  }
+
+  isCartaAcierta(t: Territory): boolean {
+    return t.id === this.territorioCartaAcierta;
   }
 
   getTerritoryFill(t: Territory): string {

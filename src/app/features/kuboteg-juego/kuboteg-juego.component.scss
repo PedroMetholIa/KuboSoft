@@ -199,6 +199,7 @@
   background: rgba(255,255,255,.03);
   overflow: hidden;
   flex-shrink: 0;
+  margin-top: 1rem;
 }
 
 .tratados-header {
@@ -216,34 +217,32 @@
   svg { flex-shrink: 0; }
 }
 
-.politica-acciones {
-  display: flex;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-}
-
-.btn-politica-icono {
-  flex: 1;
-  border: none;
-  border-radius: 6px;
-  padding: 0.45rem 0.2rem;
-  cursor: pointer;
+.politica-grid {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.2rem;
-  font-weight: 600;
+  gap: 0.85rem;
+  padding: 0.5rem 1.2rem 0.6rem;
 }
 
-.btn-pi-icon  { font-size: 1.25rem; line-height: 1; }
-.btn-pi-label { font-size: 0.62rem; line-height: 1; }
+.pol-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.32rem 0.45rem;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  background: transparent;
+  transition: background 0.14s;
+  text-align: left;
 
-.btn-politica-gris  { background: #e8eaed; color: #374151; }
-.btn-politica-rojo  { background: #f3d0d0; &:hover { background: #fca5a5; } &:active { background: #e5a0a0; } }
-.btn-politica-azul  { background: #dbeafe; &:hover { background: #bfdbfe; } &:active { background: #93c5fd; } }
-.btn-politica-verde { background: #d1fae5; &:hover { background: #a7f3d0; } &:active { background: #6ee7b7; } }
+  &:hover  { background: rgba(255,255,255,0.06); }
+  &:active { background: rgba(255,255,255,0.10); }
+}
+
+.pol-btn-icon   { font-size: 1.3rem; line-height: 1; flex-shrink: 0; }
+.pol-btn-nombre { font-size: 0.81rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; }
+
 
 // ── Acciones (aside derecho) ───────────────────────────
 .acciones-panel {
@@ -802,6 +801,27 @@
   font-size: 0.7rem;
   color: #78350f;
   font-variant-numeric: tabular-nums;
+}
+
+.obj-sub-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #475569;
+  margin: 0.5rem 0 0.15rem;
+  padding: 0 0.1rem;
+}
+
+.obj-fallback-note {
+  font-size: 0.7rem;
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.18);
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+  margin: 0.45rem 0 0;
+  line-height: 1.4;
 }
 
 // Tabla de bonus por continente
@@ -1600,9 +1620,11 @@
 
 // ── Game area ──────────────────────────────────────────
 .game-area {
-  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 320px;
+  right: 320px;
   height: 100%;
-  position: relative;
 
   app-map {
     display: block;
@@ -1659,7 +1681,7 @@
   position: absolute;
   top: 0;
   right: 0;
-  width: 272px;
+  width: 320px;
   height: 100%;
   background: #111213;
   border-left: 1px solid rgba(255,255,255,.08);
@@ -2359,15 +2381,57 @@
   background: #0f0c1e;
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 20px;
-  padding: 2.5rem 3rem;
+  padding: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  text-align: center;
+  width: min(92vw, 860px);
+  max-height: 90vh;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  animation: fin-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  overflow: hidden;
+}
+
+.fin-content {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1rem;
-  text-align: center;
-  min-width: 280px;
-  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
-  animation: fin-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  padding: 2rem 2rem 1.5rem;
+  flex: 0 0 340px;
+  border-right: 1px solid rgba(255,255,255,0.07);
+  overflow-y: auto;
+
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 4px; }
+}
+
+.fin-chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 1rem;
+  gap: 0.5rem;
+
+  app-kuboteg-chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    margin-bottom: 0.75rem;
+  }
+}
+
+.fin-chat-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #475569;
+  padding: 0 0.25rem;
 }
 
 .fin-icon {
@@ -2478,6 +2542,90 @@
   }
 }
 
+// ── Fin: objetivos revelados ──────────────────────────
+.fin-obj-section {
+  width: 100%;
+  margin-top: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.fin-obj-titulo {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #334155;
+  text-align: left;
+  margin-bottom: 0.35rem;
+  padding: 0 0.1rem;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  padding-top: 1rem;
+}
+
+.fin-obj-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(255,255,255,.025);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 9px;
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+  transition: background 0.15s;
+
+  &--ganador {
+    background: rgba(251,191,36,.06);
+    border-color: rgba(251,191,36,.18);
+  }
+
+  &--mio {
+    border-color: rgba(148,163,184,.18);
+  }
+}
+
+.fin-obj-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 5px currentColor;
+}
+
+.fin-obj-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.fin-obj-nombre {
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.fin-obj-desc {
+  font-size: 0.66rem;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.fin-obj-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #ef4444;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+
+  &--ok {
+    color: #34d399;
+  }
+}
+
 // ── Modal dedicatoria ─────────────────────────────────
 .ded-overlay {
   position: fixed;
@@ -2494,29 +2642,15 @@
 .ded-popup {
   background: #0f0c1e;
   border: 1px solid rgba(255,255,255,.12);
-  border-radius: 20px;
-  padding: 2rem 2.25rem;
+  border-radius: 16px;
+  padding: 1.25rem;
   width: 100%;
-  max-width: 480px;
+  max-width: 460px;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  animation: fin-pop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.ded-titulo {
-  margin: 0;
-  font-size: 1.6rem;
-  font-weight: 900;
-  color: #e2d9ff;
-  text-align: center;
-}
-
-.ded-sub {
-  margin: 0;
-  font-size: 0.85rem;
-  color: #64748b;
-  text-align: center;
+  gap: 0.65rem;
+  animation: fin-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.65);
 }
 
 .ded-textarea {
@@ -2525,28 +2659,28 @@
   border-radius: 10px;
   color: #e2e8f0;
   font-size: 0.95rem;
-  line-height: 1.55;
-  padding: 0.75rem 1rem;
-  resize: vertical;
+  line-height: 1.6;
+  padding: 0.85rem 1rem;
+  resize: none;
   outline: none;
   font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
   transition: border-color 0.2s;
   &::placeholder { color: #475569; }
   &:focus { border-color: rgba(124,58,237,.6); }
 }
 
-.ded-contador {
-  margin: 0;
-  font-size: 0.78rem;
-  color: #475569;
-  text-align: right;
+.ded-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
-.ded-acciones {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: flex-end;
-  margin-top: 0.25rem;
+.ded-contador {
+  font-size: 0.75rem;
+  color: #475569;
 }
 
 @keyframes fin-pop {
@@ -3290,6 +3424,7 @@
   gap: 0.25rem;
   padding: 0.4rem 0.5rem 0;
   flex-wrap: wrap;
+  margin-top: 0.75rem;
 }
 
 .chat-tab {
