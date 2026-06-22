@@ -4229,6 +4229,102 @@
   color: #334155;
 }
 
+// ── Popup: invitación a grupo ─────────────────────────────────
+.propuesta-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 560;
+  background: rgba(0,0,0,.6);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: overlayFadeIn .2s ease;
+}
+
+.propuesta-card {
+  background: linear-gradient(160deg, #0f1428, #0a0e20);
+  border: 1px solid rgba(148,163,255,.25);
+  border-top: 2px solid rgba(99,102,241,.55);
+  border-radius: 18px;
+  padding: 1.5rem 1.75rem;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 30px 70px rgba(0,0,0,.7), 0 0 50px rgba(99,102,241,.1);
+  animation: propuesta-in .28s cubic-bezier(.34,1.56,.64,1);
+}
+
+.propuesta-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: #818cf8;
+}
+
+.propuesta-badge-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #818cf8;
+  animation: pulseDot 1.2s ease-in-out infinite;
+}
+
+.propuesta-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  text-align: center;
+}
+
+.propuesta-de {
+  font-size: 0.82rem;
+  color: #7c86b0;
+  text-align: center;
+  strong { color: #a5b4fc; }
+}
+
+.propuesta-acciones {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.25rem;
+  width: 100%;
+}
+
+.btn-propuesta-rechazar,
+.btn-propuesta-aceptar {
+  flex: 1;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  border: none;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .1s, opacity .14s;
+  &:active { transform: scale(.96); }
+}
+
+.btn-propuesta-rechazar {
+  background: rgba(239,68,68,.11);
+  color: #fca5a5;
+  border: 1px solid rgba(239,68,68,.25);
+  &:hover { background: rgba(239,68,68,.22); }
+}
+
+.btn-propuesta-aceptar {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: #fff;
+  box-shadow: 0 3px 12px rgba(99,102,241,.35);
+  &:hover { opacity: .88; }
+}
+
 // ── Shared atoms ──────────────────────────────────────
 .intl-dot {
   width: 7px;
