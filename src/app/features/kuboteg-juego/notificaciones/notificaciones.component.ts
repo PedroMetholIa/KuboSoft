@@ -11,31 +11,25 @@ export interface NotifItem {
   jugador?: string | null;
 }
 
+
 @Component({
   selector: 'app-notificaciones',
   standalone: true,
   template: `
     <div class="notif-panel">
-      <div class="notif-header">
-        <span class="notif-title">Noticias</span>
-        @if (items.length > 0) {
-          <span class="notif-badge">{{ items.length }}</span>
-        }
-      </div>
-
       <div class="notif-list">
         @if (items.length === 0) {
           <div class="notif-empty">Sin eventos aún</div>
         }
 
         @for (item of items; track item.ts) {
-          <div class="notif-item" [class.notif-conquista]="item.tipo === 'conquista'">
+          <div class="notif-item">
+            <span class="notif-dot" [style.background-color]="item.color"></span>
             <span class="notif-icono">{{ item.icono }}</span>
             <div class="notif-body">
               <span class="notif-linea1">{{ item.jugador ? item.jugador + ' · ' + item.linea1 : item.linea1 }}</span>
               <span class="notif-linea2">{{ item.linea2 }}</span>
             </div>
-            <span class="notif-dot" [style.background-color]="item.color"></span>
           </div>
         }
       </div>

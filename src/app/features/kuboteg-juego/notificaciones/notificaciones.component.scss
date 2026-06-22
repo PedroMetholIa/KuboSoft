@@ -1,59 +1,17 @@
 .notif-panel {
   display: flex;
   flex-direction: column;
-  position: relative;
-  background: rgba(255,255,255,.02);
-  border: 1px solid rgba(255,255,255,.06);
-  border-radius: 12px;
-  overflow: hidden;
-  flex-shrink: 0;
-
-  &::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 28px;
-    background: linear-gradient(to top, rgba(8,6,20,.85), transparent);
-    pointer-events: none;
-    z-index: 1;
-    border-radius: 0 0 12px 12px;
-  }
+  flex: 1;
+  min-height: 0;
 }
 
-.notif-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.55rem 0.9rem;
-  border-bottom: 1px solid rgba(255,255,255,.06);
-}
-
-.notif-title {
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #555;
-}
-
-.notif-badge {
-  font-size: 0.65rem;
-  font-weight: 700;
-  background: rgba(255,255,255,.08);
-  color: #888;
-  border-radius: 20px;
-  padding: 1px 6px;
-  min-width: 18px;
-  text-align: center;
-}
 
 .notif-list {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  max-height: 160px;
+  flex: 1;
+  min-height: 0;
   scroll-behavior: smooth;
 
   // ── Scrollbar custom ──────────────────────────────────
@@ -94,16 +52,11 @@
   display: flex;
   align-items: flex-start;
   gap: 0.55rem;
-  padding: 0.5rem 0.9rem;
+  padding: 0.45rem 0;
   border-bottom: 1px solid rgba(255,255,255,.04);
   transition: background .15s;
 
   &:last-child { border-bottom: none; }
-  &:hover { background: rgba(255,255,255,.03); }
-
-  &.notif-conquista .notif-linea2 {
-    color: #fbbf24;
-  }
 }
 
 .notif-icono {
@@ -124,25 +77,19 @@
   font-size: 0.73rem;
   font-weight: 500;
   color: #c0c0d0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-word;
 }
 
 .notif-linea2 {
   font-size: 0.68rem;
   color: #666;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .notif-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+  width: 3px;
+  height: auto;
+  align-self: stretch;
+  border-radius: 3px;
   flex-shrink: 0;
-  margin-top: 4px;
-  border: 1px solid rgba(255,255,255,.2);
 }
 

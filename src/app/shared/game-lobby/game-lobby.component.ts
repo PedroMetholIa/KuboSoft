@@ -697,11 +697,9 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       limite_rondas: this.form.limite_rondas
     });
     if (nuevaPartida) {
-      const hostResult = await this.supabaseService.insertPartidaJugador(nuevaPartida.id, this.userId, 0);
-      console.log('[insertHost] resultado:', JSON.stringify(hostResult));
+      await this.supabaseService.insertPartidaJugador(nuevaPartida.id, this.userId, 0);
       for (let i = 0; i < this.form.cantBots; i++) {
-        const botResult = await this.supabaseService.agregarBotAPartida(nuevaPartida.id);
-        console.log('[agregarBot] resultado:', JSON.stringify(botResult));
+        await this.supabaseService.agregarBotAPartida(nuevaPartida.id);
       }
       this.misPartidasIds.add(nuevaPartida.id);
     }

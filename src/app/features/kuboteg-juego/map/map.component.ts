@@ -30,6 +30,16 @@ export class MapComponent implements OnInit, AfterViewInit {
   @Input() territorioMovilizandose: string | null = null;
   @Input() territorioCartaAcierta:  string | null = null;
 
+  @Input() set territoriosPactoActivos(val: string[]) {
+    this._pactoActivosSet = new Set(val);
+  }
+
+  @Input() set territoriosPactoRotos(val: string[]) {
+    this._pactoRotosSet = new Set(val);
+  }
+
+  @Input() dimBackground = false;
+
   @Input() territoriosBloqueadosMsgs: Record<string, string> = {};
 
   @Output() territorioClick = new EventEmitter<string>();
@@ -43,8 +53,10 @@ export class MapComponent implements OnInit, AfterViewInit {
   tooltipY = 0;
   activePactoMsg: string | null = null;
 
-  private _destacadosSet = new Set<string>();
-  private _combateSet    = new Set<string>();
+  private _destacadosSet   = new Set<string>();
+  private _combateSet      = new Set<string>();
+  private _pactoActivosSet = new Set<string>();
+  private _pactoRotosSet   = new Set<string>();
 
   readonly continentLegend = [
     { id: 'north_america', label: 'América del Norte', color: '#D9B34D' },
@@ -138,6 +150,14 @@ export class MapComponent implements OnInit, AfterViewInit {
     return t.id === this.territorioCartaAcierta;
   }
 
+  isPactoActivo(t: Territory): boolean {
+    return this._pactoActivosSet.has(t.id);
+  }
+
+  isPactoRoto(t: Territory): boolean {
+    return this._pactoRotosSet.has(t.id);
+  }
+
   getTerritoryFill(t: Territory): string {
     if (this.isCombate(t)) {
       const color = this.getOwnerColor(t);
@@ -154,6 +174,18 @@ export class MapComponent implements OnInit, AfterViewInit {
     if (this.isSelected(t)) {
       const color = this.getOwnerColor(t);
       return color ? this.lightenColor(color, 45) : '#ffffff';
+    }
+    if (this.isPactoRoto(t)) {
+      const color = this.getOwnerColor(t);
+      return color ? this.hexToRgba(this.lightenColor(color, 18), 0.6) : 'rgba(249,115,22,0.45)';
+    }
+    if (this.isPactoActivo(t)) {
+      const color = this.getOwnerColor(t);
+      return color ? this.hexToRgba(this.lightenColor(color, 20), 0.6) : 'rgba(34,197,94,0.45)';
+    }
+    if (this.dimBackground && !this.isHighlighted(t)) {
+      const color = this.getOwnerColor(t);
+      return color ? this.hexToRgba(this.darkenDesaturate(color, 0.38, 0.25), 0.55) : 'rgba(15,18,35,0.7)';
     }
     if (this.isHighlighted(t)) {
       const ownerId = this.territoriosOwner[t.id];
@@ -172,7 +204,10 @@ export class MapComponent implements OnInit, AfterViewInit {
     if (this.isColocandose(t))  return 'rgba(80, 220, 255, 0.97)';
     if (this.isQuitandose(t))   return 'rgba(255, 60, 100, 0.97)';
     if (this.isSelected(t))     return 'rgba(255,255,255,0.92)';
-    if (this.isHighlighted(t)) return 'rgba(255,255,255,0.68)';
+    if (this.isPactoRoto(t))    return 'rgba(251,146,60,0.90)';
+    if (this.isPactoActivo(t))  return 'rgba(74,222,128,0.90)';
+    if (this.dimBackground && !this.isHighlighted(t)) return 'rgba(0,0,0,0.2)';
+    if (this.isHighlighted(t))  return 'rgba(255,255,255,0.68)';
     const color = this.getOwnerColor(t);
     if (color) return this.darkenDesaturate(color, 0.22, 0.12);
     return 'rgba(8,6,20,0.88)';
@@ -183,7 +218,9 @@ export class MapComponent implements OnInit, AfterViewInit {
     if (this.isColocandose(t))  return 2.8;
     if (this.isQuitandose(t))   return 2.8;
     if (this.isSelected(t))     return 2.5;
-    if (this.isHighlighted(t)) return 2.0;
+    if (this.isPactoRoto(t))    return 2.6;
+    if (this.isPactoActivo(t))  return 2.6;
+    if (this.isHighlighted(t))  return 2.0;
     if (this.territoriosOwner[t.id]) return 1.6;
     return 1.3;
   }

@@ -464,7 +464,7 @@
                         [class.pacto-pendiente]="esEnRevisionNatural(p)"
                         [class.pacto-roto]="esAcuerdoRoto(p)">
                         <div class="pacto-info">
-                          <span class="pacto-nombre">{{ p.tipo === 'alianza' ? 'Alianza' : 'No agresión' }}</span>
+                          <span class="pacto-nombre">No agresión</span>
                           <span class="pacto-con">con {{ nombreJugadorById(contraParteId(p)) }}</span>
                           @if (esAcuerdoRoto(p)) {
                             <span class="pacto-estado-badge pacto-estado-badge--roto">💔 Acuerdo roto</span>
@@ -631,7 +631,7 @@
                         <span class="intl-sep">↔</span>
                         <span class="intl-dot" [style.background]="jugadorColores[p.jugador2Id]"></span>
                         <span class="intl-name">{{ jugadorNombres[p.jugador2Id] }}</span>
-                        <span class="intl-tag intl-tag--tipo">{{ p.tipo === 'alianza' ? 'Alianza' : 'No agresión' }}</span>
+                        <span class="intl-tag intl-tag--tipo">No agresión</span>
                         @if (esAcuerdoRoto(p)) {
                           <span class="intl-tag intl-tag--roto">Roto</span>
                         } @else if (esPactoEnTransicion(p)) {
@@ -786,7 +786,7 @@
           <button class="tb-btn"
             [class.tb-active]="panelActivo === 'internacionales'"
             (click)="setPanelActivo('internacionales')"
-            data-tooltip="Internacionales">
+            data-tooltip="Relaciones Internacionales">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10"/>
               <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
@@ -815,18 +815,6 @@
               <line x1="12" y1="16" x2="12" y2="12"/>
               <line x1="12" y1="8" x2="12.01" y2="8"/>
             </svg>
-          </button>
-
-          <button class="tb-btn"
-            [class.tb-active]="panelActivo === 'tratado'"
-            (click)="setPanelActivo('tratado')"
-            data-tooltip="Tratado">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-            @if (hayPactosEnRevision) {
-              <span class="tb-badge-alerta">!</span>
-            }
           </button>
 
           <button class="tb-btn"
@@ -874,10 +862,14 @@
           [territorioQuitandose]="territorioQuitandose"
           [territorioMovilizandose]="territorioMovilizandose"
           [territorioCartaAcierta]="territorioCartaAcierta"
+          [territoriosPactoActivos]="verPactosEnMapa ? todosLosTerrsEnPacto : pactoTerrsActivosMap"
+          [territoriosPactoRotos]="verPactosEnMapa ? todosLosTerrsEnPactoRoto : []"
+          [dimBackground]="verPactosEnMapa || modoPacto === 'propio' || modoPacto === 'ajeno' || !!propuestaEntrante"
           (territorioClick)="onMapTerritoryClick($event)"
           (territorioRightClick)="onMapTerritoryRightClick($event)"
           (deseleccionar)="onMapDeseleccionar()"
         />
+
         <div class="combate-overlay">
           <app-combate-panel
             [combate]="popupCombate"
@@ -1002,12 +994,28 @@
 
         <!-- Chat tabs -->
         <div class="chat-tabs">
-          <button class="chat-tab" [class.chat-tab--active]="chatActivoId === 'global'" (click)="chatActivoId = 'global'">
+          <button class="chat-tab" [class.chat-tab--active]="chatActivoId === 'global'" (click)="selectChat('global')">
             🌐 General
+            @if (chatNoLeidos['global'] > 0) {
+              <span class="chat-tab-badge">{{ chatNoLeidos['global'] }}</span>
+            }
           </button>
+          @for (j of otrosJugadoresChat; track j.usuario_id) {
+            <button class="chat-tab" [class.chat-tab--active]="chatActivoId === dmId(j.usuario_id)"
+              (click)="selectChat(dmId(j.usuario_id))">
+              <span class="chat-tab-dot" [style.background]="jugadorColores[j.usuario_id]"></span>
+              {{ nombreJugadorById(j.usuario_id) }}
+              @if (chatNoLeidos[dmId(j.usuario_id)] > 0) {
+                <span class="chat-tab-badge">{{ chatNoLeidos[dmId(j.usuario_id)] }}</span>
+              }
+            </button>
+          }
           @for (g of gruposMios; track g.id) {
-            <button class="chat-tab" [class.chat-tab--active]="chatActivoId === g.id" (click)="chatActivoId = g.id">
+            <button class="chat-tab" [class.chat-tab--active]="chatActivoId === g.id" (click)="selectChat(g.id)">
               {{ g.nombre }}
+              @if (chatNoLeidos[g.id] > 0) {
+                <span class="chat-tab-badge">{{ chatNoLeidos[g.id] }}</span>
+              }
             </button>
           }
         </div>
@@ -1023,10 +1031,102 @@
         @if (fase) {
           <div class="tratados-panel">
             <div class="politica-grid">
-              <button class="pol-btn pol-btn--pactar" (click)="abrirPropuestaCompleta()">
+
+              <button class="pol-btn pol-btn--pactar" [class.pol-btn--activo]="modoPacto !== null"
+                (click)="modoPacto ? cancelarModoPacto() : abrirPropuestaCompleta()">
                 <span class="pol-btn-icon">🕊️</span>
-                <span class="pol-btn-nombre">Proponer un pacto</span>
+                <span class="pol-btn-nombre">{{ modoPacto ? 'Cancelar pacto' : 'Proponer un pacto' }}</span>
               </button>
+
+              <!-- Panel: proponer pacto -->
+              @if (modoPacto) {
+                <div class="pacto-card">
+                  <div class="pacto-card-header">
+                    <span class="pacto-card-step">
+                      @if (modoPacto === 'propio') { Seleccioná tus territorios }
+                      @if (modoPacto === 'ajeno')  { Seleccioná los territorios del rival }
+                    </span>
+                    <button class="pacto-card-close" (click)="cancelarModoPacto()">✕</button>
+                  </div>
+
+                  @if (modoPacto === 'propio') {
+                    @if (pactoTerrsPropios.length > 0) {
+                      <div class="pacto-card-chips">
+                        @for (id of pactoTerrsPropios; track id) {
+                          <span class="pacto-card-chip"
+                            [style.background]="colorRgba(jugadorColores[userId], 0.2)"
+                            [style.color]="jugadorColores[userId]"
+                            [style.border-color]="colorRgba(jugadorColores[userId], 0.45)">{{ nombreTerritorio(id) }}</span>
+                        }
+                      </div>
+                    }
+                    <div class="pacto-card-actions">
+                      <button class="pacto-card-btn pacto-card-btn--next" [disabled]="pactoTerrsPropios.length === 0"
+                        (click)="avanzarFasePacto()">Siguiente →</button>
+                    </div>
+                  }
+
+                  @if (modoPacto === 'ajeno') {
+                    @if (pactoReceptorId) {
+                      <div class="pacto-card-receptor">
+                        <span class="pacto-card-receptor-dot" [style.background]="jugadorColores[pactoReceptorId]"></span>
+                        <span>{{ nombreJugadorById(pactoReceptorId) }}</span>
+                      </div>
+                    } @else {
+                      <p class="pacto-card-hint-txt">Clickeá un territorio limítrofe del rival</p>
+                    }
+                    @if (pactoTerrsAjenos.length > 0) {
+                      <div class="pacto-card-chips">
+                        @for (id of pactoTerrsAjenos; track id) {
+                          <span class="pacto-card-chip"
+                            [style.background]="colorRgba(jugadorColores[pactoReceptorId!], 0.2)"
+                            [style.color]="jugadorColores[pactoReceptorId!]"
+                            [style.border-color]="colorRgba(jugadorColores[pactoReceptorId!], 0.45)">{{ nombreTerritorio(id) }}</span>
+                        }
+                      </div>
+                    }
+                    <div class="pacto-card-actions">
+                      <button class="pacto-card-btn pacto-card-btn--back"
+                        (click)="modoPacto = 'propio'; pactoTerrsAjenos = []; pactoReceptorId = null">← Volver</button>
+                      <button class="pacto-card-btn pacto-card-btn--confirm" [disabled]="pactoTerrsAjenos.length === 0"
+                        (click)="confirmarPactoMapa()">Confirmar →</button>
+                    </div>
+                  }
+                </div>
+              }
+
+              <!-- Panel: propuesta entrante -->
+              @if (propuestaEntrante) {
+                <div class="propuesta-card-aside">
+                  <div class="propuesta-card-aside-header">
+                    <span class="propuesta-card-aside-badge-dot"></span>
+                    <span>Propuesta diplomática</span>
+                    <span class="propuesta-card-aside-badge-dot"></span>
+                  </div>
+
+                  <div class="propuesta-card-aside-main">
+                    <span class="propuesta-card-aside-icon">🛡️</span>
+                    <div class="propuesta-card-aside-info">
+                      <span class="propuesta-card-aside-title">Pacto de No Agresión</span>
+                      <span class="propuesta-card-aside-de">de <strong>{{ nombreJugadorById(propuestaEntrante.proponenteId) }}</strong></span>
+                      <span class="propuesta-card-aside-hint">Territorios marcados en el mapa</span>
+                    </div>
+                  </div>
+
+                  @if (propuestaNoCubiertos().length > 0) {
+                    <div class="propuesta-card-adv">
+                      <span>⚠</span>
+                      <span>Sin cubrir: {{ propuestaNoCubiertos().join(' · ') }}</span>
+                    </div>
+                  }
+
+                  <div class="propuesta-card-aside-actions">
+                    <button class="propuesta-card-aside-btn--rechazar" (click)="rechazarPropuesta()">✕ Rechazar</button>
+                    <button class="propuesta-card-aside-btn--aceptar" (click)="aceptarPropuesta()">✓ Aceptar</button>
+                  </div>
+                </div>
+              }
+
               <button class="pol-btn pol-btn--romper" (click)="abrirRomperPacto()">
                 <span class="pol-btn-icon">✂️</span>
                 <span class="pol-btn-nombre">Romper un pacto</span>
@@ -1039,9 +1139,11 @@
                 <span class="pol-btn-icon">👥</span>
                 <span class="pol-btn-nombre">Crear un grupo</span>
               </button>
+
             </div>
           </div>
         }
+
       </aside>
 
       <!-- Popup: mover tropas en reagrupación -->
@@ -1144,11 +1246,9 @@
       <div class="romper-pacto-list">
         @for (p of pactosRompibles(); track p.id) {
           <div class="romper-pacto-item">
-            <div class="romper-pacto-tipo-icon" [class.alianza]="p.tipo === 'alianza'" [class.no-agresion]="p.tipo === 'no_agresion'">
-              {{ p.tipo === 'alianza' ? '🤝' : '🛡️' }}
-            </div>
+            <div class="romper-pacto-tipo-icon no-agresion">🛡️</div>
             <div class="romper-pacto-info">
-              <div class="romper-pacto-nombre">{{ p.tipo === 'alianza' ? 'Alianza' : 'No agresión' }}</div>
+              <div class="romper-pacto-nombre">No agresión</div>
               <div class="romper-pacto-con">con <strong>{{ nombreJugadorById(contraParteId(p)) }}</strong></div>
               @if (p.tipo === 'no_agresion') {
                 <div class="romper-pacto-terrs">
@@ -1289,181 +1389,6 @@
   </div>
 }
 
-<!-- Popup: proponer tratado -->
-@if (modalPacto) {
-  <div class="tratado-overlay" (click)="modalPacto = null">
-    <div class="tratado-modal" (click)="$event.stopPropagation()">
-
-      <div class="tratado-modal-header">
-        <div class="tratado-modal-icon">🕊️</div>
-        <div class="tratado-modal-titles">
-          <div class="tratado-modal-title">Proponer Tratado</div>
-          <div class="tratado-modal-sub">Iniciá una negociación diplomática</div>
-        </div>
-        <button class="tratado-modal-close" (click)="modalPacto = null">✕</button>
-      </div>
-
-      <div class="tratado-section-label">Tipo de tratado</div>
-      <div class="tratado-tipo-row">
-        <button class="btn-tratado-tipo" [class.selected]="modalPacto.tipo === 'alianza'"
-          (click)="modalPacto.tipo = 'alianza'">
-          <span class="btn-tratado-tipo-icon">🤝</span>
-          <span class="btn-tratado-tipo-text">Alianza</span>
-          <span class="btn-tratado-tipo-desc">Cooperación mutua</span>
-        </button>
-        <button class="btn-tratado-tipo" [class.selected]="modalPacto.tipo === 'no_agresion'"
-          (click)="modalPacto.tipo = 'no_agresion'">
-          <span class="btn-tratado-tipo-icon">🛡️</span>
-          <span class="btn-tratado-tipo-text">No agresión</span>
-          <span class="btn-tratado-tipo-desc">Proteger territorios</span>
-        </button>
-        <button class="btn-tratado-tipo" [class.selected]="modalPacto.tipo === 'renovacion'"
-          (click)="abrirModalPacto(modalPacto.receptorId, 'renovacion')">
-          <span class="btn-tratado-tipo-icon">🔄</span>
-          <span class="btn-tratado-tipo-text">Renovar</span>
-          <span class="btn-tratado-tipo-desc">Extender vigencia</span>
-        </button>
-      </div>
-
-      @if (modalPacto.tipo === 'renovacion') {
-        <div class="tratado-section-label">Pactos en revisión</div>
-        @if (pactosRenovables().length === 0) {
-          <div class="renovacion-empty">No hay pactos en revisión para renovar.</div>
-        } @else {
-          <div class="renovacion-lista">
-            @for (p of pactosRenovables(); track p.id) {
-              <div class="renovacion-item" [class.selected]="modalPacto.pactoId === p.id"
-                (click)="seleccionarPactoRenovacion(p.id)">
-                <span class="renovacion-tipo-icon">{{ p.tipo === 'alianza' ? '🤝' : '🛡️' }}</span>
-                <div class="renovacion-info">
-                  <span class="renovacion-nombre">{{ p.tipo === 'alianza' ? 'Alianza' : 'No agresión' }}</span>
-                  <span class="renovacion-con">con {{ nombreJugadorById(contraParteId(p)) }}</span>
-                  @if (p.tipo === 'no_agresion') {
-                    <span class="renovacion-terrs">{{ nombreTerritorio(p.territorioId1!) }} ↔ {{ nombreTerritorio(p.territorioId2!) }}</span>
-                  }
-                </div>
-              </div>
-            }
-          </div>
-        }
-      }
-
-      @if (modalPacto.tipo !== 'renovacion') {
-        <div class="tratado-section-label">Jugador</div>
-        <div class="player-select" [class.player-select--open]="openDropdownId === 'pacto'">
-          <button type="button" class="player-select-trigger"
-            (click)="$event.stopPropagation(); openDropdownId = openDropdownId === 'pacto' ? null : 'pacto'">
-            <span class="player-select-dot" [style.background]="jugadorColores[modalPacto.receptorId]"></span>
-            <span class="player-select-name">{{ nombreJugadorById(modalPacto.receptorId) }}</span>
-            <span class="player-select-caret">▾</span>
-          </button>
-          @if (openDropdownId === 'pacto') {
-            <div class="player-select-dropdown" (click)="$event.stopPropagation()">
-              @for (e of enemigos; track e.usuario_id) {
-                <div class="player-select-option"
-                  [class.player-select-option--sel]="e.usuario_id === modalPacto.receptorId"
-                  [style.border-left-color]="jugadorColores[e.usuario_id]"
-                  (click)="modalPacto.receptorId = e.usuario_id; onReceptorChange(e.usuario_id); openDropdownId = null">
-                  <span class="player-select-dot" [style.background]="jugadorColores[e.usuario_id]"></span>
-                  {{ nombreJugador(e) }}
-                </div>
-              }
-            </div>
-          }
-        </div>
-
-      @if (modalPacto.tipo === 'no_agresion') {
-        <div class="tratado-section-label">Territorios involucrados</div>
-
-        <div class="tratado-modalidad-toggle">
-          <button class="btn-modalidad" [class.selected]="modalPacto.modalidad === 1"
-            (click)="onModalidadChange(1)">Mi territorio → Sus limítrofes</button>
-          <button class="btn-modalidad" [class.selected]="modalPacto.modalidad === 2"
-            (click)="onModalidadChange(2)">Su territorio → Mis limítrofes</button>
-        </div>
-
-        <div class="tratado-territorios-row">
-          @if (modalPacto.modalidad === 1) {
-            <div class="tratado-terr-col">
-              <div class="tratado-terr-label">Mi territorio</div>
-              <select class="tratado-select" [(ngModel)]="modalPacto.territorioId1"
-                (ngModelChange)="onMiTerritorioChange($event)">
-                @for (t of territoriosDe(userId); track t.territorio_id) {
-                  <option [value]="t.territorio_id">{{ nombreTerritorio(t.territorio_id) }}</option>
-                }
-              </select>
-            </div>
-            <div class="tratado-terr-sep">↔</div>
-            <div class="tratado-terr-col">
-              <div class="tratado-terr-label">Limítrofes del rival</div>
-              <div class="tratado-checkboxes">
-                @for (t of territoriosLimitrofesDeReceptor(modalPacto.territorioId1, modalPacto.receptorId); track t.territorio_id) {
-                  <label class="tratado-checkbox-item" [class.tratado-checkbox-disabled]="terrYaEnPacto(modalPacto.territorioId1, t.territorio_id)">
-                    <input type="checkbox"
-                      [checked]="territoriosLimitrofesSeleccionados.includes(t.territorio_id)"
-                      [disabled]="terrYaEnPacto(modalPacto.territorioId1, t.territorio_id)"
-                      (change)="toggleTerritorioLimitrofe(t.territorio_id)" />
-                    <span>{{ nombreTerritorio(t.territorio_id) }}</span>
-                    @if (terrYaEnPacto(modalPacto.territorioId1, t.territorio_id)) {
-                      <span class="tratado-checkbox-pacto-badge">pacto vigente</span>
-                    }
-                  </label>
-                }
-                @if (territoriosLimitrofesDeReceptor(modalPacto.territorioId1, modalPacto.receptorId).length === 0) {
-                  <div class="tratado-checkboxes-empty">Sin territorios limítrofes</div>
-                }
-              </div>
-            </div>
-          } @else {
-            <div class="tratado-terr-col">
-              <div class="tratado-terr-label">Su territorio</div>
-              <select class="tratado-select" [(ngModel)]="modalPacto.territorioId1"
-                (ngModelChange)="onSuTerritorioChange($event)">
-                @for (t of territoriosDe(modalPacto.receptorId); track t.territorio_id) {
-                  <option [value]="t.territorio_id">{{ nombreTerritorio(t.territorio_id) }}</option>
-                }
-              </select>
-            </div>
-            <div class="tratado-terr-sep">↔</div>
-            <div class="tratado-terr-col">
-              <div class="tratado-terr-label">Mis limítrofes</div>
-              <div class="tratado-checkboxes">
-                @for (t of territoriosLimitrofesMios(modalPacto.territorioId1); track t.territorio_id) {
-                  <label class="tratado-checkbox-item" [class.tratado-checkbox-disabled]="terrYaEnPacto(modalPacto.territorioId1, t.territorio_id)">
-                    <input type="checkbox"
-                      [checked]="territoriosLimitrofesSeleccionados.includes(t.territorio_id)"
-                      [disabled]="terrYaEnPacto(modalPacto.territorioId1, t.territorio_id)"
-                      (change)="toggleTerritorioLimitrofe(t.territorio_id)" />
-                    <span>{{ nombreTerritorio(t.territorio_id) }}</span>
-                    @if (terrYaEnPacto(modalPacto.territorioId1, t.territorio_id)) {
-                      <span class="tratado-checkbox-pacto-badge">pacto vigente</span>
-                    }
-                  </label>
-                }
-                @if (territoriosLimitrofesMios(modalPacto.territorioId1).length === 0) {
-                  <div class="tratado-checkboxes-empty">Sin territorios limítrofes</div>
-                }
-              </div>
-            </div>
-          }
-        </div>
-      }
-      }
-
-      <div class="tratado-duracion">⏱ Duración: 3 rondas</div>
-
-      <div class="tratado-modal-actions">
-        <button class="btn-tratado-cancelar" (click)="modalPacto = null">Cancelar</button>
-        <button class="btn-tratado-confirmar" (click)="proponerPacto()"
-          [disabled]="!!propuestaSaliente || (modalPacto.tipo === 'renovacion' && !modalPacto.pactoId)">
-          {{ modalPacto.tipo === 'renovacion' ? 'Proponer renovación →' : 'Proponer tratado →' }}
-        </button>
-      </div>
-
-    </div>
-  </div>
-}
-
 <!-- Modal: crear grupo de chat -->
 @if (modalGrupos) {
   <div class="grupos-overlay" (click)="modalGrupos = null">
@@ -1567,86 +1492,6 @@
   </div>
 }
 
-<!-- Popup: propuesta de tratado entrante -->
-@if (propuestaEntrante) {
-  <div class="propuesta-overlay">
-    <div class="propuesta-card">
-
-      <div class="propuesta-badge">
-        <span class="propuesta-badge-dot"></span>
-        Propuesta diplomática
-        <span class="propuesta-badge-dot"></span>
-      </div>
-
-      <div class="propuesta-icon">{{ propuestaEntrante.tipo === 'alianza' ? '🤝' : propuestaEntrante.tipo === 'renovacion' ? '🔄' : '🛡️' }}</div>
-
-      <div class="propuesta-title">
-        {{ propuestaEntrante.tipo === 'alianza' ? 'Propuesta de Alianza' : propuestaEntrante.tipo === 'renovacion' ? 'Propuesta de Renovación' : 'Pacto de No Agresión' }}
-      </div>
-
-      <div class="propuesta-de">
-        De <strong>{{ nombreJugadorById(propuestaEntrante.proponenteId) }}</strong>
-      </div>
-
-      @if (propuestaEntrante.tipo === 'no_agresion') {
-        <div class="propuesta-terr-label">Territorios involucrados</div>
-        <div class="propuesta-territorios">
-          <span class="propuesta-terr-propio">{{ nombreTerritorio(propuestaEntrante.territorioId1!) }}</span>
-          <span class="propuesta-flecha">↔</span>
-          <div class="propuesta-terr-lista">
-            @if (propuestaEntrante.territoriosId2?.length) {
-              @for (tid of propuestaEntrante.territoriosId2; track $index) {
-                <span class="propuesta-terr-chip">{{ nombreTerritorio(tid) }}</span>
-              }
-            } @else {
-              <span class="propuesta-terr-chip">{{ nombreTerritorio(propuestaEntrante.territorioId2!) }}</span>
-            }
-          </div>
-        </div>
-      }
-
-      @if (propuestaEntrante.tipo === 'renovacion' && pactoARenovar) {
-        <div class="propuesta-terr-label">Pacto a renovar</div>
-        <div class="propuesta-renovacion-detalle">
-          <span class="propuesta-renovacion-tipo">{{ pactoARenovar.tipo === 'alianza' ? '🤝 Alianza' : '🛡️ No agresión' }}</span>
-          @if (pactoARenovar.tipo === 'no_agresion') {
-            <div class="propuesta-territorios" style="margin-top:0.35rem">
-              <span class="propuesta-terr-propio">{{ nombreTerritorio(pactoARenovar.territorioId1!) }}</span>
-              <span class="propuesta-flecha">↔</span>
-              <div class="propuesta-terr-lista">
-                @if (pactoARenovar.territoriosId2?.length) {
-                  @for (tid of pactoARenovar.territoriosId2!; track $index) {
-                    <span class="propuesta-terr-chip">{{ nombreTerritorio(tid) }}</span>
-                  }
-                } @else {
-                  <span class="propuesta-terr-chip">{{ nombreTerritorio(pactoARenovar.territorioId2!) }}</span>
-                }
-              </div>
-            </div>
-          }
-        </div>
-      }
-
-      @if (propuestaEntrante.tipo === 'no_agresion' && propuestaNoCubiertos().length > 0) {
-        <div class="propuesta-advertencia">
-          <span class="propuesta-adv-icon">⚠</span>
-          <div class="propuesta-adv-body">
-            <span class="propuesta-adv-titulo">Territorios tuyos sin protección</span>
-            <span class="propuesta-adv-lista">{{ propuestaNoCubiertos().join(' · ') }}</span>
-          </div>
-        </div>
-      }
-
-      <div class="propuesta-duracion">⏱ Duración: 3 rondas</div>
-
-      <div class="propuesta-actions">
-        <button class="btn-propuesta-rechazar" (click)="rechazarPropuesta()">✕ Rechazar</button>
-        <button class="btn-propuesta-aceptar" (click)="aceptarPropuesta()">✓ Aceptar</button>
-      </div>
-
-    </div>
-  </div>
-}
 
 <!-- Popup carta robada -->
 @if (cartaPopup) {
