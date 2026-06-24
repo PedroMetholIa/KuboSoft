@@ -952,7 +952,28 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       this.loading = false;
       if (this.partida?.estado === 'En juego') { this.iniciarMusica(); this.iniciarTimer(); }
       if (this.partida?.fase_actual === 'colocacion' && this.esMiTurno) {
-        this.iniciarSubFaseColocacion();
+        const myJLoad   = this.jugadores.find(j => j.usuario_id === this.userId);
+        const tropasLoad = myJLoad?.tropas_por_colocar ?? 0;
+        if (!this.colocacionSimultanea || tropasLoad > 0) {
+          this.iniciarSubFaseColocacion();
+        } else {
+          // Simultáneo y ya confirmé (tropas=0): restaurar estado de espera/aprobación
+          // sin limpiar los mapas de colocación (que se necesitan para aprobarCobro).
+          this.colocacionConfirmadaEstaRonda = true;
+          try {
+            const snapJson = localStorage.getItem(`teg_coloc_snap_${this.partidaId}_${this.userId}`);
+            if (snapJson) {
+              const snap: Record<string, number> = JSON.parse(snapJson);
+              this._colocacionSnapshot    = snap;
+              this._colocacionTropasBase  = Object.values(snap).reduce((s, n) => s + n, 0);
+              this.tropasColocadasBase    = { ...snap };
+              this.rebuildTropasMap();
+            }
+          } catch { /* ignorar datos malformados */ }
+          const allPlacedLoad = this.jugadores.filter(j => this.estaVivo(j.usuario_id))
+            .every(j => (j.tropas_por_colocar ?? -1) === 0);
+          if (allPlacedLoad) this.mostrarAprobacionCobro = true;
+        }
       }
       if (this.esMiTurno && (this.fase === 'colocacion' || this.fase === 'ataque')) {
         void this.verificarVictoriaPorRendicion();
@@ -1800,6 +1821,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       // Esto garantiza que cualquier jugador pueda deshacer sin reversión de DB.
       const totalPlaced = Object.values(allPlaced).reduce((s, n) => s + n, 0);
       this._colocacionSnapshot = { ...allPlaced };
+      // Persistir en localStorage para sobrevivir un reload de página (DB solo guarda tropas=0).
+      localStorage.setItem(`teg_coloc_snap_${this.partidaId}_${this.userId}`, JSON.stringify(this._colocacionSnapshot));
       // Usar el mayor entre el valor real y totalPlaced para cubrir datos desactualizados.
       this._colocacionTropasBase = Math.max(
         this.jugadores.find(j => j.usuario_id === this.userId)?.tropas_por_colocar ?? 0,
@@ -1843,6 +1866,17 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       }
 
       await this.service.setTropasPorColocar(this.partidaId, this.userId, 0);
+      // Actualizar estado local inmediatamente para cerrar la ventana de Realtime:
+      // sin esto, tropasPorColocarBase seguía devolviendo N hasta que llegara el evento
+      // de partida_jugador, permitiendo confirmar una segunda vez con tropas fantasma.
+      const seqMyIdx = this.jugadores.findIndex(j => j.usuario_id === this.userId);
+      if (seqMyIdx !== -1) {
+        this.jugadores = [
+          ...this.jugadores.slice(0, seqMyIdx),
+          { ...this.jugadores[seqMyIdx], tropas_por_colocar: 0 },
+          ...this.jugadores.slice(seqMyIdx + 1),
+        ];
+      }
       this.tropasColocadasContinentes = {};
       this.tropasColocadasBase = {};
       this.continentesColocacion = [];
@@ -1889,10 +1923,17 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       if (added <= 0) continue;
       const estado = this.territorios[tid];
       if (estado) {
-        await this.updateTerritorio(tid, { tropas: estado.tropas + added });
+        const ok = await this.updateTerritorio(tid, { tropas: estado.tropas + added });
+        if (!ok) {
+          // Dejar aprobacionCobroEnviada=false para permitir reintentar.
+          this.aprobacionCobroEnviada = false;
+          this.cdr.markForCheck();
+          return;
+        }
       }
     }
     this._colocacionSnapshot = {};
+    localStorage.removeItem(`teg_coloc_snap_${this.partidaId}_${this.userId}`);
     this.tropasColocadasContinentes = {};
     this.tropasColocadasBase = {};
     this.rebuildTropasMap();
@@ -1935,6 +1976,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       this.tropasColocadasBase = { ...this._colocacionSnapshot };
       this.tropasColocadasContinentes = {};
       this._colocacionSnapshot = {};
+      localStorage.removeItem(`teg_coloc_snap_${this.partidaId}_${this.userId}`);
       this.subFaseColocacion = 'base';
       this.colocacionConfirmadaEstaRonda = false;
       this.mostrarAprobacionCobro = false;
