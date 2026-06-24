@@ -63,7 +63,7 @@ const CHAT_COLORS = [
 
       @if (chatMode) {
         <div class="jc-chat-list" #chatList>
-          @for (m of chatMessages; track m.time) {
+          @for (m of chatMessages; track $index) {
             <div class="jc-chat-row">
               <span class="jc-chat-name" [style.color]="m.color">{{ m.nombre }}</span>
               <span class="jc-chat-msg">{{ m.mensaje }}</span>

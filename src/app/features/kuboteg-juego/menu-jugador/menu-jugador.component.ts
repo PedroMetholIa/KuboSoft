@@ -11,6 +11,7 @@ const PANEL_LABELS: Record<string, string> = {
   diploma:        'Diploma',
   musica:         'Música',
   configuracion:  'Configuración',
+  nuclear:        'Programa Nuclear',
 };
 
 @Component({

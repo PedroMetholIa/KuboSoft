@@ -11,7 +11,6 @@ export interface NotifItem {
   jugador?: string | null;
 }
 
-
 @Component({
   selector: 'app-notificaciones',
   standalone: true,

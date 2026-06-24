@@ -1,9 +1,9 @@
 import { Injectable } from '@angular/core';
-
-export const BOT_USER_ID = '9ee14107-478e-4a24-bec4-aceb9f550884';
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { environment } from '../../../environments/environment';
 import { BehaviorSubject, Observable } from 'rxjs';
+
+export const BOT_USER_ID = '9ee14107-478e-4a24-bec4-aceb9f550884';
 
 export interface Profile {
   id: string;
@@ -71,6 +71,9 @@ export interface Partida {
   ultima_conquista?: UltimaConquista | null;
   acumulado_territorios?: Record<string, number> | null;
   pausado_por?: string | null;
+  con_bomba_atomica?: boolean | null;
+  con_mayorias?: boolean | null;
+  colocacion_simultanea?: boolean | null;
   created_at: string;
 }
 
@@ -87,6 +90,9 @@ export interface PartidaJugador {
   objetivo?: unknown;
   cartas?: string[] | null;
   posturas?: Record<string, 'amigable' | 'neutral' | 'hostil'> | null;
+  rendido?: boolean;
+  bomba_territorio?: string | null;
+  bomba_territorio_2?: string | null;
   usuario?: { nombre: string | null; apellido: string | null; email: string } | null;
   created_at: string;
 }
@@ -131,8 +137,11 @@ export class SupabaseService {
       this.currentUserSubject.next(data.session?.user ?? null);
     });
 
-    this.supabase.auth.onAuthStateChange((_event, session) => {
+    this.supabase.auth.onAuthStateChange((event, session) => {
       this.currentUserSubject.next(session?.user ?? null);
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
+        this.updateOnlineStatus(session.user.id, true);
+      }
     });
   }
 
@@ -286,7 +295,6 @@ export class SupabaseService {
       .eq('usuario_id', usuarioId);
   }
 
-
   marcarEstaDentroConColor(partidaId: string, usuarioId: string, color: string, lider?: string) {
     const payload: Record<string, unknown> = { esta_dentro: true, color };
     if (lider) payload['lider'] = lider;
@@ -318,10 +326,24 @@ export class SupabaseService {
 
   getPartidaJugadores(partidaId: string) {
     return this.supabase.from('partida_jugador')
-      .select('id, usuario_id, orden_turno, puntos, esta_dentro, tropas_por_colocar, color, lider, objetivo, posturas, usuario!left(nombre, apellido, email)')
+      .select('id, usuario_id, orden_turno, puntos, esta_dentro, tropas_por_colocar, color, lider, objetivo, posturas, rendido, bomba_territorio, bomba_territorio_2, usuario!left(nombre, apellido, email)')
       .eq('partida_id', partidaId)
       .order('orden_turno')
       .then(r => ({ ...r, data: r.data as unknown as PartidaJugador[] | null }));
+  }
+
+  setBombaTerritorios(partidaId: string, usuarioId: string, t1: string | null, t2: string | null) {
+    return this.supabase.from('partida_jugador')
+      .update({ bomba_territorio: t1, bomba_territorio_2: t2 })
+      .eq('partida_id', partidaId)
+      .eq('usuario_id', usuarioId);
+  }
+
+  rendirJugador(partidaId: string, usuarioId: string) {
+    return this.supabase.from('partida_jugador')
+      .update({ rendido: true })
+      .eq('partida_id', partidaId)
+      .eq('usuario_id', usuarioId);
   }
 
   eliminarPartidaJugador(partidaId: string, usuarioId: string) {
@@ -503,10 +525,10 @@ export class SupabaseService {
       .then(r => ({ ...r, data: r.data as unknown as TerritorioEstado[] | null }));
   }
 
-initTerritorios(territorios: Omit<TerritorioEstado, 'id'>[]) {
-  return this.supabase.from('territorio_estado')
-    .upsert(territorios, { onConflict: 'partida_id,territorio_id' });
-}
+  initTerritorios(territorios: Omit<TerritorioEstado, 'id'>[]) {
+    return this.supabase.from('territorio_estado')
+      .upsert(territorios, { onConflict: 'partida_id,territorio_id' });
+  }
 
   updateTerritorioEstado(partidaId: string, territorioId: string, data: Partial<Pick<TerritorioEstado, 'usuario_id' | 'tropas'>>) {
     return this.supabase.from('territorio_estado')
@@ -586,6 +608,10 @@ initTerritorios(territorios: Omit<TerritorioEstado, 'id'>[]) {
     ganador_nombre: string;
     ganador_lider: string | null;
     dedicatoria: string;
+    rondas_jugadas: number | null;
+    rondas_limite: number | null;
+    duracion_minutos: number | null;
+    tipo_victoria: 'objetivo' | 'limite_rondas' | 'rendicion' | null;
   }) {
     return this.supabase.from('dedicatorias').insert(data);
   }

@@ -9,14 +9,13 @@ import { MapComponent } from './map/map.component';
 import { NotificacionesComponent, NotifItem } from './notificaciones/notificaciones.component';
 import { CombatePanelComponent } from './combate-panel/combate-panel.component';
 import { KubotegChatComponent, ChatMensaje } from './chat/chat.component';
-import { PartidaInfoComponent } from './partida-info/partida-info.component';
 import { MenuJugadorComponent } from './menu-jugador/menu-jugador.component';
 import { TERRITORIES } from './map/territories.data';
 
 type ObjetivoSecreto =
   | { tipo: 'continentes'; ids: [string, string] }
   | { tipo: 'destruir'; color: string; fallback?: true }
-  | { tipo: 'mayorias_continente'; mayoriaIds: [string, string]; continenteId: string }
+  | { tipo: 'tres_mayorias' }
   | { tipo: 'cuatro_mayorias' };
 
 interface ConquistaPendiente {
@@ -88,11 +87,18 @@ interface CombateRpc {
   tropas_destino_final?: number;
 }
 
+interface Dedicatoria {
+  id: string;
+  ganador_nombre: string;
+  ganador_lider: string | null;
+  dedicatoria: string;
+  jugadores: Array<{ usuario_id: string }>;
+}
 
 @Component({
   selector: 'app-kuboteg-juego',
   standalone: true,
-  imports: [FormsModule, KeyValuePipe, MapComponent, NotificacionesComponent, CombatePanelComponent, KubotegChatComponent, PartidaInfoComponent, MenuJugadorComponent],
+  imports: [FormsModule, KeyValuePipe, MapComponent, NotificacionesComponent, CombatePanelComponent, KubotegChatComponent, MenuJugadorComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './kuboteg-juego.component.html',
   styleUrl: './kuboteg-juego.component.scss'
@@ -148,7 +154,6 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   declarando = false;
   procesandoTurno = false;
   panelAbierto = true;
-  private botEjecutando = false;
   readonly BOT_USER_ID = BOT_USER_ID;
 
   // ── Color / Lider modal ────────────────────────────────
@@ -187,6 +192,15 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   tropasColocadasContinentes: Record<string, number> = {};
   tropasColocadasBase: Record<string, number> = {};
   subFaseColocacion: 'continentes' | 'base' = 'base';
+  private confirmandoColocacion = false;
+  private colocacionConfirmadaEstaRonda = false;
+  private _colocacionSnapshot: Record<string, number> = {};
+  private _colocacionTropasBase = 0;
+  private deshaciendo = false;
+  mostrarAprobacionCobro = false;
+  aprobacionCobroEnviada = false;
+  private _aprobacionesCobro = new Set<string>();
+  private _startIdxParaAtaque = 0;
   continentesColocacion: Array<{
     id: string; nombre: string; bonus: number; colocadas: number; territoriosPermitidos: string[]; tipo: 'mayoria' | 'totalidad';
   }> = [];
@@ -219,6 +233,24 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   mostrarObjetivoPopup = false;
   mostrarPopupEliminado = false;
   eliminadoPorNombre = '';
+  mostrarModalRendicion = false;
+  mostrarPopupRendicion = false;
+  // ── Bomba Atómica ─────────────────────────────────
+  // null = obtenida pero no colocada, string = colocada en ese territorio
+  bombas: (string | null)[] = [];
+  bombaColocandoIdx = 0;
+  modoColocandoBomba = false;
+  bombaUsandoIdx = 0;
+  modoUsandoBomba = false;
+  combateEnCurso = false;
+  bombasMovidasEnRonda: (number | null)[] = [];
+
+  get tieneBomba(): boolean  { return this.bombas.length > 0; }
+  get jugandoConBomba(): boolean { return this.partida?.con_bomba_atomica !== false; }
+  get jugandoConMayorias(): boolean { return this.partida?.con_mayorias !== false; }
+  get bombaColocadaEnId(): string | null { return this.bombas[0] ?? null; }
+  territoriosDestruidos = new Set<string>();
+  territorioMisilActivoId: string | null = null;
   gameNotif: { msg: string; tipo: 'ok' | 'info' | 'warn' | 'error' } | null = null;
   private gameNotifTimer: ReturnType<typeof setTimeout> | null = null;
   modalPostura: { jugadorId: string; postura: 'amigable' | 'neutral' | 'hostil' } | null = null;
@@ -234,7 +266,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   dedicatoriaGuardada = false;
   guardandoDedicatoria = false;
   mostrarHistorial = false;
-  historialDedicatorias: any[] = [];
+  historialDedicatorias: Dedicatoria[] = [];
   cargandoHistorial = false;
   modoAudio: 'sin_sonido' | 'sin_musica' | 'musica_uniforme' | 'musica_lideres' = 'musica_lideres';
   private ultimoModoActivo: 'musica_uniforme' | 'musica_lideres' = 'musica_lideres';
@@ -259,6 +291,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   pactoReceptorId: string | null = null;
   modalRomperPacto = false;
   modalConfirmHostil: { jugadorId: string; jugadorNombre: string; pactosAfectados: number; gruposAfectados: number } | null = null;
+  modalConfirmMoverBomba: number | null = null;
 
   // ── Sistema de cartas ─────────────────────────────────
   misCartas: string[] = [];
@@ -506,7 +539,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const liderNombre = this.jugadorLideres[this.jugadorActualId];
+    const liderNombre = this.jugadorLideres[this.liderDisplayId];
     const lider = this.lideres.find(l => l.nombre === liderNombre);
     const rawSrc = this.modoAudio === 'musica_uniforme'
       ? 'assets/KuboTeg/sonidos/musica-fondo.mp3'
@@ -538,9 +571,56 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     return orden[idx] ?? '';
   }
 
-  get esMiTurno(): boolean { return !!this.jugadorActualId && this.jugadorActualId === this.userId; }
+  get esMiTurno(): boolean {
+    if (this.colocacionSimultanea && this.fase === 'colocacion') {
+      return this.estaVivo(this.userId);
+    }
+    return !!this.jugadorActualId && this.jugadorActualId === this.userId;
+  }
   get esHost(): boolean { return this.partida?.host_id === this.userId; }
+
+  get colocacionSimultanea(): boolean { return this.partida?.colocacion_simultanea === true; }
+
+  get misColocacionConfirmada(): boolean {
+    return this.colocacionSimultanea && this.fase === 'colocacion' && this.colocacionConfirmadaEstaRonda;
+  }
+
+  get jugadoresPendientesColocacion(): typeof this.jugadores {
+    return this.jugadores.filter(j => this.estaVivo(j.usuario_id) && (j.tropas_por_colocar ?? 0) > 0);
+  }
   get esTurnoBot(): boolean { return this.jugadorActualId === BOT_USER_ID; }
+
+  get turnOrderDisplay(): { uid: string; pos: number; nombre: string; color: string; isActual: boolean; isAlive: boolean; isMe: boolean; liderNombre: string; liderImg: string }[] {
+    if (!this.partida?.orden_jugadores) return [];
+    return [...this.partida.orden_jugadores].reverse().map((uid, _idx, arr) => {
+      const pos = arr.length - _idx;
+      const j = this.jugadores.find(jj => jj.usuario_id === uid);
+      const liderNombre = this.jugadorLideres[uid] ?? '';
+      const lider = this.lideres.find(l => l.nombre === liderNombre);
+      let liderImg = '';
+      if (lider) {
+        if (uid === this.userId) {
+          liderImg = this.getLiderImgPath(lider);
+        } else {
+          const postura = j?.posturas?.[this.userId] ?? 'neutral';
+          if (postura === 'hostil')    liderImg = this.validarImgPath(lider.img_hostil   ?? lider.img_neutra ?? '');
+          else if (postura === 'amigable') liderImg = this.validarImgPath(lider.img_amigable ?? lider.img_neutra ?? '');
+          else                         liderImg = this.getLiderImgPath(lider);
+        }
+      }
+      return {
+        uid,
+        pos,
+        nombre: j ? this.nombreJugador(j) : uid.slice(0, 6) + '…',
+        color: this.jugadorColores[uid] || '#94a3b8',
+        isActual: uid === this.jugadorActualId,
+        isAlive: this.estaVivo(uid),
+        isMe: uid === this.userId,
+        liderNombre,
+        liderImg,
+      };
+    });
+  }
 
   get todosAdentro(): boolean {
     return this.jugadores.length > 0 &&
@@ -557,6 +637,49 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   get continenteActualColocacion() {
     return this.continentesColocacion[this.continenteColocacionIdx] ?? null;
+  }
+
+  get meRendi(): boolean {
+    return this.jugadores.find(j => j.usuario_id === this.userId)?.rendido === true;
+  }
+
+  get puedeVolverContinente(): boolean {
+    if (!this.esMiTurno || this.fase !== 'colocacion') return false;
+    if (this.subFaseColocacion === 'continentes') return this.continenteColocacionIdx > 0;
+    if (this.subFaseColocacion === 'base') return this.continentesColocacion.length > 0;
+    return false;
+  }
+
+  deshacerContinente(): void {
+    let targetIdx: number;
+    if (this.subFaseColocacion === 'base') {
+      this.subFaseColocacion = 'continentes';
+      targetIdx = this.continentesColocacion.length - 1;
+      this.continenteColocacionIdx = targetIdx;
+    } else {
+      this.continenteColocacionIdx--;
+      targetIdx = this.continenteColocacionIdx;
+    }
+    const cont = this.continentesColocacion[targetIdx];
+    if (!cont) return;
+
+    const afectados: string[] = [];
+    for (const tid of cont.territoriosPermitidos) {
+      if ((this.tropasColocadasContinentes[tid] ?? 0) > 0) {
+        afectados.push(tid);
+        this.tropasColocadasContinentes = { ...this.tropasColocadasContinentes, [tid]: 0 };
+      }
+    }
+    cont.colocadas = 0;
+    this.rebuildTropasMap();
+    this.playSfx('assets/KuboTeg/sonidos/quitar-ficha.mp3');
+    for (const tid of afectados) {
+      this.channelEventos?.send({
+        type: 'broadcast', event: 'colocacion_tropa',
+        payload: { territorioId: tid, jugadorId: this.userId, accion: 'quitar', tropasTotales: this._tropasMap[tid] ?? 0 },
+      });
+    }
+    this.cdr.markForCheck();
   }
 
   get misTropasParaColocar(): number {
@@ -605,6 +728,12 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   get territoriosDestacados(): string[] {
+    if (this.modoUsandoBomba && (this.bombas[this.bombaUsandoIdx] ?? null)) return this.bombaAlcanceEnemigos;
+    if (this.modoColocandoBomba) {
+      return Object.entries(this.territorios)
+        .filter(([, e]) => e.usuario_id === this.userId)
+        .map(([id]) => id);
+    }
     if (this.modoPacto === 'propio') return this.calcPactoDisponiblesPropio();
     if (this.modoPacto === 'ajeno')  return this.calcPactoDisponiblesAjenos();
     if (this.fase === 'colocacion' && this.esMiTurno && this.subFaseColocacion === 'continentes') {
@@ -654,16 +783,34 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     return j?.posturas?.[this.userId] ?? null;
   }
 
+  // En cobro simultáneo cada jugador ve/escucha su propio líder.
+  // En el resto de fases ve/escucha al líder del turno actual.
+  get liderDisplayId(): string {
+    if (this.colocacionSimultanea && this.fase === 'colocacion' && this.estaVivo(this.userId)) {
+      return this.userId;
+    }
+    return this.jugadorActualId;
+  }
+
+  get liderDisplayNombre(): string {
+    if (this.colocacionSimultanea && this.fase === 'colocacion' && this.estaVivo(this.userId)) {
+      const miJ = this.jugadores.find(j => j.usuario_id === this.userId);
+      return miJ ? this.nombreJugador(miJ) : '';
+    }
+    return this.jugadorActualNombre;
+  }
+
   get liderActualImgPath(): string {
-    const liderNombre = this.jugadorLideres[this.jugadorActualId];
+    const displayId = this.liderDisplayId;
+    const liderNombre = this.jugadorLideres[displayId];
     if (!liderNombre) return '';
     const lider = this.lideres.find(l => l.nombre === liderNombre);
     if (!lider) return '';
-    if (this.jugadorActualId === this.userId) {
+    if (displayId === this.userId) {
       return this.getLiderImgPath(lider);
     }
-    const jugadorActual = this.jugadores.find(j => j.usuario_id === this.jugadorActualId);
-    const posturaHaciaMe = jugadorActual?.posturas?.[this.userId] ?? 'neutral';
+    const jugadorDisplay = this.jugadores.find(j => j.usuario_id === displayId);
+    const posturaHaciaMe = jugadorDisplay?.posturas?.[this.userId] ?? 'neutral';
     if (posturaHaciaMe === 'hostil') {
       return this.validarImgPath(lider.img_hostil ?? lider.img_neutra ?? '');
     }
@@ -763,6 +910,38 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       if (miJ?.cartas)   this.misCartas  = miJ.cartas;
       const storedTotal = localStorage.getItem(`teg_cartas_total_${this.partidaId}_${this.userId}`);
       if (storedTotal) this.cartasRobadasTotal = parseInt(storedTotal, 10) || 0;
+      try {
+        const bombaJson = localStorage.getItem(`teg_bomba_${this.partidaId}_${this.userId}`);
+        if (bombaJson) {
+          const b = JSON.parse(bombaJson);
+          if (Array.isArray(b.bombas)) {
+            this.bombas = b.bombas;
+          } else if (b.tiene) {
+            this.bombas = [b.colocadaEn ?? null]; // compatibilidad formato anterior
+          }
+          if (Array.isArray(b.movidasEnRonda)) {
+            this.bombasMovidasEnRonda = b.movidasEnRonda;
+          }
+        }
+      } catch { /* ignore */ }
+      try {
+        const destruidosJson = localStorage.getItem(`teg_destruidos_${this.partidaId}`);
+        if (destruidosJson) {
+          const arr: string[] = JSON.parse(destruidosJson);
+          this.territoriosDestruidos = new Set(arr);
+        }
+      } catch { /* ignore */ }
+      // Fallback desde DB si localStorage está vacío
+      const miJDb = jugadores?.find((j: PartidaJugador) => j.usuario_id === this.userId);
+      if (this.bombas.length === 0 && (miJDb?.bomba_territorio || miJDb?.bomba_territorio_2)) {
+        const dbPlaced: (string | null)[] = [];
+        if (miJDb.bomba_territorio)   dbPlaced.push(miJDb.bomba_territorio);
+        if (miJDb.bomba_territorio_2) dbPlaced.push(miJDb.bomba_territorio_2);
+        this.bombas = dbPlaced;
+      }
+      // Garantizar que jugadores refleja el estado local de bombas (fuente de verdad: localStorage)
+      const [initT1, initT2] = this.bombasT1T2();
+      this.syncBombasJugador(this.userId, initT1, initT2);
 
       const terrArray = territorios ?? [];
       this.territorios = {};
@@ -774,6 +953,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       if (this.partida?.estado === 'En juego') { this.iniciarMusica(); this.iniciarTimer(); }
       if (this.partida?.fase_actual === 'colocacion' && this.esMiTurno) {
         this.iniciarSubFaseColocacion();
+      }
+      if (this.esMiTurno && (this.fase === 'colocacion' || this.fase === 'ataque')) {
+        void this.verificarVictoriaPorRendicion();
       }
       this.cdr.markForCheck();
 
@@ -820,6 +1002,16 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       .on('broadcast', { event: 'chat' }, ({ payload }) => {
         const msg = payload as ChatMensaje;
         if (msg.userId !== this.userId) {
+          if (msg.grupoId) {
+            if (msg.grupoId.startsWith('dm:')) {
+              // DM: el grupoId es 'dm:userId1:userId2' — el receptor debe estar en el id
+              if (!msg.grupoId.includes(this.userId)) return;
+            } else {
+              // Grupo: verificar que el usuario pertenece al grupo
+              const grupo = this.grupos.find(g => g.id === msg.grupoId);
+              if (!grupo || !grupo.jugadoresIds.includes(this.userId)) return;
+            }
+          }
           this.chatMensajes = [...this.chatMensajes, msg];
           const canal = msg.grupoId ?? 'global';
           const visible = this.panelActivo === 'chat' && this.chatActivoId === canal;
@@ -839,7 +1031,6 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         if (uc.ts > this._lastCombateTs) {
           this._lastCombateTs = uc.ts;
           this.mostrarPopupCombate(uc);
-          this.pushNotifCombate(uc);
           this.cdr.markForCheck();
         }
       })
@@ -848,7 +1039,6 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         if (uq.ts > this._lastConquistaTs) {
           this._lastConquistaTs = uq.ts;
           this.mostrarNotifConquista(uq);
-          this.pushNotifConquista(uq);
           this.cdr.markForCheck();
         }
       })
@@ -893,6 +1083,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
             this.showGameNotif('¡Pacto renovado!', 'ok');
           } else if (r.accepted && r.pacto) {
             this.pactos = [...this.pactos, r.pacto];
+            void this.aplicarPostura(r.pacto.jugador2Id, 'amigable');
             this.playSfx('assets/KuboTeg/sonidos/pacto.mp3');
             this.showGameNotif('¡Pacto aceptado!', 'ok');
           } else if (!r.accepted) {
@@ -1055,6 +1246,69 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         this.activarHighlightCartaAcierta(e.cartaId);
         this.cdr.markForCheck();
       })
+      .on('broadcast', { event: 'bomba_posicion' }, ({ payload }) => {
+        const e = payload as { jugadorId: string; bomba1: string | null; bomba2: string | null };
+        if (e.jugadorId === this.userId) return;
+        this.syncBombasJugador(e.jugadorId, e.bomba1 ?? null, e.bomba2 ?? null);
+        this.cdr.markForCheck();
+      })
+      .on('broadcast', { event: 'bomba_capturada' }, ({ payload }) => {
+        // Evento específico para cuando un atacante captura la bomba del defensor.
+        // A diferencia de bomba_posicion, el DEFENSOR (dueño original) también lo procesa.
+        const e = payload as { jugadorId: string; bomba1: string | null; bomba2: string | null };
+        this.syncBombasJugador(e.jugadorId, e.bomba1 ?? null, e.bomba2 ?? null);
+        if (e.jugadorId === this.userId) {
+          // Actualizar estado local: quitar la bomba capturada
+          const nuevasBombas = ([e.bomba1, e.bomba2] as (string | null)[]).filter(b => b !== null) as string[];
+          this.bombas = nuevasBombas;
+          this.bombasMovidasEnRonda = [];
+          this.saveBombaState();
+          this.modoUsandoBomba = false;
+          this.showGameNotif('¡Tu bomba fue capturada por el atacante!', 'warn');
+        }
+        this.cdr.markForCheck();
+      })
+      .on('broadcast', { event: 'bomba_atomica' }, ({ payload }) => {
+        const e = payload as { territorioId: string; jugadorId: string; victimaId?: string; bomba1: string | null; bomba2: string | null };
+        if (e.jugadorId === this.userId) return;
+        if (e.victimaId === this.userId) void this.aplicarPostura(e.jugadorId, 'hostil');
+        this.syncBombasJugador(e.jugadorId, e.bomba1 ?? null, e.bomba2 ?? null);
+        this.territorioMisilActivoId = e.territorioId;
+        this.cdr.markForCheck();
+        setTimeout(() => { this.territorioMisilActivoId = null; this.cdr.markForCheck(); }, 1500);
+        setTimeout(() => { this.marcarDestruido(e.territorioId); this.cdr.markForCheck(); }, 750);
+        const atacanteNombre = this.jugadorNombres[e.jugadorId] ?? '?';
+        const terrNombre     = this.nombreTerritorio(e.territorioId);
+        this.playSfx('assets/KuboTeg/sonidos/bomba-nuclear.mp3');
+        this.addNotif({ tipo: 'conquista', icono: '☢', linea1: `${atacanteNombre} lanzó la Bomba Atómica`, linea2: `${terrNombre} reducido a 1 tropa`, color: '#fbbf24', ts: Date.now() });
+        this.cdr.markForCheck();
+      })
+      .on('broadcast', { event: 'combate_inicio' }, () => {
+        this.combateEnCurso = true;
+        this.cdr.markForCheck();
+      })
+      .on('broadcast', { event: 'combate_fin' }, () => {
+        this.combateEnCurso = false;
+        this.cdr.markForCheck();
+      })
+      .on('broadcast', { event: 'colocacion_lista' }, () => {
+        this.mostrarAprobacionCobro = true;
+        this.aprobacionCobroEnviada = false;
+        this._aprobacionesCobro.clear();
+        this.cdr.markForCheck();
+      })
+      .on('broadcast', { event: 'aprobacion_cobro' }, ({ payload }) => {
+        const uid = (payload as { userId: string }).userId;
+        this._aprobacionesCobro.add(uid);
+        if (this.esHost) void this.checkTodosAprobaron();
+        this.cdr.markForCheck();
+      })
+      .on('broadcast', { event: 'undo_colocacion' }, () => {
+        this.mostrarAprobacionCobro = false;
+        this.aprobacionCobroEnviada = false;
+        this._aprobacionesCobro.clear();
+        this.cdr.markForCheck();
+      })
       .subscribe();
 
     this.channelPartida = this.service.client
@@ -1093,26 +1347,30 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
           if (uc?.ts && uc.ts !== this._lastCombateTs) {
             this._lastCombateTs = uc.ts;
             this.mostrarPopupCombate(uc);
-            this.pushNotifCombate(uc);
           }
           const prevFase = this.fase;
           const prevJugadorIdx = this.partida?.jugador_actual_index;
           this.partida = newPartida;
-          if (this.fase === 'colocacion' && this.esMiTurno &&
-              (prevFase !== 'colocacion' || prevJugadorIdx !== newPartida.jugador_actual_index)) {
-            this.iniciarSubFaseColocacion();
-          }
           if (this.fase === 'reagrupacion' && prevFase !== 'reagrupacion' && this.esMiTurno) {
             this.iniciarFaseReagrupacion();
           }
           // Sincronizar territorios al cambio de turno/fase para compensar
           // eventos de postgres_changes que el observador pudo haber perdido.
+          // iniciarSubFaseColocacion se llama DENTRO del .then() para garantizar que
+          // usa datos de territorio frescos al calcular continentesColocacion.
           const turnoCambio = prevFase !== this.fase || prevJugadorIdx !== newPartida.jugador_actual_index;
+          const needsColocInit = this.fase === 'colocacion' && this.esMiTurno &&
+            (prevFase !== 'colocacion' || prevJugadorIdx !== newPartida.jugador_actual_index);
           if (turnoCambio) {
-            this.syncTerritorios();
+            this.syncTerritorios().then(() => {
+              if (needsColocInit) this.iniciarSubFaseColocacion();
+            });
             if (this.partida?.estado === 'En juego') this.cambiarMusicaLider();
             if (this.esMiTurno && prevJugadorIdx !== newPartida.jugador_actual_index) {
               this.playSfx('assets/KuboTeg/sonidos/confirma-seleccion.mp3');
+            }
+            if (this.esMiTurno && (this.fase === 'colocacion' || this.fase === 'ataque')) {
+              void this.verificarVictoriaPorRendicion();
             }
             // Bot turns handled by Edge Function (Option B)
           }
@@ -1133,10 +1391,44 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
           const prev = this.jugadores[idx];
           this.jugadores = [
             ...this.jugadores.slice(0, idx),
-            { ...prev, ...updated, usuario: prev.usuario },
+            {
+              ...prev,
+              ...updated,
+              usuario: prev.usuario,
+              // Aplicar valor de DB. Excepción: si el broadcast ya limpió el estado en memoria
+              // (prev = null) y llega un evento Realtime tardío con un valor no-null (snapshot
+              // anterior al lanzamiento), se mantiene null para no restaurar el ícono.
+              // El evento definitivo de setBombaTerritorios(null) llega después y confirma.
+              bomba_territorio: (() => {
+                const dbVal = updated.bomba_territorio !== undefined ? updated.bomba_territorio : prev.bomba_territorio;
+                if (updated.usuario_id !== this.userId && prev.bomba_territorio === null && dbVal !== null) return null;
+                return dbVal;
+              })(),
+              bomba_territorio_2: (() => {
+                const dbVal2 = updated.bomba_territorio_2 !== undefined ? updated.bomba_territorio_2 : prev.bomba_territorio_2;
+                if (updated.usuario_id !== this.userId && prev.bomba_territorio_2 === null && dbVal2 !== null) return null;
+                return dbVal2;
+              })(),
+            },
             ...this.jugadores.slice(idx + 1),
           ];
           if (updated.usuario_id === this.userId) {
+            // Sanear bombas cuyos territorios ya no son propios (conquista mientras
+            // setBombaTerritorios no había llegado a DB). El broadcast bomba_capturada
+            // es el canal primario; este chequeo actúa como red de seguridad secundaria.
+            const bombasSaneadas = this.bombas.map(pos => {
+              if (!pos) return null;
+              const terr = this.territorios[pos];
+              return (!terr || terr.usuario_id !== this.userId) ? null : pos;
+            });
+            const bombasChanged = bombasSaneadas.some((b, i) => b !== this.bombas[i]);
+            if (bombasChanged) {
+              this.bombas = bombasSaneadas.filter(b => b !== null) as string[];
+              this.saveBombaState();
+            }
+            const [pjT1, pjT2] = this.bombasT1T2();
+            this.syncBombasJugador(this.userId, pjT1, pjT2);
+
             if (updated.objetivo) {
               this.miObjetivo = updated.objetivo as ObjetivoSecreto;
               const seenKey = `obj_visto_${this.partidaId}_${this.userId}`;
@@ -1147,9 +1439,27 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
             if (updated.posturas) this.posturas = { ...updated.posturas };
             if (updated.cartas != null) this.misCartas = updated.cartas;
           }
+          if (updated.rendido && !prev.rendido) {
+            if (updated.usuario_id !== this.userId) {
+              const nombre = this.nombreJugador(this.jugadores.find(j => j.usuario_id === updated.usuario_id) ?? null);
+              this.addNotif({ tipo: 'conquista', icono: '🏳', linea1: `${nombre} se rindió`, linea2: 'abandonó la partida', color: '#94a3b8', ts: Date.now() });
+            }
+            void this.verificarVictoriaPorRendicion();
+          }
+          if (updated.bomba_territorio !== prev.bomba_territorio && updated.usuario_id !== this.userId) {
+            this.cdr.markForCheck();
+          }
           this.rebuildJugadores();
           this.cdr.markForCheck();
           this.checkAutoDistribuir();
+          // Modo colocación simultánea: el host detecta cuando todos confirmaron
+          if (this.esHost && this.colocacionSimultanea && this.fase === 'colocacion') {
+            const prevTropas = prev.tropas_por_colocar ?? -1;
+            const newTropas  = updated.tropas_por_colocar ?? -1;
+            if (prevTropas > 0 && newTropas === 0) {
+              void this.checkTodosConfirmaronColocacion();
+            }
+          }
         }
       })
       .subscribe((status, err) => {
@@ -1185,6 +1495,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     const map: Record<string, TerritorioEstado> = {};
     for (const t of data) map[t.territorio_id] = t;
     this.territorios = { ...this.territorios, ...map };
+    this._tropasPreviewMap = {};
     this.rebuildMaps();
     this.cdr.markForCheck();
   }
@@ -1205,13 +1516,47 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         if (partida) this.partida = partida;
         if (jugadores) {
           this.jugadores = jugadores;
+          // Re-aplicar posición de bomba propia (el broadcast es efímero; puede haberse perdido)
+          const [rcT1, rcT2] = this.bombasT1T2();
+          this.syncBombasJugador(this.userId, rcT1, rcT2);
           this.rebuildJugadores();
         }
         if (territorios) {
           this.territorios = {};
           territorios.forEach(t => { this.territorios[t.territorio_id] = t; });
         }
+        // Limpiar previews: al reconectar, el DB es la fuente de verdad.
+        // Sin esto, broadcasts de colocación previos a la caída sobreescriben los valores frescos.
+        this._tropasPreviewMap = {};
         this.rebuildMaps();
+        // Re-inicializar subFase de colocación con datos frescos de territorio.
+        // Solo si el jugador aún tiene tropas por colocar (tropas_por_colocar > 0).
+        // Si ya estaban en 0, la confirmación fue exitosa y no hay que volver a iniciar.
+        const miJRecon = this.jugadores.find(j => j.usuario_id === this.userId);
+        if (this.partida?.fase_actual === 'colocacion' && this.esMiTurno) {
+          const misT = miJRecon?.tropas_por_colocar ?? 0;
+          if (misT > 0) {
+            this.iniciarSubFaseColocacion();
+          } else if (this.colocacionSimultanea && misT === 0) {
+            // Ya confirmé antes de la caída; restaurar estado de espera/aprobación.
+            // Los mapas de colocación persisten en memoria si no hubo recarga de página.
+            this.colocacionConfirmadaEstaRonda = true;
+            // Reconstruir snapshot desde los mapas locales (no se borraron al confirmar).
+            if (Object.keys(this._colocacionSnapshot).length === 0) {
+              const rebuilt: Record<string, number> = {};
+              for (const [tid, n] of Object.entries(this.tropasColocadasContinentes)) {
+                if (n > 0) rebuilt[tid] = (rebuilt[tid] ?? 0) + n;
+              }
+              for (const [tid, n] of Object.entries(this.tropasColocadasBase)) {
+                if (n > 0) rebuilt[tid] = (rebuilt[tid] ?? 0) + n;
+              }
+              this._colocacionSnapshot = rebuilt;
+            }
+            const allPlaced = this.jugadores.filter(j => this.estaVivo(j.usuario_id))
+              .every(j => (j.tropas_por_colocar ?? -1) === 0);
+            if (allPlaced) this.mostrarAprobacionCobro = true;
+          }
+        }
         this.toast.show('Conexión restaurada', 'success');
       } catch {
         this.toast.show('No se pudo reconectar. Recargá la página.', 'error');
@@ -1329,10 +1674,17 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     if (this.verPactosEnMapa) { this.verPactosEnMapa = false; this.cdr.markForCheck(); return; }
     if (this.modoPacto === 'propio')   { this.handlePactoClickPropio(territorioId);   return; }
     if (this.modoPacto === 'ajeno')    { this.handlePactoClickAjeno(territorioId);    return; }
+    // Bomba activa durante fase de ataque: permitir click aunque no sea el turno propio,
+    // siempre que no haya un combate en curso del atacante.
+    if (this.modoUsandoBomba && this.fase === 'ataque' && !this.esMiTurno) {
+      if (!this.combateEnCurso) void this.ejecutarBomba(territorioId);
+      return;
+    }
     if (!this.esMiTurno) return;
+    if (this.modoColocandoBomba) { this.colocarBomba(territorioId); return; }
     switch (this.fase) {
       case 'colocacion':   this.colocarTropa(territorioId); break;
-      case 'ataque':       this.handleAtaqueClick(territorioId); break;
+      case 'ataque':       void this.handleAtaqueClick(territorioId); break;
       case 'reagrupacion': this.handleReagrupacionClick(territorioId); break;
     }
   }
@@ -1417,8 +1769,15 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   async confirmarColocacion() {
+    if (this.confirmandoColocacion) return;
     if (this.subFaseColocacion !== 'base' || this.misTropasParaColocar !== 0 || !this.partida) return;
+    if (this.bombas.some(b => b === null)) {
+      this.showGameNotif('Debés colocar todas las Bombas Atómicas antes de continuar', 'warn');
+      return;
+    }
 
+    this.confirmandoColocacion = true;
+    try {
     // Capturar valores de turno antes de cualquier await para evitar que
     // eventos de Realtime actualicen this.partida durante la ejecución.
     const orden      = this.partida.orden_jugadores!;
@@ -1435,30 +1794,163 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     for (const [tid, n] of Object.entries(this.tropasColocadasBase)) {
       if (n > 0) allPlaced[tid] = (allPlaced[tid] ?? 0) + n;
     }
-    for (const [tid, added] of Object.entries(allPlaced)) {
-      const estado = this.territorios[tid];
-      if (estado) {
-        const ok = await this.updateTerritorio(tid, { tropas: estado.tropas + added });
-        if (!ok) { this.cdr.markForCheck(); return; }
+    if (this.colocacionSimultanea) {
+      // Modo simultáneo: guardar placements en snapshot y señalizar "listo" (tropas=0).
+      // Los territorios NO se escriben en DB hasta que el jugador apruebe el cobro.
+      // Esto garantiza que cualquier jugador pueda deshacer sin reversión de DB.
+      const totalPlaced = Object.values(allPlaced).reduce((s, n) => s + n, 0);
+      this._colocacionSnapshot = { ...allPlaced };
+      // Usar el mayor entre el valor real y totalPlaced para cubrir datos desactualizados.
+      this._colocacionTropasBase = Math.max(
+        this.jugadores.find(j => j.usuario_id === this.userId)?.tropas_por_colocar ?? 0,
+        totalPlaced
+      );
+
+      // Señalizar "ya coloqué" — tropas_por_colocar = 0 actúa como flag para el host.
+      await this.service.setTropasPorColocar(this.partidaId, this.userId, 0);
+      this.continentesColocacion = [];
+      this.subFaseColocacion = 'base';
+      // No limpiar tropasColocadasContinentes/Base — se necesitan para aplicar en aprobarCobro.
+
+      this.colocacionConfirmadaEstaRonda = true;
+      const myPJIdx = this.jugadores.findIndex(j => j.usuario_id === this.userId);
+      if (myPJIdx !== -1) {
+        this.jugadores = [
+          ...this.jugadores.slice(0, myPJIdx),
+          { ...this.jugadores[myPJIdx], tropas_por_colocar: 0 },
+          ...this.jugadores.slice(myPJIdx + 1),
+        ];
+      }
+      this.rebuildTropasMap();
+      this.cdr.markForCheck();
+      if (this.esHost) this.checkTodosConfirmaronColocacion(startIdx);
+    } else {
+      // Modo secuencial: escribir territorios inmediatamente (comportamiento original).
+      for (const [tid, added] of Object.entries(allPlaced)) {
+        const estado = this.territorios[tid];
+        if (estado) {
+          const ok = await this.updateTerritorio(tid, { tropas: estado.tropas + added });
+          if (!ok) { this.cdr.markForCheck(); return; }
+          delete this.tropasColocadasContinentes[tid];
+          delete this.tropasColocadasBase[tid];
+        }
+      }
+
+      // Garantizar que la posición de bomba esté persistida antes de avanzar de fase.
+      const [cbT1, cbT2] = this.bombasT1T2();
+      if (cbT1 || cbT2) {
+        await this.service.setBombaTerritorios(this.partidaId, this.userId, cbT1, cbT2);
+      }
+
+      await this.service.setTropasPorColocar(this.partidaId, this.userId, 0);
+      this.tropasColocadasContinentes = {};
+      this.tropasColocadasBase = {};
+      this.continentesColocacion = [];
+      this.subFaseColocacion = 'base';
+      this.rebuildTropasMap();
+
+      if (nextIdx === startIdx) {
+        await this.service.setFase(this.partidaId, 'ataque', startIdx);
+      } else {
+        await this.service.avanzarJugador(this.partidaId, nextIdx);
       }
     }
+    } finally {
+      this.confirmandoColocacion = false;
+    }
+  }
 
-    await this.service.setTropasPorColocar(this.partidaId, this.userId, 0);
+  private checkTodosConfirmaronColocacion(startIdx?: number) {
+    if (!this.esHost || !this.partida || this.fase !== 'colocacion' || !this.colocacionSimultanea) return;
+    if (this.mostrarAprobacionCobro) return; // ya en fase de aprobación
+    const allDone = this.jugadores
+      .filter(j => this.estaVivo(j.usuario_id))
+      .every(j => (j.tropas_por_colocar ?? -1) === 0);
+    if (!allDone) return;
+    const orden = this.partida.orden_jugadores!;
+    const ronda = this.partida.ronda_actual!;
+    const n = orden.length;
+    this._startIdxParaAtaque = startIdx ?? this.primerVivoDesde((ronda - 1) % n, orden);
+    this._aprobacionesCobro.clear();
+    // Notificar a todos que empiecen la fase de aprobación
+    this.channelEventos?.send({ type: 'broadcast', event: 'colocacion_lista', payload: {} });
+    this.mostrarAprobacionCobro = true;
+    this.aprobacionCobroEnviada = false;
+    this.cdr.markForCheck();
+  }
+
+  async aprobarCobro() {
+    if (this.aprobacionCobroEnviada) return;
+    this.aprobacionCobroEnviada = true;
+    this.cdr.markForCheck();
+
+    // Ahora sí escribir los territorios en DB (diferido desde confirmarColocacion).
+    for (const [tid, added] of Object.entries(this._colocacionSnapshot)) {
+      if (added <= 0) continue;
+      const estado = this.territorios[tid];
+      if (estado) {
+        await this.updateTerritorio(tid, { tropas: estado.tropas + added });
+      }
+    }
+    this._colocacionSnapshot = {};
     this.tropasColocadasContinentes = {};
     this.tropasColocadasBase = {};
-    this.continentesColocacion = [];
-    this.subFaseColocacion = 'base';
     this.rebuildTropasMap();
 
-    if (nextIdx === startIdx) {
-      await this.service.setFase(this.partidaId, 'ataque', startIdx);
-    } else {
-      await this.service.avanzarJugador(this.partidaId, nextIdx);
+    // Garantizar posición de bomba persistida.
+    const [cbT1, cbT2] = this.bombasT1T2();
+    if (cbT1 || cbT2) {
+      await this.service.setBombaTerritorios(this.partidaId, this.userId, cbT1, cbT2);
+    }
+
+    this._aprobacionesCobro.add(this.userId);
+    this.channelEventos?.send({ type: 'broadcast', event: 'aprobacion_cobro', payload: { userId: this.userId } });
+    if (this.esHost) await this.checkTodosAprobaron();
+    this.cdr.markForCheck();
+  }
+
+  private async checkTodosAprobaron() {
+    if (!this.esHost || !this.partida || this.fase !== 'colocacion') return;
+    const living = this.jugadores.filter(j => this.estaVivo(j.usuario_id)).map(j => j.usuario_id);
+    if (!living.every(uid => this._aprobacionesCobro.has(uid))) return;
+    await this.service.setFase(this.partidaId, 'ataque', this._startIdxParaAtaque);
+  }
+
+  async deshacerColocacionSimultanea() {
+    if (this.deshaciendo || !this.colocacionConfirmadaEstaRonda) return;
+    this.deshaciendo = true;
+    try {
+      // Los territorios NO están escritos en DB (se difieren hasta aprobarCobro),
+      // así que el undo es solo restaurar el estado local sin tocar la DB de territorios.
+      await this.service.setTropasPorColocar(this.partidaId, this.userId, this._colocacionTropasBase);
+      const myIdx = this.jugadores.findIndex(j => j.usuario_id === this.userId);
+      if (myIdx !== -1) {
+        this.jugadores = [
+          ...this.jugadores.slice(0, myIdx),
+          { ...this.jugadores[myIdx], tropas_por_colocar: this._colocacionTropasBase },
+          ...this.jugadores.slice(myIdx + 1),
+        ];
+      }
+      // Restaurar los mapas de colocación desde el snapshot para que el jugador vea sus tropas
+      this.tropasColocadasBase = { ...this._colocacionSnapshot };
+      this.tropasColocadasContinentes = {};
+      this._colocacionSnapshot = {};
+      this.subFaseColocacion = 'base';
+      this.colocacionConfirmadaEstaRonda = false;
+      this.mostrarAprobacionCobro = false;
+      this.aprobacionCobroEnviada = false;
+      this._aprobacionesCobro.clear();
+      this.rebuildTropasMap();
+      this.channelEventos?.send({ type: 'broadcast', event: 'undo_colocacion', payload: {} });
+      this.cdr.markForCheck();
+    } finally {
+      this.deshaciendo = false;
     }
   }
 
   // ── Ataque ────────────────────────────────────────────
   async handleAtaqueClick(territorioId: string) {
+    if (this.modoUsandoBomba) { await this.ejecutarBomba(territorioId); return; }
     if (this.conquistaPendiente) return;
     const estado = this.territorios[territorioId];
     if (!estado) return;
@@ -1490,6 +1982,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   async ejecutarAtaque(origenId: string, destinoId: string) {
     this.lastAttack = { origenId, destinoId };
     this.procesandoCombate = true;
+    this.channelEventos?.send({ type: 'broadcast', event: 'combate_inicio', payload: {} });
     const defensorId = this.territorios[destinoId]?.usuario_id ?? '';
     const defensorJ  = this.jugadores.find(j => j.usuario_id === defensorId);
     try {
@@ -1528,7 +2021,6 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       };
       this._lastCombateTs = popupData.ts;
       this.mostrarPopupCombate(popupData);
-      this.pushNotifCombate(popupData);
       this.channelEventos?.send({ type: 'broadcast', event: 'combate', payload: popupData });
 
       if (conquista) {
@@ -1548,6 +2040,11 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       }
     } finally {
       this.procesandoCombate = false;
+      // Si no hubo conquista, el combate terminó acá. Si hubo, el lock se libera
+      // en confirmarMovimientoConquista cuando conquistaPendiente se limpia.
+      if (!this.conquistaPendiente) {
+        this.channelEventos?.send({ type: 'broadcast', event: 'combate_fin', payload: {} });
+      }
       this.cdr.markForCheck();
     }
   }
@@ -1579,6 +2076,40 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       this.conquistoEnEsteTurno = true;
       this.ultimoTerritorioConquistadoId = destinoId;
 
+      // Transferir bomba si el territorio conquistado la tenía
+      const jugadorConBomba = this.jugadores.find(
+        j => j.usuario_id !== this.userId &&
+             (j.bomba_territorio === destinoId || j.bomba_territorio_2 === destinoId)
+      );
+      if (jugadorConBomba) {
+        // El defensor pierde esa bomba específica
+        const nuevaT1 = jugadorConBomba.bomba_territorio === destinoId ? null : (jugadorConBomba.bomba_territorio ?? null);
+        const nuevaT2 = jugadorConBomba.bomba_territorio_2 === destinoId ? null : (jugadorConBomba.bomba_territorio_2 ?? null);
+        this.syncBombasJugador(jugadorConBomba.usuario_id, nuevaT1, nuevaT2);
+        // Broadcast primero: el defensor y los demás eliminan el ícono inmediatamente
+        this.channelEventos?.send({ type: 'broadcast', event: 'bomba_capturada',
+          payload: { jugadorId: jugadorConBomba.usuario_id, bomba1: nuevaT1, bomba2: nuevaT2 } });
+        // Await garantiza que el DB write se ejecuta
+        await this.service.setBombaTerritorios(this.partidaId, jugadorConBomba.usuario_id, nuevaT1, nuevaT2);
+
+        if (this.bombas.length < 2) {
+          // El atacante captura la bomba (queda colocada en el territorio conquistado)
+          this.bombas = [...this.bombas, destinoId];
+          this.saveBombaState();
+          this.syncBombasJugador(this.userId, this.bombas[0] ?? null, this.bombas[1] ?? null);
+          await this.service.setBombaTerritorios(this.partidaId, this.userId, this.bombas[0] ?? null, this.bombas[1] ?? null);
+          this.channelEventos?.send({ type: 'broadcast', event: 'bomba_posicion',
+            payload: { jugadorId: this.userId, bomba1: this.bombas[0] ?? null, bomba2: this.bombas[1] ?? null } });
+          this.playSfx('assets/KuboTeg/sonidos/alerta-bomba.mp3');
+          this.addNotif({ tipo: 'conquista', icono: '☢', linea1: '¡Bomba Atómica capturada!',
+            linea2: `La bomba de ${defensorNombre} es tuya`, color: '#fbbf24', ts: Date.now() });
+        } else {
+          // Ya tiene 2 bombas → la capturada se destruye
+          this.addNotif({ tipo: 'conquista', icono: '☢', linea1: 'Bomba enemiga destruida',
+            linea2: 'Ya tenés 2 bombas activas', color: '#94a3b8', ts: Date.now() });
+        }
+      }
+
       const defensorQuedan = defensorId
         ? Object.values(this.territorios).filter(
             t => t.usuario_id === defensorId && t.territorio_id !== destinoId
@@ -1596,7 +2127,6 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       };
       this._lastConquistaTs = conquistaData.ts;
       this.mostrarNotifConquista(conquistaData);
-      this.pushNotifConquista(conquistaData);
       this.channelEventos?.send({ type: 'broadcast', event: 'conquista', payload: conquistaData });
 
       if (eliminadoId) {
@@ -1611,6 +2141,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       }
 
       this.conquistaPendiente = null;
+      this.channelEventos?.send({ type: 'broadcast', event: 'combate_fin', payload: {} });
       this.cdr.markForCheck();
 
       if (this.verificarVictoriaObjetivo(destinoId, eliminadoId)) {
@@ -1638,7 +2169,14 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   iniciarSubFaseColocacion() {
     this.tropasColocadasContinentes = {};
     this.tropasColocadasBase = {};
+    this.colocacionConfirmadaEstaRonda = false;
+    this._colocacionSnapshot = {};
+    this.mostrarAprobacionCobro = false;
+    this.aprobacionCobroEnviada = false;
+    this._aprobacionesCobro.clear();
     this.continenteColocacionIdx = 0;
+    this.modoColocandoBomba = false;
+    this.modoUsandoBomba = false;
 
     // Ronda 1: solo tropas iniciales, sin bonus de continente
     if ((this.partida?.ronda_actual ?? 1) <= 1) {
@@ -1665,7 +2203,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
           territoriosPermitidos: [...terrs],
           tipo: 'totalidad',
         });
-      } else if (ownedIds.length >= threshold) {
+      } else if (ownedIds.length >= threshold && this.jugandoConMayorias) {
         const maj = KuboTegJuegoComponent.CONTINENT_MAJORITY.find(m => m.id === cb.id)!;
         entries.push({
           id: cb.id,
@@ -1818,6 +2356,14 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.misCartas = nuevasCartas;
     this.cartasRobadasTotal++;
     localStorage.setItem(`teg_cartas_total_${this.partidaId}_${this.userId}`, String(this.cartasRobadasTotal));
+    if (this.cartasRobadasTotal === 2 && this.bombas.length < 2 && this.jugandoConBomba) {
+      this.bombas = [...this.bombas, null];
+      this.saveBombaState();
+      this.cartasRobadasTotal = 0;
+      localStorage.setItem(`teg_cartas_total_${this.partidaId}_${this.userId}`, '0');
+      const numBomba = this.bombas.length;
+      this.addNotif({ tipo: 'conquista', icono: '☢', linea1: `¡Bomba Atómica ${numBomba > 1 ? numBomba + ' ' : ''}obtenida!`, linea2: 'Colocala en tu próxima fase de colocación', color: '#fbbf24', ts: Date.now() });
+    }
     this.playSfx(esMio
       ? 'assets/KuboTeg/sonidos/acierta-carta.mp3'
       : 'assets/KuboTeg/sonidos/noacierta-carta.mp3');
@@ -1954,6 +2500,17 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
+  private async aplicarPostura(jugadorId: string, postura: 'amigable' | 'neutral' | 'hostil'): Promise<void> {
+    const nuevas = { ...this.posturas, [jugadorId]: postura };
+    const { error } = await this.service.setPosturas(this.partidaId, this.userId, nuevas);
+    if (error) return;
+    this.posturas = nuevas;
+    this.channelEventos?.send({
+      type: 'broadcast', event: 'postura_declarada',
+      payload: { declaranteId: this.userId, receptorId: jugadorId, postura, declaranteNombre: this.nombreJugadorById(this.userId) },
+    });
+  }
+
   async confirmarHostilidad() {
     if (!this.modalConfirmHostil || !this.modalPostura) return;
     const { jugadorId } = this.modalPostura;
@@ -2035,6 +2592,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   // ── Jugadores muertos ─────────────────────────────────
   estaVivo(jugadorId: string): boolean {
+    if (this.jugadores.find(j => j.usuario_id === jugadorId)?.rendido) return false;
     return Object.values(this.territorios).some(t => t.usuario_id === jugadorId);
   }
 
@@ -2081,6 +2639,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   async iniciarNuevaRonda() {
     if (!this.partida) return;
+    // Refrescar territorios antes de calcular bonuses para evitar que datos desactualizados
+    // del host produzcan un tropas_por_colocar incorrecto para cada jugador.
+    await this.syncTerritorios();
     const orden       = this.partida.orden_jugadores!;
     const rondaActual = this.partida.ronda_actual!;
     const limite      = this.partida.limite_rondas ?? null;
@@ -2161,7 +2722,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       const threshold = Math.floor(terrs.length / 2) + 1;
       if (owned === terrs.length) {
         bonus += cb.bonus;
-      } else if (owned >= threshold) {
+      } else if (owned >= threshold && this.jugandoConMayorias) {
         const maj = KuboTegJuegoComponent.CONTINENT_MAJORITY.find(m => m.id === cb.id)!;
         bonus += maj.bonus;
       }
@@ -2224,9 +2785,6 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   get todasPosturasVacias(): boolean {
     return this.jugadores.every(j => !j.posturas || Object.keys(j.posturas).length === 0);
   }
-
-
-
 
   private hayHostilidadEntre(idA: string, idB: string): boolean {
     const aDeclaroHostilAb = idA === this.userId
@@ -2500,7 +3058,6 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     return this.misPactosActivos.some(p => this.esPactoEnTransicion(p) || this.esAcuerdoRoto(p));
   }
 
-
   propuestaNoCubiertos(): string[] {
     const p = this.propuestaEntrante;
     if (!p || p.tipo !== 'no_agresion') return [];
@@ -2563,6 +3120,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.pushNotifPacto(nuevoPayload.jugador1Nombre, nuevoPayload.jugador2Nombre, 'no_agresion', nuevoPayload.color, false, nuevoPayload.ts);
     this.channelEventos?.send({ type: 'broadcast', event: 'pacto_aceptado', payload: nuevoPayload });
     await this.service.setPactos(this.partidaId, this.pactos);
+    void this.aplicarPostura(p.proponenteId, 'amigable');
     this.playSfx('assets/KuboTeg/sonidos/pacto.mp3');
     this.cdr.markForCheck();
   }
@@ -2634,6 +3192,12 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     return TERRITORIES.find(t => t.id === id)?.name ?? id;
   }
 
+  cartaTerritory(id: string): { path: string; fill: string; viewBox: string } | null {
+    const t = TERRITORIES.find(t => t.id === id);
+    if (!t) return null;
+    return { path: t.svgPath, fill: t.baseFill, viewBox: this.pathViewBox(t.svgPath, 10) };
+  }
+
   colorRgba(hex: string, alpha: number): string {
     if (!hex) return `rgba(148,163,184,${alpha})`;
     const h = hex.replace('#', '');
@@ -2647,7 +3211,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     return ids.map(id => this.nombreTerritorio(id)).join(', ');
   }
 
-  private pathViewBox(d: string, padding = 16): string {
+  pathViewBox(d: string, padding = 16): string {
     const xs: number[] = [];
     const ys: number[] = [];
     let cx = 0, cy = 0;
@@ -2954,8 +3518,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     const currentIds = new Set(this.jugadores.map(j => j.usuario_id));
     const { data, error } = await this.service.getDedicatorias();
     if (error || !data) { this.cargandoHistorial = false; this.cdr.markForCheck(); return; }
-    this.historialDedicatorias = data.filter(d => {
-      const ids: string[] = (d.jugadores as any[]).map((j: any) => j.usuario_id).filter(Boolean);
+    this.historialDedicatorias = (data as Dedicatoria[]).filter(d => {
+      const ids: string[] = d.jugadores.map(j => j.usuario_id).filter(Boolean);
       if (ids.length !== currentIds.size) return false;
       return ids.every(id => currentIds.has(id));
     });
@@ -2967,7 +3531,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     const conteo: Record<string, number> = {};
     for (const j of this.jugadores) conteo[this.nombreJugador(j)] = 0;
     for (const d of this.historialDedicatorias) {
-      const n = d.ganador_nombre as string;
+      const n = d.ganador_nombre;
       conteo[n] = (conteo[n] ?? 0) + 1;
     }
     return Object.entries(conteo)
@@ -2993,6 +3557,14 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.mostrarModalDedicatoria = true;
   }
 
+  private detectarTipoVictoria(): 'objetivo' | 'limite_rondas' | 'rendicion' {
+    if (this.jugadores.some(j => j.rendido && j.usuario_id !== this.userId)) return 'rendicion';
+    const ronda  = this.partida?.ronda_actual ?? 0;
+    const limite = this.partida?.limite_rondas ?? null;
+    if (limite && ronda >= limite) return 'limite_rondas';
+    return 'objetivo';
+  }
+
   async guardarDedicatoria(): Promise<void> {
     const texto = this.dedicatoriaTexto.trim();
     if (!texto || !this.partida || !this.userId || this.guardandoDedicatoria) return;
@@ -3004,15 +3576,21 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       color:  this.jugadorColores[j.usuario_id] ?? '',
       lider:  this.jugadorLideres[j.usuario_id] ?? null,
     }));
+    const inicioMs    = new Date(this.partida.created_at).getTime();
+    const duracionMin = Math.round((Date.now() - inicioMs) / 60000);
     const { error } = await this.service.insertDedicatoria({
-      partida_id:     this.partida.id,
-      nombre_partida: this.partida.nombre,
-      fecha_partida:  this.partida.created_at,
-      jugadores:      jugadoresData,
-      ganador_id:     this.userId,
-      ganador_nombre: this.nombreJugador(ganadorJ),
-      ganador_lider:  this.jugadorLideres[this.userId] ?? null,
-      dedicatoria:    texto,
+      partida_id:       this.partida.id,
+      nombre_partida:   this.partida.nombre,
+      fecha_partida:    this.partida.created_at,
+      jugadores:        jugadoresData,
+      ganador_id:       this.userId,
+      ganador_nombre:   this.nombreJugador(ganadorJ),
+      ganador_lider:    this.jugadorLideres[this.userId] ?? null,
+      dedicatoria:      texto,
+      rondas_jugadas:   this.partida.ronda_actual ?? null,
+      rondas_limite:    this.partida.limite_rondas ?? null,
+      duracion_minutos: duracionMin,
+      tipo_victoria:    this.detectarTipoVictoria(),
     });
     this.guardandoDedicatoria = false;
     if (error) { this.showGameNotif('Error al guardar la dedicatoria', 'error'); return; }
@@ -3021,6 +3599,49 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
     // Publicar la dedicatoria como mensaje en el chat global
     await this.onChatSendFin(`✍ ${texto}`);
+  }
+
+  abrirModalRendicion(): void {
+    this.mostrarModalRendicion = true;
+  }
+
+  cancelarRendicion(): void {
+    this.mostrarModalRendicion = false;
+  }
+
+  async ejecutarRendicion(): Promise<void> {
+    this.mostrarModalRendicion = false;
+    const { error } = await this.service.rendirJugador(this.partidaId, this.userId);
+    if (error) { this.showGameNotif('Error al rendirse', 'error'); return; }
+    // Actualización optimista local (Realtime lo confirma luego)
+    const idx = this.jugadores.findIndex(j => j.usuario_id === this.userId);
+    if (idx !== -1) {
+      this.jugadores = [
+        ...this.jugadores.slice(0, idx),
+        { ...this.jugadores[idx], rendido: true },
+        ...this.jugadores.slice(idx + 1),
+      ];
+    }
+    this.mostrarPopupRendicion = true;
+    this.addNotif({ tipo: 'conquista', icono: '🏳', linea1: `${this.miNombre} se rindió`, linea2: 'abandonó la partida', color: '#94a3b8', ts: Date.now() });
+    await this.verificarVictoriaPorRendicion();
+    if (this.esMiTurno) await this.avanzarTurno();
+    this.cdr.markForCheck();
+  }
+
+  private async verificarVictoriaPorRendicion(): Promise<void> {
+    if (this.partida?.ganador_id) return;
+    const { data: jugadoresDb } = await this.service.getPartidaJugadores(this.partidaId);
+    if (!jugadoresDb) return;
+    const territoriosMap = Object.values(this.territorios);
+    const humanosConTerritorios = jugadoresDb.filter(j =>
+      j.usuario_id !== BOT_USER_ID &&
+      territoriosMap.some(t => t.usuario_id === j.usuario_id)
+    );
+    const noRendidos = humanosConTerritorios.filter(j => !j.rendido);
+    if (noRendidos.length === 1) {
+      await this.service.declararGanadorAcumulacion(this.partidaId, noRendidos[0].usuario_id);
+    }
   }
 
   volver() { this.router.navigate(['/kuboteg']); }
@@ -3064,12 +3685,11 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       }
       return `Destruir a ${targetName}`;
     }
-    if (obj.tipo === 'mayorias_continente') {
-      const mays = obj.mayoriaIds.map(id => this.getNombreContinente(id)).join(' y ');
-      return `Mayoría en ${mays} + Totalidad de ${this.getNombreContinente(obj.continenteId)}`;
+    if (obj.tipo === 'tres_mayorias') {
+      return 'Mayoría en 3 continentes cualesquiera';
     }
     if (obj.tipo === 'cuatro_mayorias') {
-      return 'Mayoría en 4 continentes';
+      return 'Conquistar 4 mayorías cualesquiera';
     }
     return '—';
   }
@@ -3241,10 +3861,6 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     if (this.panelActivo !== 'noticias') this.notifNoVistas++;
   }
 
-  private pushNotifCombate(_data: UltimoCombate) { /* solo overlay, no aparece en noticias */ }
-
-  private pushNotifConquista(_data: UltimaConquista) { /* solo overlay, no aparece en noticias */ }
-
   private pushNotifPacto(j1: string, j2: string, _tipo: 'no_agresion', color: string, esRenovacion: boolean, ts: number) {
     const icono = '🛡️';
     const label = 'No agresión';
@@ -3285,6 +3901,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         this.playSfx('assets/KuboTeg/sonidos/conquista-continente.mp3');
         this.pushNotifContinente(jugador, nombre, color, 'totalidad');
       } else if (ownedBefore < threshold && ownedNow >= threshold) {
+        this.playSfx('assets/KuboTeg/sonidos/conquista-mayoria.mp3');
         this.pushNotifContinente(jugador, nombre, color, 'mayoria');
       }
     }
@@ -3419,6 +4036,227 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.playSfx(`assets/KuboTeg/sonidos/combate${n}.mp3`);
   }
 
+  // ── Bomba Atómica ─────────────────────────────────────
+
+  private syncBombasJugador(userId: string, t1: string | null, t2: string | null) {
+    const idx = this.jugadores.findIndex(j => j.usuario_id === userId);
+    if (idx === -1) return;
+    this.jugadores = [
+      ...this.jugadores.slice(0, idx),
+      { ...this.jugadores[idx], bomba_territorio: t1, bomba_territorio_2: t2 },
+      ...this.jugadores.slice(idx + 1),
+    ];
+  }
+
+  private bombasT1T2(): [string | null, string | null] {
+    return [this.bombas[0] ?? null, this.bombas[1] ?? null];
+  }
+
+  saveBombaState() {
+    localStorage.setItem(
+      `teg_bomba_${this.partidaId}_${this.userId}`,
+      JSON.stringify({ bombas: this.bombas, movidasEnRonda: this.bombasMovidasEnRonda })
+    );
+  }
+
+  private territoriosEnRango(origen: string, maxHops: number): Set<string> {
+    const visitados = new Set<string>([origen]);
+    let frontera = [origen];
+    for (let i = 0; i < maxHops; i++) {
+      const siguiente: string[] = [];
+      for (const curr of frontera) {
+        for (const v of (TERRITORIES.find(t => t.id === curr)?.neighbors ?? [])) {
+          if (!visitados.has(v)) { visitados.add(v); siguiente.push(v); }
+        }
+      }
+      frontera = siguiente;
+    }
+    visitados.delete(origen);
+    return visitados;
+  }
+
+  get bombaNuclearClipPath(): string {
+    const pct = this.tieneBomba ? 100 : Math.min(this.cartasRobadasTotal * 50, 100);
+    return `inset(${100 - pct}% 0 0 0)`;
+  }
+
+  get territoriosDestruidosArray(): string[] {
+    return [...this.territoriosDestruidos];
+  }
+
+  private marcarDestruido(territorioId: string) {
+    this.territoriosDestruidos = new Set([...this.territoriosDestruidos, territorioId]);
+    localStorage.setItem(`teg_destruidos_${this.partidaId}`, JSON.stringify([...this.territoriosDestruidos]));
+  }
+
+  get bombasEnMapa(): string[] {
+    return this.jugadores.flatMap(j =>
+      [j.bomba_territorio, j.bomba_territorio_2].filter(Boolean) as string[]
+    );
+  }
+
+  get bombaAlcanceEnemigos(): string[] {
+    const origen = this.bombas[this.bombaUsandoIdx] ?? null;
+    if (!origen) return [];
+    const rango = this.territoriosEnRango(origen, 3);
+    return [...rango].filter(id => {
+      const e = this.territorios[id];
+      return e && e.usuario_id !== this.userId && e.usuario_id !== BOT_USER_ID;
+    });
+  }
+
+  toggleModoColocandoBomba(idx = 0) {
+    if (this.modoColocandoBomba && this.bombaColocandoIdx === idx) {
+      this.modoColocandoBomba = false;
+    } else {
+      this.bombaColocandoIdx = idx;
+      this.modoColocandoBomba = true;
+    }
+    this.cdr.markForCheck();
+  }
+
+  moverBomba(idx: number) {
+    this.modalConfirmMoverBomba = idx;
+    this.cdr.markForCheck();
+  }
+
+  confirmarMoverBomba() {
+    const idx = this.modalConfirmMoverBomba;
+    if (idx === null) return;
+    this.modalConfirmMoverBomba = null;
+
+    const rondaActual = this.partida?.ronda_actual ?? 0;
+    const nuevasRondas = [...this.bombasMovidasEnRonda];
+    while (nuevasRondas.length <= idx) nuevasRondas.push(null);
+    nuevasRondas[idx] = rondaActual;
+    this.bombasMovidasEnRonda = nuevasRondas;
+
+    const nuevas = [...this.bombas];
+    nuevas[idx] = null;
+    this.bombas = nuevas;
+    this.bombaColocandoIdx = idx;
+    this.modoColocandoBomba = true;
+    this.saveBombaState();
+    const [t1, t2] = this.bombasT1T2();
+    this.syncBombasJugador(this.userId, t1, t2);
+    void this.service.setBombaTerritorios(this.partidaId, this.userId, t1, t2);
+    this.channelEventos?.send({ type: 'broadcast', event: 'bomba_posicion', payload: { jugadorId: this.userId, bomba1: t1, bomba2: t2 } });
+    this.cdr.markForCheck();
+  }
+
+  toggleModoUsandoBomba(idx = 0) {
+    if (this.modoUsandoBomba && this.bombaUsandoIdx === idx) {
+      this.modoUsandoBomba = false;
+    } else {
+      const bombaTerr = this.bombas[idx] ?? null;
+      if (bombaTerr && this.territorios[bombaTerr]?.usuario_id !== this.userId) {
+        // El territorio fue conquistado: sincronizar y cancelar
+        this.bombas = this.bombas.filter((_, i) => i !== idx);
+        this.bombasMovidasEnRonda = this.bombasMovidasEnRonda.filter((_, i) => i !== idx);
+        this.saveBombaState();
+        const [t1, t2] = this.bombasT1T2();
+        this.syncBombasJugador(this.userId, t1, t2);
+        this.service.setBombaTerritorios(this.partidaId, this.userId, t1, t2).then();
+        this.showGameNotif('El territorio con tu bomba fue conquistado. La bomba fue capturada.', 'warn');
+        this.cdr.markForCheck();
+        return;
+      }
+      const rondaActual = this.partida?.ronda_actual ?? 0;
+      const rondaMovida = this.bombasMovidasEnRonda[idx] ?? null;
+      if (rondaMovida !== null && rondaMovida >= rondaActual) {
+        this.showGameNotif('Moviste esta bomba en la fase de colocación. Podés lanzarla a partir de la próxima ronda.', 'warn');
+        return;
+      }
+      this.bombaUsandoIdx = idx;
+      this.modoUsandoBomba = true;
+    }
+    this.territorioAtacanteId = null;
+    this.cdr.markForCheck();
+  }
+
+  colocarBomba(territorioId: string) {
+    const estado = this.territorios[territorioId];
+    if (!estado || estado.usuario_id !== this.userId) {
+      this.showGameNotif('Elegí uno de tus propios territorios', 'warn');
+      return;
+    }
+    const rondaActual = this.partida?.ronda_actual ?? 0;
+    const nuevasRondas = [...this.bombasMovidasEnRonda];
+    while (nuevasRondas.length <= this.bombaColocandoIdx) nuevasRondas.push(null);
+    nuevasRondas[this.bombaColocandoIdx] = rondaActual;
+    this.bombasMovidasEnRonda = nuevasRondas;
+
+    const nuevas = [...this.bombas];
+    nuevas[this.bombaColocandoIdx] = territorioId;
+    this.bombas = nuevas;
+    this.modoColocandoBomba = false;
+    this.saveBombaState();
+    const [t1, t2] = this.bombasT1T2();
+    this.syncBombasJugador(this.userId, t1, t2);
+    void this.service.setBombaTerritorios(this.partidaId, this.userId, t1, t2);
+    this.channelEventos?.send({ type: 'broadcast', event: 'bomba_posicion', payload: { jugadorId: this.userId, bomba1: t1, bomba2: t2 } });
+    this.playSfx('assets/KuboTeg/sonidos/alerta-bomba.mp3');
+    this.showGameNotif(`Bomba ${this.bombaColocandoIdx + 1} colocada en ${this.nombreTerritorio(territorioId)}`, 'ok');
+    this.cdr.markForCheck();
+  }
+
+  async ejecutarBomba(territorioId: string): Promise<void> {
+    const origenBomba = this.bombas[this.bombaUsandoIdx] ?? null;
+    if (!origenBomba) return;
+    // Solo bloquear a jugadores ajenos al turno: el propio atacante recibe su broadcast
+    // de vuelta (Supabase self-loop) y no debe quedar bloqueado por su propio combate.
+    if (this.combateEnCurso && !this.esMiTurno) {
+      this.showGameNotif('Esperá a que termine el combate en curso', 'warn');
+      return;
+    }
+    // Verificar que el territorio origen sigue siendo propio
+    if (this.territorios[origenBomba]?.usuario_id !== this.userId) {
+      this.modoUsandoBomba = false;
+      this.bombas = this.bombas.filter((_, i) => i !== this.bombaUsandoIdx);
+      this.bombasMovidasEnRonda = this.bombasMovidasEnRonda.filter((_, i) => i !== this.bombaUsandoIdx);
+      this.saveBombaState();
+      const [t1, t2] = this.bombasT1T2();
+      this.syncBombasJugador(this.userId, t1, t2);
+      // .then() dispara el fetch (void no lo haría en Supabase PromiseLike)
+      this.service.setBombaTerritorios(this.partidaId, this.userId, t1, t2).then();
+      this.showGameNotif('El territorio con tu bomba fue conquistado. La bomba fue capturada.', 'warn');
+      this.cdr.markForCheck();
+      return;
+    }
+    const estado = this.territorios[territorioId];
+    if (!estado || estado.usuario_id === this.userId) return;
+    const victimaId = estado.usuario_id;
+    if (!this.bombaAlcanceEnemigos.includes(territorioId)) {
+      this.showGameNotif('Ese territorio está fuera del alcance de la bomba', 'warn');
+      return;
+    }
+    this.modoUsandoBomba = false;
+    const terrNombre = this.nombreTerritorio(territorioId);
+    this.territorioMisilActivoId = territorioId;
+    this.cdr.markForCheck();
+    setTimeout(() => { this.territorioMisilActivoId = null; this.cdr.markForCheck(); }, 1500);
+    await new Promise<void>(r => setTimeout(r, 750));
+    const ok = await this.updateTerritorio(territorioId, { tropas: 1 });
+    if (!ok) return;
+    this.bombas = this.bombas.filter((_, i) => i !== this.bombaUsandoIdx);
+    this.bombaUsandoIdx = 0;
+    this.saveBombaState();
+    const [t1, t2] = this.bombasT1T2();
+    this.syncBombasJugador(this.userId, t1, t2);
+    // Broadcast primero: actualización inmediata del ícono para todos los jugadores
+    this.channelEventos?.send({
+      type: 'broadcast', event: 'bomba_atomica',
+      payload: { territorioId, jugadorId: this.userId, victimaId, bomba1: t1, bomba2: t2 },
+    });
+    // Await garantiza que el DB write se ejecuta (void no dispara el fetch en Supabase PromiseLike)
+    await this.service.setBombaTerritorios(this.partidaId, this.userId, t1, t2);
+    this.marcarDestruido(territorioId);
+    void this.aplicarPostura(victimaId, 'hostil');
+    this.playSfx('assets/KuboTeg/sonidos/bomba-nuclear.mp3');
+    this.addNotif({ tipo: 'conquista', icono: '☢', linea1: `${this.miNombre} lanzó la Bomba Atómica`, linea2: `${terrNombre} reducido a 1 tropa`, color: '#fbbf24', ts: Date.now() });
+    this.cdr.markForCheck();
+  }
+
   // ── Objetivos secretos ────────────────────────────────
 
   private async generarYAsignarObjetivos() {
@@ -3439,17 +4277,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       }
     }
 
-    // 2 mayorías + 1 totalidad
-    const mayoriaCombos: Array<{ mayoriaIds: [string, string]; continenteId: string }> = [
-      { mayoriaIds: ['north_america', 'south_america'], continenteId: 'europe'        },
-      { mayoriaIds: ['europe',        'africa'        ], continenteId: 'asia'          },
-      { mayoriaIds: ['asia',          'oceania'       ], continenteId: 'north_america' },
-      { mayoriaIds: ['africa',        'south_america' ], continenteId: 'oceania'       },
-      { mayoriaIds: ['north_america', 'asia'          ], continenteId: 'africa'        },
-      { mayoriaIds: ['europe',        'oceania'       ], continenteId: 'south_america' },
-    ];
-    for (const combo of mayoriaCombos) {
-      pool.push({ tipo: 'mayorias_continente', ...combo });
+    // 3 mayorías en cualquier continente
+    for (let i = 0; i < 6; i++) {
+      pool.push({ tipo: 'tres_mayorias' });
     }
 
     // Mayoría en 4 continentes
@@ -3501,14 +4331,12 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       }
     }
 
-    if (this.miObjetivo.tipo === 'mayorias_continente') {
+    if (this.miObjetivo.tipo === 'tres_mayorias') {
       const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
-      const tieneMayoria = (cid: string) => {
-        const terrs = CONT[cid];
-        return terrs.filter(tid => esMio(tid)).length >= Math.floor(terrs.length / 2) + 1;
-      };
-      return this.miObjetivo.mayoriaIds.every(cid => tieneMayoria(cid))
-        && CONT[this.miObjetivo.continenteId].every(tid => esMio(tid));
+      const count = Object.entries(CONT).filter(([, terrs]) =>
+        terrs.filter(tid => esMio(tid)).length >= Math.floor(terrs.length / 2) + 1
+      ).length;
+      return count >= 3;
     }
 
     if (this.miObjetivo.tipo === 'cuatro_mayorias') {
@@ -3541,15 +4369,15 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     return this.miObjetivo?.tipo === 'destruir' && !!this.miObjetivo.fallback;
   }
 
-  get objetivoMayoriasContinente() {
-    return this.miObjetivo?.tipo === 'mayorias_continente' ? this.miObjetivo : null;
+  get objetivoTresMayorias(): boolean {
+    return this.miObjetivo?.tipo === 'tres_mayorias';
   }
 
   get objetivoCuatroMayorias(): boolean {
     return this.miObjetivo?.tipo === 'cuatro_mayorias';
   }
 
-  get cuatroMayoriasActuales(): number {
+  get mayoriasActuales(): number {
     const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
     return Object.entries(CONT).filter(([, terrs]) => {
       const owned = terrs.filter(tid => this.territorios[tid]?.usuario_id === this.userId).length;
@@ -3557,29 +4385,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     }).length;
   }
 
-  private mayoriaEnContinente(cid: string): boolean {
-    const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
-    const terrs = CONT[cid];
-    return terrs.filter(tid => this.territorios[tid]?.usuario_id === this.userId).length
-      >= Math.floor(terrs.length / 2) + 1;
-  }
-
-  get mayoriasContinenteA(): boolean {
-    const obj = this.objetivoMayoriasContinente;
-    return obj ? this.mayoriaEnContinente(obj.mayoriaIds[0]) : false;
-  }
-
-  get mayoriasContinenteB(): boolean {
-    const obj = this.objetivoMayoriasContinente;
-    return obj ? this.mayoriaEnContinente(obj.mayoriaIds[1]) : false;
-  }
-
-  get mayoriasContinenteTotalidad(): boolean {
-    const obj = this.objetivoMayoriasContinente;
-    if (!obj) return false;
-    const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
-    return CONT[obj.continenteId].every(tid => this.territorios[tid]?.usuario_id === this.userId);
-  }
+  get cuatroMayoriasActuales(): number { return this.mayoriasActuales; }
 
   get objetivoTargetJugador(): PartidaJugador | null {
     const color = this.objetivoColor;
@@ -3615,284 +4421,5 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     return Object.values(this.territorios).filter(t => t.usuario_id === this.userId).length;
   }
 
-  // ── IA Bot ────────────────────────────────────────────
-
-  private botTerritorios(): [string, TerritorioEstado][] {
-    return Object.entries(this.territorios).filter(([_, e]) => e.usuario_id === BOT_USER_ID);
-  }
-
-  private botObjetivo(): ObjetivoSecreto | null {
-    const botJ = this.jugadores.find(j => j.usuario_id === BOT_USER_ID);
-    return botJ?.objetivo ? botJ.objetivo as ObjetivoSecreto : null;
-  }
-
-  private botVecinosEnemigos(territorioId: string): string[] {
-    return (TERRITORIES.find(t => t.id === territorioId)?.neighbors ?? [])
-      .filter(v => { const e = this.territorios[v]; return e && e.usuario_id !== BOT_USER_ID; });
-  }
-
-  private botPrioridad(destinoId: string): number {
-    const obj = this.botObjetivo();
-    if (!obj) return 1;
-    const defId = this.territorios[destinoId]?.usuario_id;
-    if (obj.tipo === 'continentes') {
-      const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
-      return obj.ids.some(cid => (CONT[cid] ?? []).includes(destinoId)) ? 10 : 1;
-    }
-    if (obj.tipo === 'destruir') {
-      const targetJ = this.jugadores.find(j => j.color === obj.color);
-      return (targetJ && defId === targetJ.usuario_id) ? 10 : 1;
-    }
-    return 1;
-  }
-
-  private verificarVictoriaBot(conquistadoId: string, eliminadoId: string | null): boolean {
-    const obj = this.botObjetivo();
-    if (!obj) return false;
-    const esBotMio = (tid: string) =>
-      tid === conquistadoId || this.territorios[tid]?.usuario_id === BOT_USER_ID;
-    if (obj.tipo === 'continentes') {
-      const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
-      return obj.ids.every(cid => (CONT[cid] ?? []).every(tid => esBotMio(tid)));
-    }
-    if (obj.tipo === 'destruir') {
-      const targetJ = this.jugadores.find(j => j.color === obj.color);
-      if (!targetJ) return Object.values(this.territorios).filter(t => esBotMio(t.territorio_id)).length >= 24;
-      const quedan = Object.values(this.territorios)
-        .filter(t => t.usuario_id === targetJ.usuario_id && t.territorio_id !== conquistadoId).length;
-      if (quedan === 0) {
-        if (eliminadoId === targetJ.usuario_id) return true;
-        return Object.values(this.territorios).filter(t => esBotMio(t.territorio_id)).length >= 24;
-      }
-    }
-    return false;
-  }
-
-  /** @deprecated Opción A — turnos del bot manejados por Edge Function (Opción B activa) */
-  private async ejecutarTurnoBot() {
-    if (!this.partida || this.botEjecutando) return;
-    this.botEjecutando = true;
-    try {
-      const fase = this.fase;
-      if      (fase === 'colocacion')    await this.botColocacion();
-      else if (fase === 'ataque')        await this.botAtaques();
-      else if (fase === 'reagrupacion')  await this.botReagrupacion();
-    } finally {
-      this.botEjecutando = false;
-    }
-  }
-
-  private async botColocacion() {
-    if (!this.partida) return;
-    const botJ   = this.jugadores.find(j => j.usuario_id === BOT_USER_ID);
-    const tropas = botJ?.tropas_por_colocar ?? 0;
-
-    if (tropas > 0) {
-      const botTerrs = this.botTerritorios();
-      if (botTerrs.length > 0) {
-        const patches: Record<string, number> = {};
-
-        if ((this.partida.ronda_actual ?? 1) <= 1) {
-          const [tid] = this.mejorTerritorioBotDeLista(botTerrs);
-          patches[tid] = tropas;
-        } else {
-          // Sub-fase continental: igual que humano — bonus va dentro del continente
-          const CONT = KuboTegJuegoComponent.CONTINENT_TERRITORIES;
-          let restantes = tropas;
-          for (const cb of KuboTegJuegoComponent.CONTINENT_BONUSES) {
-            if (CONT[cb.id].every(tid => this.territorios[tid]?.usuario_id === BOT_USER_ID)) {
-              const contBotTerrs = botTerrs.filter(([id]) => CONT[cb.id].includes(id));
-              if (contBotTerrs.length > 0) {
-                const [tid] = this.mejorTerritorioBotDeLista(contBotTerrs);
-                patches[tid] = (patches[tid] ?? 0) + cb.bonus;
-                restantes   -= cb.bonus;
-              }
-            }
-          }
-          if (restantes > 0) {
-            const [tid] = this.mejorTerritorioBotDeLista(botTerrs);
-            patches[tid] = (patches[tid] ?? 0) + restantes;
-          }
-        }
-
-        for (const [tid, add] of Object.entries(patches)) {
-          const estado = this.territorios[tid];
-          if (estado) await this.updateTerritorio(tid, { tropas: estado.tropas + add });
-        }
-      }
-      await this.service.setTropasPorColocar(this.partidaId, BOT_USER_ID, 0);
-    }
-
-    const orden    = this.partida.orden_jugadores!;
-    const n        = orden.length;
-    const ronda    = this.partida.ronda_actual!;
-    const startIdx = this.primerVivoDesde((ronda - 1) % n, orden);
-    const currIdx  = this.partida.jugador_actual_index!;
-    const nextIdx  = this.siguienteVivoIdx(currIdx, orden);
-    if (nextIdx === startIdx) {
-      await this.service.setFase(this.partidaId, 'ataque', startIdx);
-    } else {
-      await this.service.avanzarJugador(this.partidaId, nextIdx);
-    }
-  }
-
-  private mejorTerritorioBotDeLista(lista: [string, TerritorioEstado][]): [string, TerritorioEstado] {
-    const conEnemigos = lista.filter(([id]) => this.botVecinosEnemigos(id).length > 0);
-    const candidatos  = conEnemigos.length > 0 ? conEnemigos : lista;
-    return candidatos.reduce((a, b) => a[1].tropas >= b[1].tropas ? a : b);
-  }
-
-  private async botAtaques() {
-    const botJ      = this.jugadores.find(j => j.usuario_id === BOT_USER_ID);
-    const botNombre = botJ ? this.nombreJugador(botJ) : 'IA';
-
-    // Sin tope de ataques — igual que un humano, ataca hasta agotar opciones válidas
-    for (let i = 0; i < 50; i++) {
-      const atacantes = this.botTerritorios()
-        .filter(([_, e]) => e.tropas > 1)
-        .map(([id, e]) => ({
-          id, tropas: e.tropas,
-          enemigos: this.botVecinosEnemigos(id).filter(vid => !this.tieneNoAgresion(id, vid)),
-        }))
-        .filter(t => t.enemigos.length > 0);
-
-      if (atacantes.length === 0) break;
-
-      atacantes.sort((a, b) => b.tropas - a.tropas);
-      const atacante = atacantes[0];
-
-      const destinos = atacante.enemigos
-        .map(eid => ({ id: eid, tropas: this.territorios[eid]?.tropas ?? 999, prioridad: this.botPrioridad(eid) }))
-        .sort((a, b) => b.prioridad - a.prioridad || a.tropas - b.tropas);
-
-      if (!destinos[0]) break;
-
-      await this.botAtacarUno(atacante.id, destinos[0].id, botNombre);
-      await new Promise(r => setTimeout(r, 700));
-    }
-
-    await this.terminarAtaque();
-  }
-
-  private async botAtacarUno(origenId: string, destinoId: string, botNombre: string) {
-    const defensorId = this.territorios[destinoId]?.usuario_id ?? '';
-    const defensorJ  = this.jugadores.find(j => j.usuario_id === defensorId);
-
-    const { data: rpcData, error } = await this.service.resolverCombate(this.partidaId, origenId, destinoId);
-    if (error || !rpcData) return;
-    const res = rpcData as CombateRpc;
-    if (res.error) return;
-
-    const conquista = res.conquista ?? false;
-    const ts = Date.now();
-    const popupData: UltimoCombate = {
-      dadosAtaque:      res.dados_ataque   ?? [],
-      dadosDefensa:     res.dados_defensa  ?? [],
-      bajasAtacante:    res.bajas_atacante ?? 0,
-      bajasDefensor:    res.bajas_defensor ?? 0,
-      conquista,
-      atacanteNombre:   botNombre,
-      defensorNombre:   defensorJ ? this.nombreJugador(defensorJ) : '?',
-      origenNombre:     this.nombreTerritorio(origenId),
-      destinoNombre:    this.nombreTerritorio(destinoId),
-      colorAtacante:    this.jugadorColores[BOT_USER_ID] ?? '#94a3b8',
-      colorDefensor:    this.jugadorColores[defensorId]  ?? '#fff',
-      liderAtacanteImg: this.getLiderImgByUserId(BOT_USER_ID),
-      liderDefensorImg: this.getLiderImgByNombre(this.jugadorLideres[defensorId] ?? ''),
-      ts,
-      origenId,
-      destinoId,
-    };
-    this._lastCombateTs = ts;
-    this.mostrarPopupCombate(popupData);
-    this.pushNotifCombate(popupData);
-    this.channelEventos?.send({ type: 'broadcast', event: 'combate', payload: popupData });
-
-    if (!conquista) return;
-
-    // Mismo límite que el humano: máximo 3 tropas tras conquista
-    const maxMovibles   = Math.min(3, Math.max(0, (res.tropas_origen_final ?? 1) - 1));
-    const tropasAMover  = Math.max(1, maxMovibles);
-    const { error: moveErr } = await this.service.moverTropasConquista(this.partidaId, origenId, destinoId, tropasAMover);
-    if (moveErr) return;
-
-    this.conquistoEnEsteTurno = true;
-    this.ultimoTerritorioConquistadoId = destinoId;
-
-    // Patch local sin esperar Realtime
-    const origenEstado  = this.territorios[origenId];
-    const destinoEstado = this.territorios[destinoId];
-    const patch: Record<string, TerritorioEstado> = {};
-    if (origenEstado)  patch[origenId]  = { ...origenEstado,  tropas: origenEstado.tropas - tropasAMover };
-    if (destinoEstado) patch[destinoId] = { ...destinoEstado, tropas: destinoEstado.tropas + tropasAMover, usuario_id: BOT_USER_ID };
-    this.territorios = { ...this.territorios, ...patch };
-    this.rebuildMaps();
-
-    const defQuedan = defensorId
-      ? Object.values(this.territorios).filter(t => t.usuario_id === defensorId && t.territorio_id !== destinoId).length
-      : 1;
-    const eliminadoId = defQuedan === 0 ? defensorId : null;
-    this.disolverPactosTerritorio(destinoId, eliminadoId);
-
-    const conquistaData: UltimaConquista = {
-      territorioNombre: this.nombreTerritorio(destinoId),
-      atacanteNombre:   botNombre,
-      defensorNombre:   defensorJ ? this.nombreJugador(defensorJ) : '?',
-      colorAtacante:    this.jugadorColores[BOT_USER_ID] ?? '#94a3b8',
-      ts: Date.now(),
-    };
-    this._lastConquistaTs = conquistaData.ts;
-    this.mostrarNotifConquista(conquistaData);
-    this.pushNotifConquista(conquistaData);
-    this.channelEventos?.send({ type: 'broadcast', event: 'conquista', payload: conquistaData });
-
-    if (eliminadoId) {
-      const eliminadoNombre = this.nombreJugadorById(eliminadoId);
-      const tsElim = Date.now();
-      this.addNotif({ tipo: 'conquista', icono: '☠', linea1: `${eliminadoNombre} fue eliminado`, linea2: `por ${botNombre}`, color: '#f87171', ts: tsElim });
-      this.playSfx('assets/KuboTeg/sonidos/muerte-jugador.mp3');
-      this.channelEventos?.send({
-        type: 'broadcast', event: 'jugador_eliminado',
-        payload: { jugadorId: eliminadoId, jugadorNombre: eliminadoNombre, eliminadoPorNombre: botNombre, ts: tsElim },
-      });
-    }
-
-    if (this.verificarVictoriaBot(destinoId, eliminadoId)) {
-      await this.declararGanadorPorObjetivo();
-    }
-  }
-
-  private async botReagrupacion() {
-    if (this.partida) {
-      const botTerrs = this.botTerritorios();
-
-      // Territorios interiores: vecinos todos propios y con tropas sobrantes
-      const interiores = botTerrs.filter(([id, e]) => {
-        if (e.tropas <= 1) return false;
-        const vecinos = TERRITORIES.find(t => t.id === id)?.neighbors ?? [];
-        return vecinos.every(v => !this.territorios[v] || this.territorios[v]?.usuario_id === BOT_USER_ID);
-      });
-
-      // Territorios fronterizos: tienen vecino enemigo
-      const fronteras = botTerrs.filter(([id]) => {
-        const vecinos = TERRITORIES.find(t => t.id === id)?.neighbors ?? [];
-        return vecinos.some(v => { const e = this.territorios[v]; return e && e.usuario_id !== BOT_USER_ID; });
-      });
-
-      if (interiores.length > 0 && fronteras.length > 0) {
-        const [origenId, origenEst]  = interiores.reduce((a, b) => a[1].tropas > b[1].tropas ? a : b);
-        const [destinoId, destinoEst] = fronteras.reduce((a, b) => a[1].tropas < b[1].tropas ? a : b);
-        const vecinos = TERRITORIES.find(t => t.id === origenId)?.neighbors ?? [];
-        if (origenId !== destinoId && vecinos.includes(destinoId)) {
-          const mover = origenEst.tropas - 1;
-          if (mover > 0) {
-            await this.updateTerritorio(origenId,  { tropas: origenEst.tropas  - mover });
-            await this.updateTerritorio(destinoId, { tropas: destinoEst.tropas + mover });
-          }
-        }
-      }
-    }
-    await this.saltarReagrupacion();
-  }
-
 }
+

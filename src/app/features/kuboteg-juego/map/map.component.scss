@@ -49,6 +49,28 @@
   &.en-carta-acierta {
     animation: carta-acierta-burst 0.55s ease-out 4;
   }
+
+  &.bomba-colocada {
+    stroke: #fbbf24 !important;
+    stroke-width: 3px !important;
+    animation: bomba-colocada-pulse 1.4s ease-in-out infinite;
+  }
+
+  &.bomba-alcance {
+    stroke: #f97316 !important;
+    stroke-width: 2.5px !important;
+    animation: bomba-alcance-pulse 0.9s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes bomba-colocada-pulse {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(251,191,36,0.7)); }
+  50%       { filter: drop-shadow(0 0 16px rgba(251,191,36,1.0)); }
+}
+
+@keyframes bomba-alcance-pulse {
+  from { filter: brightness(1)    drop-shadow(0 0 3px rgba(249,115,22,0.5)); }
+  to   { filter: brightness(1.15) drop-shadow(0 0 10px rgba(249,115,22,0.9)); }
 }
 
 @keyframes combate-pulse {
@@ -178,4 +200,50 @@
 @keyframes pacto-in {
   from { opacity: 0; transform: translate(-50%, -46%); }
   to   { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+// ── Misil nuclear ─────────────────────────────────────────
+@keyframes misil-caer {
+  0%   { transform: translateY(-320px); opacity: 1; }
+  82%  { transform: translateY(0px);    opacity: 1; }
+  90%  { transform: translateY(0px);    opacity: 0.6; }
+  100% { transform: translateY(0px);    opacity: 0; }
+}
+
+@keyframes explosion-destello {
+  0%   { opacity: 0;    transform: scale(0.2); }
+  20%  { opacity: 1;    transform: scale(1.1); }
+  55%  { opacity: 0.85; transform: scale(1.4); }
+  100% { opacity: 0;    transform: scale(2.8); }
+}
+
+@keyframes explosion-anillo-1 {
+  0%   { r: 0;  opacity: 1;   stroke-width: 5; }
+  100% { r: 48; opacity: 0;   stroke-width: 1; }
+}
+@keyframes explosion-anillo-2 {
+  0%   { r: 0;  opacity: 0.9; stroke-width: 3.5; }
+  100% { r: 34; opacity: 0;   stroke-width: 1; }
+}
+@keyframes explosion-anillo-3 {
+  0%   { r: 0;  opacity: 0.7; stroke-width: 2; }
+  100% { r: 22; opacity: 0;   stroke-width: 0.5; }
+}
+
+.misil-cuerpo {
+  animation: misil-caer 0.78s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+
+.explosion-flash {
+  animation: explosion-destello 0.65s ease-out 0.72s both;
+}
+
+.explosion-ring-1 {
+  animation: explosion-anillo-1 0.75s ease-out 0.72s both;
+}
+.explosion-ring-2 {
+  animation: explosion-anillo-2 0.65s ease-out 0.78s both;
+}
+.explosion-ring-3 {
+  animation: explosion-anillo-3 0.55s ease-out 0.84s both;
 }

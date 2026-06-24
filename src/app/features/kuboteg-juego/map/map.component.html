@@ -16,6 +16,10 @@
         <feComposite in="color" in2="outline" operator="in" result="colored"/>
         <feGaussianBlur in="colored" stdDeviation="10"/>
       </filter>
+
+      <pattern id="destruccion-pattern" patternUnits="objectBoundingBox" patternContentUnits="objectBoundingBox" width="1" height="1">
+        <image href="assets/KuboTeg/destruccion.png" x="0" y="0" width="1" height="1" preserveAspectRatio="xMidYMid slice"/>
+      </pattern>
     </defs>
 
     <image href="assets/KuboTeg/FondoOceano.webp" x="0" y="50" width="1100" height="550" preserveAspectRatio="xMidYMid slice"/>
@@ -81,11 +85,22 @@
             [class.en-quitar]="isQuitandose(t)"
             [class.en-movilizacion]="isMovilizandose(t)"
             [class.en-carta-acierta]="isCartaAcierta(t)"
+            [class.bomba-colocada]="isBomba(t)"
+            [class.bomba-alcance]="isBombaAlcance(t)"
             (click)="onTerritoryClick(t); $event.stopPropagation()"
             (contextmenu)="onTerritoryRightClick(t, $event); $event.stopPropagation()"
             (mouseenter)="onTerritoryHover(t, $event)"
             (mouseleave)="onTerritoryLeave()"
           />
+        }
+      </g>
+
+      <!-- Textura destrucción sobre territorios bombeados -->
+      <g id="destruccion-layer" pointer-events="none">
+        @for (t of territories; track t.id) {
+          @if (isDestruido(t)) {
+            <path [attr.d]="t.svgPath" fill="url(#destruccion-pattern)" opacity="0.52" stroke="none"/>
+          }
         }
       </g>
 
@@ -111,6 +126,49 @@
               font-family="'Outfit', sans-serif"
               letter-spacing="0.5"
             >{{ getTropas(t.id) }}</text>
+          }
+        }
+      </g>
+
+      <!-- Animación misil nuclear -->
+      <g id="misil-layer" pointer-events="none">
+        @if (misilTerr) {
+          <g [attr.transform]="'translate(' + misilTerr.labelPosition.x + ',' + misilTerr.labelPosition.y + ')'">
+            <!-- Misil cayendo -->
+            <g class="misil-cuerpo">
+              <!-- Llama de escape (arriba) -->
+              <ellipse cx="0" cy="-17" rx="4" ry="7" fill="#fbbf24" opacity="0.92"/>
+              <ellipse cx="0" cy="-14" rx="2.5" ry="4" fill="#fb923c"/>
+              <!-- Aletas (arriba) -->
+              <polygon points="-5,-6 -11,-13 -5,-10" fill="#64748b"/>
+              <polygon points="5,-6 11,-13 5,-10" fill="#64748b"/>
+              <!-- Cuerpo -->
+              <rect x="-4.5" y="-9" width="9" height="15" rx="1.5" fill="#cbd5e1"/>
+              <rect x="-3" y="-7" width="3" height="8" rx="1" fill="#94a3b8"/>
+              <!-- Cabeza (nariz apuntando abajo) -->
+              <polygon points="0,14 5.5,4 -5.5,4" fill="#dc2626"/>
+            </g>
+            <!-- Explosión (retrasada, aparece al impactar) -->
+            <circle class="explosion-flash"  cx="0" cy="0" r="22" fill="#fef08a"/>
+            <circle class="explosion-ring-1" cx="0" cy="0" r="0"  fill="none" stroke="#fbbf24" stroke-width="4"/>
+            <circle class="explosion-ring-2" cx="0" cy="0" r="0"  fill="none" stroke="#ef4444" stroke-width="2.5"/>
+            <circle class="explosion-ring-3" cx="0" cy="0" r="0"  fill="none" stroke="#f97316" stroke-width="1.5"/>
+          </g>
+        }
+      </g>
+
+      <!-- Icono Bomba Atómica sobre el territorio -->
+      <g id="bomba-icon-layer" pointer-events="none">
+        @for (t of territories; track t.id) {
+          @if (isBomba(t)) {
+            <!-- scale 0.43 → ícono ~10px; centrado verticalmente con el badge, pegado a su derecha -->
+            <g [attr.transform]="'translate(' + (t.labelPosition.x + 14) + ',' + (t.labelPosition.y - 5.2) + ') scale(0.43)'">
+              <circle cx="12" cy="12" r="11.5" fill="rgba(8,4,18,0.88)" stroke="#fbbf24" stroke-width="1.5"/>
+              <path fill="#fbbf24" d="M10 8.54A4 4 0 0 1 14 8.54L17.5 2.47A11 11 0 0 0 6.5 2.47Z"/>
+              <path fill="#fbbf24" d="M16 12A4 4 0 0 1 14 15.46L17.5 21.53A11 11 0 0 0 23 12Z"/>
+              <path fill="#fbbf24" d="M10 15.46A4 4 0 0 1 8 12L1 12A11 11 0 0 0 6.5 21.53Z"/>
+              <circle cx="12" cy="12" r="2" fill="#fbbf24"/>
+            </g>
           }
         }
       </g>

@@ -325,6 +325,20 @@ interface PartidaFinalizada {
                 </div>
               </div>
               <div class="form-row">
+                <div class="field-check field-check-inline">
+                  <label>
+                    <input type="checkbox" [(ngModel)]="form.con_bomba_atomica" />
+                    ☢ Bomba Atómica
+                  </label>
+                </div>
+                <div class="field-check field-check-inline">
+                  <label>
+                    <input type="checkbox" [(ngModel)]="form.colocacion_simultanea" />
+                    ⚡ Colocación simultánea
+                  </label>
+                </div>
+              </div>
+              <div class="form-row">
                 <div class="field field-narrow">
                   <label>Tropas iniciales (4–10)</label>
                   <div class="num-stepper">
@@ -442,7 +456,9 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     tropas_iniciales: 5,
     limite_rondas: 30,
     requiere_contrasena: false,
-    contrasena: ''
+    contrasena: '',
+    con_bomba_atomica: true,
+    colocacion_simultanea: true
   };
 
   private channelUsuario: RealtimeChannel | null = null;
@@ -674,7 +690,9 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       tropas_iniciales: 5,
       limite_rondas: 30,
       requiere_contrasena: false,
-      contrasena: ''
+      contrasena: '',
+      con_bomba_atomica: true,
+      colocacion_simultanea: true
     };
   }
 
@@ -694,7 +712,9 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       contrasena: this.form.requiere_contrasena ? this.form.contrasena : null,
       turno_actual_usuario_id: null,
       tropas_iniciales: this.form.tropas_iniciales,
-      limite_rondas: this.form.limite_rondas
+      limite_rondas: this.form.limite_rondas,
+      con_bomba_atomica: this.form.con_bomba_atomica,
+      colocacion_simultanea: this.form.colocacion_simultanea
     });
     if (nuevaPartida) {
       await this.supabaseService.insertPartidaJugador(nuevaPartida.id, this.userId, 0);

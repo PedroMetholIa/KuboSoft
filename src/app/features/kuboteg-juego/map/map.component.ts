@@ -38,6 +38,29 @@ export class MapComponent implements OnInit, AfterViewInit {
     this._pactoRotosSet = new Set(val);
   }
 
+  @Input() set territoriosBomba(val: string[]) {
+    this._bombaColocadaSet = new Set(val);
+  }
+
+  @Input() set territoriosBombaAlcance(val: string[]) {
+    this._bombaAlcanceSet = new Set(val);
+  }
+
+  @Input() set territoriosDestruidos(val: string[]) {
+    this._destruidosSet = new Set(val);
+  }
+
+  @Input() set territorioMisilId(val: string | null) {
+    this._misilTerrId = val;
+    this._misilTerr = val ? (this.territories.find(t => t.id === val) ?? null) : null;
+  }
+
+  get misilTerr(): Territory | null {
+    if (!this._misilTerrId) return null;
+    if (!this._misilTerr) this._misilTerr = this.territories.find(t => t.id === this._misilTerrId) ?? null;
+    return this._misilTerr;
+  }
+
   @Input() dimBackground = false;
 
   @Input() territoriosBloqueadosMsgs: Record<string, string> = {};
@@ -57,6 +80,11 @@ export class MapComponent implements OnInit, AfterViewInit {
   private _combateSet      = new Set<string>();
   private _pactoActivosSet = new Set<string>();
   private _pactoRotosSet   = new Set<string>();
+  private _bombaColocadaSet = new Set<string>();
+  private _bombaAlcanceSet  = new Set<string>();
+  private _destruidosSet    = new Set<string>();
+  _misilTerrId: string | null = null;
+  _misilTerr:   Territory | null = null;
 
   readonly continentLegend = [
     { id: 'north_america', label: 'América del Norte', color: '#D9B34D' },
@@ -80,7 +108,7 @@ export class MapComponent implements OnInit, AfterViewInit {
     const dx = +(550 - (b.x + b.width / 2)).toFixed(1);
     const dy = +(325 - (b.y + b.height / 2)).toFixed(1);
     const transform = `translate(${dx},${dy})`;
-    ['#territories', '#coastal-glow-layer'].forEach(sel => {
+    ['#territories', '#coastal-glow-layer', '#destruccion-layer'].forEach(sel => {
       const g = this.el.nativeElement.querySelector(sel) as SVGGElement;
       if (g) g.setAttribute('transform', transform);
     });
@@ -156,6 +184,18 @@ export class MapComponent implements OnInit, AfterViewInit {
 
   isPactoRoto(t: Territory): boolean {
     return this._pactoRotosSet.has(t.id);
+  }
+
+  isBomba(t: Territory): boolean {
+    return this._bombaColocadaSet.has(t.id);
+  }
+
+  isBombaAlcance(t: Territory): boolean {
+    return this._bombaAlcanceSet.has(t.id);
+  }
+
+  isDestruido(t: Territory): boolean {
+    return this._destruidosSet.has(t.id);
   }
 
   getTerritoryFill(t: Territory): string {
@@ -238,16 +278,17 @@ export class MapComponent implements OnInit, AfterViewInit {
     return `rgba(${Math.min(255, r + 95)},${Math.min(255, g + 95)},${Math.min(255, b + 95)},0.82)`;
   }
 
+  private readonly _continentLabels: Record<Continent, string> = {
+    north_america: 'América del Norte',
+    south_america: 'América del Sur',
+    europe: 'Europa',
+    africa: 'África',
+    asia: 'Asia',
+    oceania: 'Oceanía',
+  };
+
   continentLabel(continent: Continent): string {
-    const map: Record<Continent, string> = {
-      north_america: 'América del Norte',
-      south_america: 'América del Sur',
-      europe: 'Europa',
-      africa: 'África',
-      asia: 'Asia',
-      oceania: 'Oceanía',
-    };
-    return map[continent];
+    return this._continentLabels[continent];
   }
 
   private getOwnerColor(t: Territory): string | null {

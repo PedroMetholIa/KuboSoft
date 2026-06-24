@@ -119,17 +119,37 @@
         <span class="header-brand">HEGEMONY</span>
       </div>
       <div class="game-header-center">
-        <app-partida-info
-          [nombre]="partida.nombre"
-          [estado]="partida.estado"
-          [rondaActual]="partida.ronda_actual ?? null"
-          [limiteRondas]="partida.limite_rondas ?? null"
-          [tiempoPartida]="tiempoPartida"
-          [jugadorNombre]="jugadorActualNombre"
-          [jugadorColor]="jugadorColores[jugadorActualId] || ''"
-          [esMiTurno]="esMiTurno"
-          [fase]="fase"
-        />
+        @if (turnOrderDisplay.length > 0) {
+          <div class="turn-order-inline">
+            @for (slot of turnOrderDisplay; track slot.uid; let i = $index) {
+              <div class="to-slot"
+                   [class.to-slot--actual]="slot.isActual"
+                   [class.to-slot--muerto]="!slot.isAlive"
+                   [class.to-slot--clickable]="!slot.isMe"
+                   [style.--tc]="slot.color"
+                   (click)="!slot.isMe && abrirChatPrivado(slot.uid)">
+                <span class="to-num">{{ slot.pos }}</span>
+                <div class="to-card">
+                  @if (slot.liderImg) {
+                    <img class="to-avatar" [src]="slot.liderImg" [alt]="slot.liderNombre">
+                  } @else {
+                    <div class="to-avatar to-avatar--empty"></div>
+                  }
+                  <div class="to-info">
+                    <span class="to-name">{{ slot.nombre }}</span>
+                    @if (slot.liderNombre) {
+                      <span class="to-lider">{{ slot.liderNombre }}</span>
+                    }
+                  </div>
+                  @if (slot.isActual) { <span class="to-dot"></span> }
+                </div>
+              </div>
+              @if (i < turnOrderDisplay.length - 1) {
+                <span class="to-arrow">›</span>
+              }
+            }
+          </div>
+        }
       </div>
       <div class="game-header-right">
         @if (!enPausa) {
@@ -162,26 +182,30 @@
       <!-- Panel izquierdo -->
       <aside class="scoreboard" [class.panel-cerrado]="!panelAbierto">
 
-        <!-- Líder del turno actual -->
+        <!-- Líder del turno actual (o propio en cobro simultáneo) -->
         @if (fase && liderActualImgPath) {
           <div class="turno-lider-banner"
-               [style.border-color]="jugadorColores[jugadorActualId]"
-               [style.box-shadow]="'0 0 12px ' + jugadorColores[jugadorActualId] + '55'">
+               [style.border-color]="jugadorColores[liderDisplayId]"
+               [style.box-shadow]="'0 0 12px ' + jugadorColores[liderDisplayId] + '55'">
             <img class="turno-lider-img"
-                 [class.turno-lider-img--clickable]="!esMiTurno"
+                 [class.turno-lider-img--clickable]="liderDisplayId !== userId"
                  [src]="liderActualImgPath"
-                 [attr.title]="!esMiTurno ? 'Chatear con ' + jugadorActualNombre : null"
-                 [alt]="jugadorLideres[jugadorActualId]"
-                 (click)="!esMiTurno && abrirChatPrivado(jugadorActualId)">
+                 [attr.title]="liderDisplayId !== userId ? 'Chatear con ' + liderDisplayNombre : null"
+                 [alt]="jugadorLideres[liderDisplayId]"
+                 (click)="liderDisplayId !== userId && abrirChatPrivado(liderDisplayId)">
             <div class="turno-lider-footer">
               <span class="turno-color-dot"
-                    [style.background-color]="jugadorColores[jugadorActualId]"></span>
+                    [style.background-color]="jugadorColores[liderDisplayId]"></span>
               <div class="turno-lider-text">
-                <span class="turno-nombre">{{ jugadorActualNombre }}</span>
-                <span class="turno-label" [class.mi-turno]="esMiTurno">
-                  {{ fase === 'colocacion' ? 'Colocando tropas' : fase === 'ataque' ? 'Atacando' : fase === 'reagrupacion' ? 'Reagrupando' : 'Turno de...' }}
+                <span class="turno-nombre">{{ liderDisplayNombre }}</span>
+                <span class="turno-label" [class.mi-turno]="liderDisplayId === userId">
+                  @if (colocacionSimultanea && fase === 'colocacion') {
+                    Colocando tropas
+                  } @else {
+                    {{ fase === 'colocacion' ? 'Colocando tropas' : fase === 'ataque' ? 'Atacando' : fase === 'reagrupacion' ? 'Reagrupando' : 'Turno de...' }}
+                  }
                 </span>
-                @if (posturaJugadorActual) {
+                @if (posturaJugadorActual && liderDisplayId !== userId) {
                   <span class="turno-postura"
                     [class.turno-postura--amigable]="posturaJugadorActual === 'amigable'"
                     [class.turno-postura--hostil]="posturaJugadorActual === 'hostil'">
@@ -310,36 +334,18 @@
                 @if (misCartas.length > 0) {
                   <div class="cartas-list">
                     @for (c of misCartas; track $index) {
-                      <span class="carta-chip">{{ nombreTerritorio(c) }}</span>
+                      <div class="carta-card">
+                        @if (cartaTerritory(c); as td) {
+                          <svg class="carta-svg" [attr.viewBox]="td.viewBox" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+                            <path [attr.d]="td.path" [attr.fill]="td.fill" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
+                          </svg>
+                        }
+                        <span class="carta-card-name">{{ nombreTerritorio(c) }}</span>
+                      </div>
                     }
                   </div>
                 } @else {
                   <div class="cartas-empty">Sin cartas en mano</div>
-                }
-              </div>
-
-              <!-- Grupos de chat -->
-              <div class="grupos-inicio-section">
-                <div class="grupos-inicio-label">👥 Grupos</div>
-                @if (gruposMios.length === 0) {
-                  <div class="grupos-inicio-empty">Sin grupos aún</div>
-                } @else {
-                  @for (g of gruposMios; track g.id) {
-                    <div class="grupos-inicio-item" [class.grupos-inicio-item--activo]="chatActivoId === g.id"
-                         [attr.data-tooltip]="grupoMiembrosTooltip(g)"
-                         (click)="chatActivoId = g.id">
-                      <div class="grupos-inicio-info">
-                        <span class="grupos-inicio-nombre">{{ g.nombre }}</span>
-                        <div class="grupos-inicio-miembros">
-                          @for (uid of g.jugadoresIds; track uid) {
-                            <span class="grupos-inicio-dot" [style.background]="jugadorColores[uid] || '#94a3b8'"
-                                  [title]="jugadorNombres[uid] || uid"></span>
-                          }
-                          <span class="grupos-inicio-cant">{{ g.jugadoresIds.length }} miembros</span>
-                        </div>
-                      </div>
-                    </div>
-                  }
                 }
               </div>
 
@@ -352,13 +358,17 @@
                     <div class="bonus-tabla-title">Bonus por continente</div>
                     <div class="bonus-tabla-header">
                       <span class="bonus-col-cont">Continente</span>
-                      <span class="bonus-col-val">Mayoría</span>
+                      @if (jugandoConMayorias) {
+                        <span class="bonus-col-val">Mayoría</span>
+                      }
                       <span class="bonus-col-val">Totalidad</span>
                     </div>
                     @for (row of tablaBonusContinentes; track row.nombre) {
                       <div class="bonus-tabla-row">
                         <span class="bonus-col-cont">{{ row.nombre }}</span>
-                        <span class="bonus-col-val bonus-mayoria">+{{ row.mayoria }}</span>
+                        @if (jugandoConMayorias) {
+                          <span class="bonus-col-val bonus-mayoria">+{{ row.mayoria }}</span>
+                        }
                         <span class="bonus-col-val bonus-totalidad">+{{ row.totalidad }}</span>
                       </div>
                     }
@@ -505,7 +515,6 @@
                   </div>
                   <div class="obj-card-body">
 
-                    <!-- Tipo: totalidad de 2 continentes -->
                     @if (objetivoContinentes; as ids) {
                       <div class="obj-item" [class.obj-done]="objetivoContinenteA">
                         <span class="obj-mark">{{ objetivoContinenteA ? '✓' : '○' }}</span>
@@ -517,34 +526,22 @@
                       </div>
                     }
 
-                    <!-- Tipo: 2 mayorías + 1 totalidad -->
-                    @if (objetivoMayoriasContinente; as obj) {
-                      <p class="obj-sub-label">Mayoría en:</p>
-                      <div class="obj-item" [class.obj-done]="mayoriasContinenteA">
-                        <span class="obj-mark">{{ mayoriasContinenteA ? '✓' : '◑' }}</span>
-                        <span>{{ getNombreContinente(obj.mayoriaIds[0]) }}</span>
-                      </div>
-                      <div class="obj-item" [class.obj-done]="mayoriasContinenteB">
-                        <span class="obj-mark">{{ mayoriasContinenteB ? '✓' : '◑' }}</span>
-                        <span>{{ getNombreContinente(obj.mayoriaIds[1]) }}</span>
-                      </div>
-                      <p class="obj-sub-label">Totalidad en:</p>
-                      <div class="obj-item" [class.obj-done]="mayoriasContinenteTotalidad">
-                        <span class="obj-mark">{{ mayoriasContinenteTotalidad ? '✓' : '○' }}</span>
-                        <span>{{ getNombreContinente(obj.continenteId) }}</span>
+                    @if (objetivoTresMayorias) {
+                      <div class="obj-item" [class.obj-done]="mayoriasActuales >= 3">
+                        <span class="obj-mark">{{ mayoriasActuales >= 3 ? '✓' : '◑' }}</span>
+                        <span>Mayoría en 3 continentes</span>
+                        <span class="obj-prog">{{ mayoriasActuales }}/3</span>
                       </div>
                     }
 
-                    <!-- Tipo: mayoría en 4 continentes -->
                     @if (objetivoCuatroMayorias) {
-                      <div class="obj-item" [class.obj-done]="cuatroMayoriasActuales >= 4">
-                        <span class="obj-mark">{{ cuatroMayoriasActuales >= 4 ? '✓' : '◑' }}</span>
-                        <span>Mayoría en 4 continentes</span>
-                        <span class="obj-prog">{{ cuatroMayoriasActuales }}/4</span>
+                      <div class="obj-item" [class.obj-done]="mayoriasActuales >= 4">
+                        <span class="obj-mark">{{ mayoriasActuales >= 4 ? '✓' : '◑' }}</span>
+                        <span>Conquistar 4 mayorías cualesquiera</span>
+                        <span class="obj-prog">{{ mayoriasActuales }}/4</span>
                       </div>
                     }
 
-                    <!-- Tipo: destruir -->
                     @if (objetivoColor) {
                       @if (objetivoFallbackActivo) {
                         <div class="obj-item obj-alt">
@@ -574,6 +571,9 @@
                 <div class="mj-placeholder">Objetivo no asignado aún</div>
               }
               <button class="obj-historial-btn" (click)="abrirHistorial()">📜 Ver historial</button>
+              @if (!partida.ganador_id && !meRendi && estaVivo(userId)) {
+                <button class="btn-rendicion btn-rendicion--panel" (click)="abrirModalRendicion()">🏳 Rendición</button>
+              }
             }
             @case ('configuracion') {
               <div class="cfg-panel">
@@ -693,11 +693,96 @@
                   <div class="intl-empty">Sin posturas declaradas</div>
                 }
 
+                <!-- ── Grupos ───────────────────── -->
+                <div class="intl-section-label intl-section-label--mt">Grupos</div>
+                @if (gruposMios.length === 0) {
+                  <div class="intl-empty">Sin grupos aún</div>
+                } @else {
+                  @for (g of gruposMios; track g.id) {
+                    <div class="grupos-inicio-item" [class.grupos-inicio-item--activo]="chatActivoId === g.id"
+                         [attr.data-tooltip]="grupoMiembrosTooltip(g)"
+                         (click)="chatActivoId = g.id">
+                      <div class="grupos-inicio-info">
+                        <span class="grupos-inicio-nombre">{{ g.nombre }}</span>
+                        <div class="grupos-inicio-miembros">
+                          @for (uid of g.jugadoresIds; track uid) {
+                            <span class="grupos-inicio-dot" [style.background]="jugadorColores[uid] || '#94a3b8'"
+                                  [title]="jugadorNombres[uid] || uid"></span>
+                          }
+                          <span class="grupos-inicio-cant">{{ g.jugadoresIds.length }} miembros</span>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                }
+
               </div>
             }
 
             @case ('noticias') {
               <app-notificaciones [items]="notifItems"></app-notificaciones>
+            }
+
+            @case ('nuclear') {
+              <div class="nuclear-panel">
+                <div class="nuclear-progreso">
+                  <span class="nuclear-progreso-label">Cartas robadas</span>
+                  <div class="nuclear-progreso-bar-wrap">
+                    <div class="nuclear-progreso-bar"
+                         [style.width.%]="tieneBomba ? 100 : (cartasRobadasTotal >= 2 ? 100 : cartasRobadasTotal * 50)">
+                    </div>
+                  </div>
+                  <span class="nuclear-progreso-contador">
+                    @if (tieneBomba || cartasRobadasTotal >= 2) {
+                      <span class="nuclear-obtenida-badge">☢ ¡BOMBA OBTENIDA!</span>
+                    } @else {
+                      {{ cartasRobadasTotal }} / 2
+                    }
+                  </span>
+                </div>
+                <div class="nuclear-bomba-wrap">
+                  <img class="nuclear-bomba-img nuclear-bomba-dark" src="assets/KuboTeg/bomba.png" alt=""/>
+                  <img class="nuclear-bomba-img nuclear-bomba-color" src="assets/KuboTeg/bomba.png" alt="Bomba Atómica"
+                       [style.clip-path]="bombaNuclearClipPath"/>
+                </div>
+                <div class="nuclear-completado">
+                  <span class="nuclear-completado-label">Programa completado</span>
+                  <span class="nuclear-completado-pct"
+                        [class.nuclear-completado-pct--full]="tieneBomba">
+                    {{ tieneBomba ? 100 : (cartasRobadasTotal * 50) }}%
+                  </span>
+                </div>
+
+                @if (tieneBomba) {
+                  <div class="nuclear-lanzar-section">
+                    @for (bomba of bombas; track $index; let i = $index) {
+                      @if (bomba !== null) {
+                        <button class="btn-bomba-lanzar"
+                          [class.btn-bomba-activo]="modoUsandoBomba && bombaUsandoIdx === i"
+                          [disabled]="fase !== 'ataque' || (esMiTurno && !!conquistaPendiente) || (combateEnCurso && !(modoUsandoBomba && bombaUsandoIdx === i))"
+                          (click)="toggleModoUsandoBomba(i)">
+                          <svg viewBox="0 0 24 24" fill="currentColor" class="btn-bomba-ico">
+                            <circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1"/>
+                            <path d="M10 8.54A4 4 0 0 1 14 8.54L17.5 2.47A11 11 0 0 0 6.5 2.47Z"/>
+                            <path d="M16 12A4 4 0 0 1 14 15.46L17.5 21.53A11 11 0 0 0 23 12Z"/>
+                            <path d="M10 15.46A4 4 0 0 1 8 12L1 12A11 11 0 0 0 6.5 21.53Z"/>
+                            <circle cx="12" cy="12" r="2"/>
+                          </svg>
+                          @if (modoUsandoBomba && bombaUsandoIdx === i) {
+                            Cancelar bomba{{ bombas.length > 1 ? ' ' + (i + 1) : '' }}
+                          } @else {
+                            Lanzar{{ bombas.length > 1 ? ' ' + (i + 1) : '' }}
+                          }
+                        </button>
+                      } @else {
+                        <p class="nuclear-bomba-sin-colocar">
+                          Colocá la bomba{{ bombas.length > 1 ? ' ' + (i + 1) : '' }} en el mapa primero
+                        </p>
+                      }
+                    }
+                  </div>
+                }
+              </div>
             }
 
           }
@@ -763,17 +848,6 @@
 
         <div class="tb-group-bottom">
           <button class="tb-btn"
-            [class.tb-active]="panelActivo === 'jugadores'"
-            (click)="setPanelActivo('jugadores')"
-            data-tooltip="Jugadores">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-          </button>
-          <button class="tb-btn"
             [class.tb-active]="panelActivo === 'inicio'"
             (click)="setPanelActivo('inicio')"
             data-tooltip="Inicio">
@@ -782,6 +856,32 @@
               <polyline points="9 22 9 12 15 12 15 22"/>
             </svg>
           </button>
+
+          <button class="tb-btn"
+            [class.tb-active]="panelActivo === 'objetivo'"
+            (click)="setPanelActivo('objetivo')"
+            data-tooltip="Objetivo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="8" r="6"/>
+              <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+            </svg>
+          </button>
+
+          @if (jugandoConBomba) {
+          <button class="tb-btn"
+            [class.tb-active]="panelActivo === 'nuclear'"
+            [class.tb-nuclear-btn--lista]="tieneBomba"
+            (click)="setPanelActivo('nuclear')"
+            data-tooltip="Programa Nuclear">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1"/>
+              <path d="M10 8.54A4 4 0 0 1 14 8.54L17.5 2.47A11 11 0 0 0 6.5 2.47Z"/>
+              <path d="M16 12A4 4 0 0 1 14 15.46L17.5 21.53A11 11 0 0 0 23 12Z"/>
+              <path d="M10 15.46A4 4 0 0 1 8 12L1 12A11 11 0 0 0 6.5 21.53Z"/>
+              <circle cx="12" cy="12" r="2"/>
+            </svg>
+          </button>
+          }
 
           <button class="tb-btn"
             [class.tb-active]="panelActivo === 'internacionales'"
@@ -817,15 +917,6 @@
             </svg>
           </button>
 
-          <button class="tb-btn"
-            [class.tb-active]="panelActivo === 'objetivo'"
-            (click)="setPanelActivo('objetivo')"
-            data-tooltip="Objetivo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="8" r="6"/>
-              <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
-            </svg>
-          </button>
         </div>
 
       </nav>
@@ -862,6 +953,10 @@
           [territorioQuitandose]="territorioQuitandose"
           [territorioMovilizandose]="territorioMovilizandose"
           [territorioCartaAcierta]="territorioCartaAcierta"
+          [territoriosBomba]="panelActivo === 'internacionales' ? [] : bombasEnMapa"
+          [territoriosBombaAlcance]="modoUsandoBomba ? bombaAlcanceEnemigos : []"
+          [territoriosDestruidos]="territoriosDestruidosArray"
+          [territorioMisilId]="territorioMisilActivoId"
           [territoriosPactoActivos]="verPactosEnMapa ? todosLosTerrsEnPacto : pactoTerrsActivosMap"
           [territoriosPactoRotos]="verPactosEnMapa ? todosLosTerrsEnPactoRoto : []"
           [dimBackground]="verPactosEnMapa || modoPacto === 'propio' || modoPacto === 'ajeno' || !!propuestaEntrante"
@@ -886,40 +981,74 @@
         <div class="acciones-panel">
 
           <!-- FASE: Colocación - mi turno -->
-          @if (fase === 'colocacion' && esMiTurno) {
-            <div class="phase-panel">
-              <div class="phase-title">📦 Fase de Colocación</div>
+          @if (fase === 'colocacion' && esMiTurno && !misColocacionConfirmada) {
+            <div class="phase-panel phase-panel--colocacion">
+              <div class="phase-hdr">
+                <span class="phase-hdr-icon">📦</span>
+                <div class="phase-hdr-text">
+                  <span class="phase-hdr-label">Colocación de tropas</span>
+                  <span class="phase-hdr-step">Fase 1 · 3</span>
+                </div>
+              </div>
 
               <!-- Sub-fase: tropas de continente -->
               @if (subFaseColocacion === 'continentes' && continenteActualColocacion; as cont) {
-                <p class="phase-sub">
-                  Continente <strong>{{ continenteColocacionIdx + 1 }}</strong> de <strong>{{ continentesColocacion.length }}</strong>
-                </p>
-                <p class="phase-sub">
-                  <strong>{{ cont.nombre }}</strong>
-                  @if (cont.tipo === 'mayoria') {
-                    <span class="cont-tipo-badge">(Mayoría)</span>
-                  }
-                  — +{{ cont.bonus }}
-                </p>
-                <p class="phase-sub">
-                  Tropas a colocar: <strong>{{ cont.bonus - cont.colocadas }}</strong>
-                </p>
-                <p class="phase-hint">{{ cont.tipo === 'totalidad' ? 'Podés colocar en cualquier territorio de este continente' : 'Solo podés colocar en tus territorios de este continente' }}</p>
+                <div class="phase-cont-card">
+                  <div class="phase-cont-top">
+                    <span class="phase-cont-name">{{ cont.nombre }}</span>
+                    @if (cont.tipo === 'mayoria') {
+                      <span class="cont-tipo-badge">Mayoría</span>
+                    }
+                    <span class="phase-cont-prog">{{ continenteColocacionIdx + 1 }} / {{ continentesColocacion.length }}</span>
+                  </div>
+                  <div class="phase-tropas-inline">
+                    <span class="phase-tropas-n">{{ cont.bonus - cont.colocadas }}</span>
+                    <span class="phase-tropas-lbl">tropas por colocar</span>
+                  </div>
+                </div>
+                <p class="phase-hint">{{ cont.tipo === 'totalidad' ? 'Hacé clic en cualquier territorio de este continente' : 'Solo tus territorios de este continente' }}</p>
+                @if (puedeVolverContinente) {
+                  <button class="btn-deshacer-continente" (click)="deshacerContinente()">← Deshacer continente anterior</button>
+                }
               }
 
               <!-- Sub-fase: tropas base -->
               @if (subFaseColocacion === 'base') {
-                <p class="phase-sub">Tropas por colocar: <strong>{{ misTropasParaColocar }}</strong></p>
+                @if (puedeVolverContinente) {
+                  <button class="btn-deshacer-continente" (click)="deshacerContinente()">← Volver al último continente</button>
+                }
+                <div class="phase-tropas">
+                  <span class="phase-tropas-n">{{ misTropasParaColocar }}</span>
+                  <span class="phase-tropas-lbl">tropas por colocar</span>
+                </div>
                 @if (misTropasParaColocar > 0) {
-                  <p class="phase-hint">Hacé clic en uno de tus territorios para colocar una tropa. Clic derecho para quitar.</p>
+                  <p class="phase-hint">Clic en un territorio tuyo · Clic derecho para quitar</p>
                 }
                 @if (misCartas.length >= 3) {
-                  <button class="btn-canjear-cartas"
-                    [disabled]="canjeandoCartas"
-                    (click)="canjearCartas()">
+                  <button class="btn-canjear-cartas" [disabled]="canjeandoCartas" (click)="canjearCartas()">
                     🃏 Canjear 3 cartas → +3 tropas
                   </button>
+                }
+                @if (jugandoConBomba) {
+                  @for (bomba of bombas; track $index; let i = $index) {
+                    @if (bomba === null) {
+                      <div class="bomba-pendiente-aviso">
+                        <span class="bomba-pendiente-icono">☢</span>
+                        <span>Bomba {{ bombas.length > 1 ? (i + 1) : '' }} — debés colocarla antes de continuar.</span>
+                      </div>
+                      <button class="btn-bomba-colocar"
+                        [class.btn-bomba-activo]="modoColocandoBomba && bombaColocandoIdx === i"
+                        (click)="toggleModoColocandoBomba(i)">
+                        ☢ {{ modoColocandoBomba && bombaColocandoIdx === i ? 'Cancelar — elegí un territorio' : 'Colocar Bomba' + (bombas.length > 1 ? ' ' + (i + 1) : '') }}
+                      </button>
+                    } @else {
+                      <div class="bomba-colocada-aviso">
+                        <span class="bomba-pendiente-icono">☢</span>
+                        <span>Bomba {{ bombas.length > 1 ? (i + 1) + ' — ' : '' }}colocada en <strong>{{ nombreTerritorio(bomba) }}</strong></span>
+                        <button class="bomba-mover-btn" (click)="moverBomba(i)">Cambiar</button>
+                      </div>
+                    }
+                  }
                 }
                 @if (misTropasParaColocar === 0) {
                   <button class="btn-phase-action" (click)="confirmarColocacion()">
@@ -930,35 +1059,175 @@
             </div>
           }
 
-          <!-- FASE: Colocación - turno ajeno -->
+          <!-- FASE: Colocación simultánea - confirmado, esperando que todos coloquen -->
+          @if (fase === 'colocacion' && misColocacionConfirmada && !mostrarAprobacionCobro) {
+            <div class="phase-panel phase-panel--waiting">
+              <div class="phase-hdr">
+                <span class="phase-hdr-icon">📦</span>
+                <div class="phase-hdr-text">
+                  <span class="phase-hdr-label">Colocación simultánea</span>
+                  <span class="phase-hdr-step">Fase 1 · 3</span>
+                </div>
+              </div>
+              <p class="phase-waiting-line">✓ Tropas colocadas</p>
+              @if (jugadoresPendientesColocacion.length > 0) {
+                <p class="phase-sub-waiting">Esperando a:
+                  @for (j of jugadoresPendientesColocacion; track j.usuario_id) {
+                    <strong> {{ nombreJugador(j) }}</strong>
+                  }
+                </p>
+              }
+              <button class="btn-volver-colocacion" (click)="deshacerColocacionSimultanea()">
+                ← Volver a replantear
+              </button>
+            </div>
+          }
+
+          <!-- FASE: Colocación simultánea - todos colocaron, pendiente aprobación -->
+          @if (fase === 'colocacion' && misColocacionConfirmada && mostrarAprobacionCobro) {
+            <div class="phase-panel phase-panel--aprobacion">
+              <div class="phase-hdr">
+                <span class="phase-hdr-icon">✅</span>
+                <div class="phase-hdr-text">
+                  <span class="phase-hdr-label">Aprobación del cobro</span>
+                  <span class="phase-hdr-step">Fase 1 · 3</span>
+                </div>
+              </div>
+              @if (!aprobacionCobroEnviada) {
+                <p class="phase-waiting-line">Todos colocaron sus tropas.</p>
+                <p class="phase-hint">Revisá el mapa y confirmá el cobro.</p>
+                <button class="btn-phase-action" (click)="aprobarCobro()">
+                  Aprobado →
+                </button>
+                <button class="btn-volver-colocacion" (click)="deshacerColocacionSimultanea()">
+                  ← Volver a replantear
+                </button>
+              } @else {
+                <p class="phase-waiting-line">✓ Cobro aprobado</p>
+                <p class="phase-hint">Esperando que los demás aprueben…</p>
+              }
+            </div>
+          }
+
+          <!-- FASE: Colocación - turno ajeno (modo secuencial) o espectador -->
           @if (fase === 'colocacion' && !esMiTurno) {
-            <div class="phase-panel">
-              <div class="phase-title">📦 Colocación de tropas</div>
-              <p class="phase-sub">Colocando <strong>{{ jugadorActualNombre }}</strong>...</p>
+            <div class="phase-panel phase-panel--waiting">
+              <div class="phase-hdr">
+                <span class="phase-hdr-icon">📦</span>
+                <div class="phase-hdr-text">
+                  <span class="phase-hdr-label">Colocación de tropas</span>
+                  <span class="phase-hdr-step">Fase 1 · 3</span>
+                </div>
+              </div>
+              @if (colocacionSimultanea) {
+                <p class="phase-waiting-line">Colocación simultánea en curso…</p>
+              } @else {
+                <p class="phase-waiting-line">Colocando <strong>{{ jugadorActualNombre }}</strong>…</p>
+              }
             </div>
           }
 
           <!-- FASE: Ataque - mi turno -->
           @if (fase === 'ataque' && esMiTurno) {
-            <div class="phase-panel">
-              <div class="phase-title">⚔️ Fase de Ataque</div>
-              @if (territorioAtacanteId && !conquistaPendiente) {
-                <p class="phase-hint">
-                  <strong>{{ nombreTerritorio(territorioAtacanteId) }}</strong> — elegí un enemigo adyacente
-                </p>
+            <div class="phase-panel phase-panel--ataque">
+              <div class="phase-hdr">
+                <span class="phase-hdr-icon">⚔️</span>
+                <div class="phase-hdr-text">
+                  <span class="phase-hdr-label">Fase de Ataque</span>
+                  <span class="phase-hdr-step">Fase 2 · 3</span>
+                </div>
+              </div>
+              @if (jugandoConBomba && modoUsandoBomba) {
+                <div class="phase-terr-card phase-terr-card--bomba">
+                  <span class="phase-terr-name">☢ Elegí un territorio enemigo</span>
+                  @if (bombas[bombaUsandoIdx]) {
+                    <span class="phase-terr-hint">Alcance: 3 territorios desde {{ nombreTerritorio(bombas[bombaUsandoIdx]!) }}</span>
+                  }
+                </div>
+              } @else if (territorioAtacanteId && !conquistaPendiente) {
+                <div class="phase-terr-card">
+                  <span class="phase-terr-label">Atacando desde</span>
+                  <span class="phase-terr-name">{{ nombreTerritorio(territorioAtacanteId) }}</span>
+                  <span class="phase-terr-hint">Seleccioná un territorio enemigo adyacente</span>
+                </div>
+              } @else if (!conquistaPendiente) {
+                <p class="phase-hint">Seleccioná uno de tus territorios para atacar</p>
+              }
+              @if (jugandoConBomba) {
+                @for (bomba of bombas; track $index; let i = $index) {
+                  @if (bomba !== null && !conquistaPendiente) {
+                    <button class="btn-bomba-lanzar"
+                      [class.btn-bomba-activo]="modoUsandoBomba && bombaUsandoIdx === i"
+                      (click)="toggleModoUsandoBomba(i)">
+                      <svg viewBox="0 0 24 24" fill="currentColor" class="btn-bomba-ico">
+                        <circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1"/>
+                        <path d="M10 8.54A4 4 0 0 1 14 8.54L17.5 2.47A11 11 0 0 0 6.5 2.47Z"/>
+                        <path d="M16 12A4 4 0 0 1 14 15.46L17.5 21.53A11 11 0 0 0 23 12Z"/>
+                        <path d="M10 15.46A4 4 0 0 1 8 12L1 12A11 11 0 0 0 6.5 21.53Z"/>
+                        <circle cx="12" cy="12" r="2"/>
+                      </svg>
+                      @if (modoUsandoBomba && bombaUsandoIdx === i) {
+                        Cancelar bomba{{ bombas.length > 1 ? ' ' + (i + 1) : '' }}
+                      } @else {
+                        Lanzar Bomba{{ bombas.length > 1 ? ' ' + (i + 1) + ' — ' + nombreTerritorio(bomba) : ' Atómica' }}
+                      }
+                    </button>
+                  }
+                }
               }
               <button class="btn-phase-action btn-end-attack"
                 [disabled]="procesandoTurno || !!conquistaPendiente" (click)="terminarAtaque()">
-                {{ procesandoTurno ? 'Procesando...' : 'Finalizar y reagrupar →' }}
+                {{ procesandoTurno ? 'Procesando…' : 'Finalizar y reagrupar →' }}
               </button>
             </div>
           }
 
           <!-- FASE: Ataque - turno ajeno -->
           @if (fase === 'ataque' && !esMiTurno) {
-            <div class="phase-panel">
-              <div class="phase-title">⚔️ Fase de Ataque</div>
-              <p class="phase-sub">Atacando <strong>{{ jugadorActualNombre }}</strong>...</p>
+            <div class="phase-panel" [class.phase-panel--waiting]="!jugandoConBomba || !tieneBomba">
+              <div class="phase-hdr">
+                <span class="phase-hdr-icon">⚔️</span>
+                <div class="phase-hdr-text">
+                  <span class="phase-hdr-label">Fase de Ataque</span>
+                  <span class="phase-hdr-step">Fase 2 · 3</span>
+                </div>
+              </div>
+              @if (modoUsandoBomba) {
+                <div class="phase-terr-card phase-terr-card--bomba">
+                  <span class="phase-terr-name">☢ Elegí un territorio enemigo</span>
+                  @if (bombas[bombaUsandoIdx]) {
+                    <span class="phase-terr-hint">Alcance: 3 territorios desde {{ nombreTerritorio(bombas[bombaUsandoIdx]!) }}</span>
+                  }
+                </div>
+              } @else {
+                <p class="phase-waiting-line">
+                  Atacando <strong>{{ jugadorActualNombre }}</strong>…
+                  @if (combateEnCurso) { <span class="phase-combate-lock">⚔ Combate en curso</span> }
+                </p>
+              }
+              @if (jugandoConBomba && tieneBomba) {
+                @for (bomba of bombas; track $index; let i = $index) {
+                  @if (bomba !== null) {
+                    <button class="btn-bomba-lanzar"
+                      [class.btn-bomba-activo]="modoUsandoBomba && bombaUsandoIdx === i"
+                      [disabled]="combateEnCurso && !(modoUsandoBomba && bombaUsandoIdx === i)"
+                      (click)="toggleModoUsandoBomba(i)">
+                      <svg viewBox="0 0 24 24" fill="currentColor" class="btn-bomba-ico">
+                        <circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1"/>
+                        <path d="M10 8.54A4 4 0 0 1 14 8.54L17.5 2.47A11 11 0 0 0 6.5 2.47Z"/>
+                        <path d="M16 12A4 4 0 0 1 14 15.46L17.5 21.53A11 11 0 0 0 23 12Z"/>
+                        <path d="M10 15.46A4 4 0 0 1 8 12L1 12A11 11 0 0 0 6.5 21.53Z"/>
+                        <circle cx="12" cy="12" r="2"/>
+                      </svg>
+                      @if (modoUsandoBomba && bombaUsandoIdx === i) {
+                        Cancelar bomba{{ bombas.length > 1 ? ' ' + (i + 1) : '' }}
+                      } @else {
+                        Lanzar Bomba{{ bombas.length > 1 ? ' ' + (i + 1) + ' — ' + nombreTerritorio(bomba) : ' Atómica' }}
+                      }
+                    </button>
+                  }
+                }
+              }
             </div>
           }
 
@@ -1221,6 +1490,16 @@
       <div class="footer-left">
         <span class="footer-players">{{ jugadoresEnOrden.length }} jugadores</span>
       </div>
+      <div class="footer-center">
+        @if (partida.ronda_actual) {
+          <span class="footer-ronda">
+            Ronda <strong>{{ partida.ronda_actual }}</strong>
+            @if (partida.limite_rondas) { de {{ partida.limite_rondas }} }
+          </span>
+        }
+        <span class="footer-sep">·</span>
+        <span class="footer-timer">⏱ {{ tiempoPartida }}</span>
+      </div>
       <div class="footer-right">
         <span class="footer-brand">KuboSoft</span>
       </div>
@@ -1383,6 +1662,42 @@
       <div class="tratado-modal-actions">
         <button class="btn-tratado-cancelar" (click)="modalConfirmHostil = null">Cancelar</button>
         <button class="btn-hostil-confirmar" (click)="confirmarHostilidad()">Confirmar hostilidad ⚔️</button>
+      </div>
+
+    </div>
+  </div>
+}
+
+<!-- Popup: confirmar reposición de bomba -->
+@if (modalConfirmMoverBomba !== null) {
+  <div class="tratado-overlay" (click)="modalConfirmMoverBomba = null">
+    <div class="tratado-modal" (click)="$event.stopPropagation()">
+
+      <div class="tratado-modal-header">
+        <div class="tratado-modal-icon">☢️</div>
+        <div class="tratado-modal-titles">
+          <div class="tratado-modal-title">Reposicionar Bomba{{ bombas.length > 1 ? ' ' + (modalConfirmMoverBomba + 1) : '' }}</div>
+          <div class="tratado-modal-sub">Esta acción tiene consecuencias para esta ronda</div>
+        </div>
+      </div>
+
+      <div class="hostil-consecuencias">
+        <div class="hostil-consec-titulo">Consecuencias:</div>
+        <ul class="hostil-consec-lista">
+          <li>
+            <span class="hostil-consec-icon">🚫</span>
+            No podrás lanzar esta bomba durante <strong>el resto de esta ronda</strong>.
+          </li>
+          <li>
+            <span class="hostil-consec-icon">⏳</span>
+            El lanzamiento quedará habilitado en la <strong>próxima ronda</strong>.
+          </li>
+        </ul>
+      </div>
+
+      <div class="tratado-modal-actions">
+        <button class="btn-tratado-cancelar" (click)="modalConfirmMoverBomba = null">Cancelar</button>
+        <button class="btn-hostil-confirmar" style="background: linear-gradient(135deg,#92400e,#b45309); color: #fff" (click)="confirmarMoverBomba()">☢️ Confirmar reposición</button>
       </div>
 
     </div>
@@ -1632,6 +1947,33 @@
       } @else {
         <p class="pausa-msg">{{ jugadorPausadorNombre || 'Un jugador' }} pausó la partida. Esperando que la reanude…</p>
       }
+    </div>
+  </div>
+}
+
+<!-- Modal confirmación rendición -->
+@if (mostrarModalRendicion) {
+  <div class="rendicion-overlay" (click)="cancelarRendicion()">
+    <div class="rendicion-popup" (click)="$event.stopPropagation()">
+      <div class="rendicion-icon">🏳</div>
+      <h2 class="rendicion-titulo">¿Rendirte?</h2>
+      <p class="rendicion-sub">No podrás continuar jugando.<br>Seguirás como espectador.</p>
+      <div class="rendicion-btns">
+        <button class="btn-rendicion-cancelar" (click)="cancelarRendicion()">Cancelar</button>
+        <button class="btn-rendicion-confirmar" (click)="ejecutarRendicion()">Rendirme</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Popup rendición propia -->
+@if (mostrarPopupRendicion && partida?.estado !== 'Finalizada') {
+  <div class="eliminado-overlay">
+    <div class="eliminado-popup eliminado-popup--rendicion">
+      <div class="eliminado-icon">🏳</div>
+      <h2 class="eliminado-titulo eliminado-titulo--rendicion">Te rendiste</h2>
+      <p class="eliminado-sub">Seguís como espectador hasta que finalice la partida.</p>
+      <button class="eliminado-btn eliminado-btn--rendicion" (click)="mostrarPopupRendicion = false">Seguir observando</button>
     </div>
   </div>
 }
