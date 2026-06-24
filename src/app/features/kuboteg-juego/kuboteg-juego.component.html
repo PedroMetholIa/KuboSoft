@@ -729,14 +729,14 @@
                   <span class="nuclear-progreso-label">Cartas robadas</span>
                   <div class="nuclear-progreso-bar-wrap">
                     <div class="nuclear-progreso-bar"
-                         [style.width.%]="tieneBomba ? 100 : (cartasRobadasTotal >= 2 ? 100 : cartasRobadasTotal * 50)">
+                         [style.width.%]="tieneBomba ? 100 : (cartasRobadasTotal / 9 * 100)">
                     </div>
                   </div>
                   <span class="nuclear-progreso-contador">
-                    @if (tieneBomba || cartasRobadasTotal >= 2) {
+                    @if (tieneBomba || cartasRobadasTotal >= 9) {
                       <span class="nuclear-obtenida-badge">☢ ¡BOMBA OBTENIDA!</span>
                     } @else {
-                      {{ cartasRobadasTotal }} / 2
+                      {{ cartasRobadasTotal }} / 9
                     }
                   </span>
                 </div>
@@ -749,7 +749,7 @@
                   <span class="nuclear-completado-label">Programa completado</span>
                   <span class="nuclear-completado-pct"
                         [class.nuclear-completado-pct--full]="tieneBomba">
-                    {{ tieneBomba ? 100 : (cartasRobadasTotal * 50) }}%
+                    {{ bombaPct }}%
                   </span>
                 </div>
 

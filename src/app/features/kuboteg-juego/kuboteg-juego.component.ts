@@ -2356,7 +2356,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.misCartas = nuevasCartas;
     this.cartasRobadasTotal++;
     localStorage.setItem(`teg_cartas_total_${this.partidaId}_${this.userId}`, String(this.cartasRobadasTotal));
-    if (this.cartasRobadasTotal === 2 && this.bombas.length < 2 && this.jugandoConBomba) {
+    if (this.cartasRobadasTotal === 9 && this.bombas.length < 2 && this.jugandoConBomba) {
       this.bombas = [...this.bombas, null];
       this.saveBombaState();
       this.cartasRobadasTotal = 0;
@@ -4075,9 +4075,12 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     return visitados;
   }
 
+  get bombaPct(): number {
+    return this.tieneBomba ? 100 : Math.min(Math.round(this.cartasRobadasTotal / 9 * 100), 100);
+  }
+
   get bombaNuclearClipPath(): string {
-    const pct = this.tieneBomba ? 100 : Math.min(this.cartasRobadasTotal * 50, 100);
-    return `inset(${100 - pct}% 0 0 0)`;
+    return `inset(${100 - this.bombaPct}% 0 0 0)`;
   }
 
   get territoriosDestruidosArray(): string[] {
