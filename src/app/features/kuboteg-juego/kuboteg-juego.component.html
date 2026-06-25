@@ -363,7 +363,7 @@
                       }
                       <span class="bonus-col-val">Totalidad</span>
                     </div>
-                    @for (row of tablaBonusContinentes; track row.nombre) {
+                    @for (row of tablaBonusContinentes; track row.id) {
                       <div class="bonus-tabla-row">
                         <span class="bonus-col-cont">{{ row.nombre }}</span>
                         @if (jugandoConMayorias) {

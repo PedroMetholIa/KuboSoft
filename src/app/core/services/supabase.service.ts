@@ -195,7 +195,7 @@ export class SupabaseService {
     return !!data;
   }
 
-  async subscribeToProduct(userId: string, productId: string): Promise<{ data: null; error: any }> {
+  async subscribeToProduct(userId: string, productId: string): Promise<{ data: null; error: { message: string } | null }> {
     const { data: { session } } = await this.supabase.auth.getSession();
     if (!session) return { data: null, error: { message: 'No autenticado' } };
 
@@ -220,7 +220,7 @@ export class SupabaseService {
     return { data: null, error: null };
   }
 
-  async getUsuariosPorProducto(nombreProducto: string): Promise<{ data: any[] | null; error: any }> {
+  async getUsuariosPorProducto(nombreProducto: string): Promise<{ data: unknown[] | null; error: unknown }> {
     const { data: prod, error: e1 } = await this.supabase
       .from('producto').select('id').eq('nombre', nombreProducto).single();
     if (e1 || !prod) return { data: [], error: e1 };
@@ -232,7 +232,9 @@ export class SupabaseService {
     const ids = (subs ?? []).map((s: { usuario_id: string }) => s.usuario_id);
     if (ids.length === 0) return { data: [], error: null };
 
-    return this.supabase.from('usuario').select('nombre, apellido, email, last_seen, mensaje, is_online').in('id', ids);
+    const { data: usuarios, error: e3 } = await this.supabase
+      .from('usuario').select('nombre, apellido, email, last_seen, mensaje, is_online').in('id', ids);
+    return { data: usuarios, error: e3 };
   }
 
   // ── Partidas ──────────────────────────────────────────
@@ -625,12 +627,7 @@ export class SupabaseService {
     return this.supabase.from('categoria').select('id, nombre, logo').eq('nombre', nombre).single();
   }
 
-  getProductosPorCategoria() {
-    return this.supabase.from('categoria_producto')
-      .select('categoria_id, producto:producto_id(id, nombre)');
-  }
-
-  async getProductosByCategoriaNombre(nombre: string): Promise<{ data: any[] | null; error: any }> {
+  async getProductosByCategoriaNombre(nombre: string): Promise<{ data: unknown[] | null; error: unknown }> {
     const { data: cat, error: e1 } = await this.supabase
       .from('categoria')
       .select('id')

@@ -75,6 +75,10 @@ export class KuboJuegosComponent implements OnInit {
     await this.doSuscribir(juego);
   }
 
+  private slug(nombre: string): string {
+    return nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
   private readonly displayNames: Record<string, string> = {
     'KuboTeg': 'HEGEMONY',
   };
@@ -84,12 +88,11 @@ export class KuboJuegosComponent implements OnInit {
   }
 
   getImgPath(nombre: string): string {
-    const slug = nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
-    return `assets/productos/favicon-${slug}.svg`;
+    return `assets/productos/favicon-${this.slug(nombre)}.svg`;
   }
 
   async navigateTo(juego: Juego) {
-    const slug = juego.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const slug = this.slug(juego.nombre);
     const routeExists = this.router.config.some(r => r.path === slug);
 
     if (!routeExists) {
@@ -125,8 +128,7 @@ export class KuboJuegosComponent implements OnInit {
     const ok = await this.doSuscribir(juego);
     if (ok) {
       this.closePopup();
-      const slug = juego.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
-      this.router.navigate([`/${slug}`]);
+      this.router.navigate([`/${this.slug(juego.nombre)}`]);
     }
   }
 

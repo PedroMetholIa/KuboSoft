@@ -1,9 +1,9 @@
-import { Component, OnInit, OnDestroy, Input } from '@angular/core';
+import { Component, OnInit, inject, DestroyRef, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../../core/services/auth.service';
 import { SupabaseService } from '../../core/services/supabase.service';
-import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
 @Component({
@@ -119,7 +119,7 @@ import { filter } from 'rxjs/operators';
     }
   `,
 })
-export class NavComponent implements OnInit, OnDestroy {
+export class NavComponent implements OnInit {
   @Input() logoSrc: string | null = null;
   userName = '';
   isLoggedIn = false;
@@ -140,13 +140,14 @@ export class NavComponent implements OnInit, OnDestroy {
   regError = '';
   regSuccess = '';
 
-  private sub: Subscription | undefined;
+  private destroyRef = inject(DestroyRef);
 
   constructor(private auth: AuthService, private supabase: SupabaseService) {}
 
   ngOnInit() {
-    this.sub = this.auth.currentUser$.pipe(
-      filter(u => u !== undefined)
+    this.auth.currentUser$.pipe(
+      filter(u => u !== undefined),
+      takeUntilDestroyed(this.destroyRef)
     ).subscribe(async user => {
       this.authChecked = true;
       this.isLoggedIn = !!user;
@@ -161,10 +162,6 @@ export class NavComponent implements OnInit, OnDestroy {
         this.userName = '';
       }
     });
-  }
-
-  ngOnDestroy() {
-    this.sub?.unsubscribe();
   }
 
   openModal(modal: 'login' | 'register') {
@@ -197,8 +194,8 @@ export class NavComponent implements OnInit, OnDestroy {
     this.loginError = '';
     try {
       await this.auth.signIn(this.loginEmail, this.loginPassword);
-    } catch (err: any) {
-      this.loginError = err.message || 'Error al iniciar sesión';
+    } catch (err: unknown) {
+      this.loginError = err instanceof Error ? err.message : 'Error al iniciar sesión';
     } finally {
       this.loginLoading = false;
     }
@@ -215,8 +212,8 @@ export class NavComponent implements OnInit, OnDestroy {
     try {
       await this.auth.signUp(this.regEmail, this.regPassword, this.regNombre, this.regApellido);
       this.regSuccess = '¡Cuenta creada! Revisá tu email para confirmar.';
-    } catch (err: any) {
-      this.regError = err.message || 'Error al registrarse';
+    } catch (err: unknown) {
+      this.regError = err instanceof Error ? err.message : 'Error al registrarse';
     } finally {
       this.regLoading = false;
     }
