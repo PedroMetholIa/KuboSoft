@@ -53,7 +53,7 @@ interface Categoria {
 
             @if (!loading) {
               <div class="grid-3">
-                @for (cat of categorias; track cat.id) {
+                @for (cat of categoriasEmpresa; track cat.id) {
                   <div class="card prod-card"
                        [class.card--clickable]="hasRoute(cat.nombre)"
                        (click)="navigateTo(cat.nombre)">
@@ -65,15 +65,43 @@ interface Categoria {
                       }
                       <h3 class="cat-title"><span [style.color]="getCategoryColor(cat.nombre)">{{ getCategorySuffix(cat.nombre) }}</span></h3>
                     </div>
-                    <p class="prod-desc">{{ cat.descripcion }}</p>
+                    <p class="prod-desc">{{ getCategoryDescription(cat) }}</p>
                   </div>
                 }
               </div>
             } @else {
               <div class="grid-3">
-                @for (_ of [1,2,3,4,5,6]; track $index) {
+                @for (_ of [1,2,3,4,5]; track $index) {
                   <div class="card skeleton"></div>
                 }
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- OTROS PRODUCTOS -->
+      <div class="sec-wrap sec-wrap--alt">
+        <div class="section">
+          <div class="container">
+            <span class="section-tag">Otros productos</span>
+            <h2>Soluciones especializadas para industrias específicas.</h2>
+            <span class="section-lead">También desarrollamos para otros rubros</span>
+            @if (!loading && categoriaJuegos) {
+              <div class="card prod-card otros-card"
+                   [class.card--clickable]="hasRoute(categoriaJuegos.nombre)"
+                   (click)="navigateTo(categoriaJuegos.nombre)">
+                <div class="card-header">
+                  @if (categoriaJuegos.logo) {
+                    <div class="card-logo">
+                      <img loading="lazy" [src]="categoriaJuegos.logo" [alt]="categoriaJuegos.nombre" />
+                    </div>
+                  }
+                  <h3 class="cat-title">
+                    <span [style.color]="getCategoryColor(categoriaJuegos.nombre)">{{ getCategorySuffix(categoriaJuegos.nombre) }}</span>
+                  </h3>
+                </div>
+                <p class="prod-desc">{{ getCategoryDescription(categoriaJuegos) }}</p>
               </div>
             }
           </div>
@@ -169,15 +197,36 @@ export class InicioComponent implements OnInit {
     ).subscribe(() => this.loadCategorias());
   }
 
+  get categoriasEmpresa(): Categoria[] {
+    return this.categorias.filter(c => c.nombre !== 'KuboJuegos');
+  }
+
+  get categoriaJuegos(): Categoria | undefined {
+    return this.categorias.find(c => c.nombre === 'KuboJuegos');
+  }
+
+  private readonly categoryOrder: Record<string, number> = {
+    'KuboGestión':  0,
+    'KuboReservas': 1,
+    'KuboRRHH':     2,
+    'KuboStock':    3,
+    'KuboMétricas': 4,
+    'KuboJuegos':   5,
+  };
+
   async loadCategorias() {
     const { data, error } = await this.supabase.getCategorias();
     if (error) this.toast.show('Error al cargar los productos.', 'error');
-    this.categorias = (data as Categoria[]) ?? [];
+    const cats = (data as Categoria[]) ?? [];
+    this.categorias = cats.sort((a, b) =>
+      (this.categoryOrder[a.nombre] ?? 99) - (this.categoryOrder[b.nombre] ?? 99)
+    );
     this.loading = false;
   }
 
   private readonly routeMap: Record<string, string> = {
     'KuboJuegos': '/kubojuegos',
+    'KuboRRHH':   '/kubo-rrhh',
   };
 
   hasRoute(nombre: string): boolean { return nombre in this.routeMap; }
@@ -201,8 +250,20 @@ export class InicioComponent implements OnInit {
     return this.colorMap[nombre] ?? '#7C5CFC';
   }
 
+  private readonly displayNameMap: Record<string, string> = {
+    'KuboJuegos': 'Entretenimiento',
+  };
+
+  private readonly descriptionMap: Record<string, string> = {
+    'KuboJuegos': 'Plataforma para lanzar apps de entretenimiento con jugadores en tiempo real.',
+  };
+
   getCategorySuffix(nombre: string): string {
-    return nombre.startsWith('Kubo') ? nombre.slice(4) : nombre;
+    return this.displayNameMap[nombre] ?? (nombre.startsWith('Kubo') ? nombre.slice(4) : nombre);
+  }
+
+  getCategoryDescription(cat: Categoria): string {
+    return this.descriptionMap[cat.nombre] ?? cat.descripcion ?? '';
   }
 
   scrollTo(id: string) {

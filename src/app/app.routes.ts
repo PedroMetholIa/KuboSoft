@@ -42,5 +42,11 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/kuboteg-juego/kuboteg-juego.component').then(m => m.KuboTegJuegoComponent),
   },
+  {
+    path: 'kubo-rrhh',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/kubo-rrhh/kubo-rrhh.component').then(m => m.KuboRrhhComponent),
+  },
   { path: '**', redirectTo: 'inicio' },
 ];

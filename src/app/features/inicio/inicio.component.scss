@@ -337,6 +337,14 @@ h2 {
   white-space: nowrap;
 }
 
+// ── OTROS PRODUCTOS ────────────────────────────────────
+.sec-wrap--alt {
+  background: var(--bg-deep);
+  border-top: 1px solid var(--bd2);
+}
+
+.otros-card { max-width: 380px; }
+
 // ── CONTACTO ───────────────────────────────────────────
 .contact-box {
   position: relative;

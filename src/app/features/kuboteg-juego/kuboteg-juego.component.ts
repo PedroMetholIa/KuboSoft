@@ -49,7 +49,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     { hex: 'rgb(255, 182, 77)',  nombre: 'Amarillo' },
     { hex: 'rgb(32, 161, 80)',   nombre: 'Verde' },
     { hex: 'rgb(252, 101, 39)',  nombre: 'Naranja' },
-    { hex: 'rgb(200, 71, 249)',  nombre: 'Violeta' },
+    { hex: 'rgb(141, 33, 163)',  nombre: 'Violeta' },
     { hex: 'rgb(188, 186, 186)', nombre: 'Blanco' },
     { hex: 'rgb(47, 47, 47)',    nombre: 'Negro' },
   ];
@@ -1582,6 +1582,12 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       }
       this.cdr.markForCheck();
     } else {
+      // Guardia defensiva: detecta estado incoherente (base pero con continentes pendientes)
+      // y lo corrige antes de permitir colocar. Cubre edge cases de reconexión o undo fallido.
+      if (this.continentesColocacion.length > 0) {
+        this.iniciarSubFaseColocacion();
+        return;
+      }
       if (this.misTropasParaColocar <= 0) return;
       this.tropasColocadasBase = {
         ...this.tropasColocadasBase,
@@ -1596,6 +1602,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   quitarTropa(territorioId: string) {
+    if (this.misColocacionConfirmada) return;
     if (this.subFaseColocacion === 'continentes') {
       const cont = this.continentesColocacion[this.continenteColocacionIdx];
       if (!cont || !cont.territoriosPermitidos.includes(territorioId)) return;
@@ -1803,19 +1810,15 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
           ...this.jugadores.slice(myIdx + 1),
         ];
       }
-      // Restaurar los mapas de colocación desde el snapshot para que el jugador vea sus tropas
-      this.tropasColocadasBase = { ...this._colocacionSnapshot };
-      this.tropasColocadasContinentes = {};
-      this._colocacionSnapshot = {};
-      localStorage.removeItem(`teg_coloc_snap_${this.partidaId}_${this.userId}`);
-      this.subFaseColocacion = 'base';
-      this.colocacionConfirmadaEstaRonda = false;
-      this.mostrarAprobacionCobro = false;
-      this.aprobacionCobroEnviada = false;
+        localStorage.removeItem(`teg_coloc_snap_${this.partidaId}_${this.userId}`);
       this._aprobacionesCobro.clear();
-      this.rebuildTropasMap();
       this.channelEventos?.send({ type: 'broadcast', event: 'undo_colocacion', payload: {} });
-      this.cdr.markForCheck();
+      // Reinicializa completamente la subfase: limpia mapas, recalcula continentes
+      // y establece subFaseColocacion con la restricción correcta.
+      // Hacerlo manual (sólo 'base') dejaba continentesColocacion no vacío,
+      // permitiendo eludir las restricciones de continente.
+      this.iniciarSubFaseColocacion();
+      this.rebuildTropasMap();
     } finally {
       this.deshaciendo = false;
     }

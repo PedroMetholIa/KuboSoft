@@ -1,0 +1,709 @@
+<div class="rrhh-wrap">
+
+  <!-- ── SIDEBAR (position: fixed) ─────────────────────── -->
+  <aside class="sb">
+    <div class="sb-logo-area">
+      <img src="assets/categorias/favicon-kuborrhh.svg" class="sb-logoimg" alt="KuboRRHH">
+      <span class="sb-brand">RRHH</span>
+    </div>
+
+    <div class="sb-section-lbl">Principal</div>
+    <nav class="sb-nav">
+      <div class="ni active" data-view="dashboard">
+        <i class="nic fa-solid fa-gauge-high"></i> Panel general
+      </div>
+      <div class="ni" data-view="empleados">
+        <i class="nic fa-solid fa-users"></i> Empleados
+        <span class="nb" id="nb-emp"></span>
+      </div>
+      <div class="ni" data-view="onboarding">
+        <i class="nic fa-solid fa-user-plus"></i> Onboarding
+        <span class="nb" id="nb-onb"></span>
+      </div>
+    </nav>
+
+    <div class="sb-section-lbl">Gestión</div>
+    <nav class="sb-nav">
+      <div class="ni" data-view="asistencia">
+        <i class="nic fa-solid fa-calendar-check"></i> Asistencia
+      </div>
+      <div class="ni" data-view="licencias">
+        <i class="nic fa-solid fa-umbrella-beach"></i> Licencias
+        <span class="nb" id="nb-lic"></span>
+      </div>
+      <div class="ni" data-view="liquidacion">
+        <i class="nic fa-solid fa-calculator"></i> Liquidación
+      </div>
+      <div class="ni" data-view="evaluaciones">
+        <i class="nic fa-solid fa-star"></i> Evaluaciones
+        <span class="nb" id="nb-eval"></span>
+      </div>
+    </nav>
+
+    <div class="sb-section-lbl">Organización</div>
+    <nav class="sb-nav">
+      <div class="ni" data-view="estructura">
+        <i class="nic fa-solid fa-sitemap"></i> Estructura
+      </div>
+      <div class="ni" data-view="documentos">
+        <i class="nic fa-solid fa-folder"></i> Documentos
+      </div>
+    </nav>
+
+    <div class="sb-section-lbl">Análisis</div>
+    <nav class="sb-nav">
+      <div class="ni" data-view="reportes">
+        <i class="nic fa-solid fa-chart-bar"></i> Reportes
+      </div>
+      <div class="ni" data-view="configuracion">
+        <i class="nic fa-solid fa-gear"></i> Configuración
+      </div>
+    </nav>
+  </aside>
+
+  <!-- ── MAIN ──────────────────────────────────────────── -->
+  <div class="main">
+
+    <!-- Topbar -->
+    <div class="tb">
+      <div class="tb-title" id="tb-title">Panel general</div>
+      <div class="tb-right">
+        <span>Pedro Methol</span>
+        <div class="eavatar av-a" style="width:34px;height:34px;font-size:12px;">PM</div>
+      </div>
+    </div>
+
+    <!-- Eval strip -->
+    <div class="estrip">
+      <i class="fa-solid fa-star"></i>
+      Tenés <strong id="strip-eval-count">0</strong> evaluaciones pendientes de completar &nbsp;
+      <button class="btn btn-sm btn-p" onclick="navigate('evaluaciones')">Ver evaluaciones</button>
+    </div>
+
+    <!-- VIEWS WRAPPER -->
+    <div class="views-wrap">
+
+      <!-- ── DASHBOARD ──────────────────────────────── -->
+      <div class="view active" id="view-dashboard">
+        <div class="metrics-row">
+          <div class="mc acc">
+            <div class="mt">
+              <div class="mlbl">Total empleados</div>
+              <div class="mi"><i class="fa-solid fa-users"></i></div>
+            </div>
+            <div class="mv" id="d-total">—</div>
+            <div class="mdelta" id="d-delta">...</div>
+          </div>
+          <div class="mc mc--link" onclick="navigate('empleados')">
+            <div class="mt">
+              <div class="mlbl">Activos</div>
+              <div class="mi mi-g"><i class="fa-solid fa-circle-check"></i></div>
+            </div>
+            <div class="mv" id="d-act">—</div>
+            <div class="mdelta" id="d-pct">...</div>
+            <span class="mc-link">Ver empleados →</span>
+          </div>
+          <div class="mc mc--link" onclick="navigate('licencias')">
+            <div class="mt">
+              <div class="mlbl">En licencia</div>
+              <div class="mi mi-y"><i class="fa-solid fa-umbrella-beach"></i></div>
+            </div>
+            <div class="mv" id="d-lic">—</div>
+            <div class="mdelta" style="color:var(--ink4);">Días aprobados</div>
+            <span class="mc-link">Ver licencias →</span>
+          </div>
+          <div class="mc mc--link" onclick="navigate('onboarding')">
+            <div class="mt">
+              <div class="mlbl">En onboarding</div>
+              <div class="mi mi-b"><i class="fa-solid fa-user-plus"></i></div>
+            </div>
+            <div class="mv" id="d-onb">—</div>
+            <div class="mdelta" style="color:var(--ink4);">Nuevos ingresos</div>
+            <span class="mc-link">Ver onboarding →</span>
+          </div>
+        </div>
+
+        <div class="dash-grid">
+          <!-- Recent employees -->
+          <div class="panel dash-col-main">
+            <div class="ph">
+              <div class="ptitle">Empleados recientes</div>
+              <button class="btn btn-p btn-sm" onclick="openModal('emp')"><i class="fa-solid fa-plus"></i> Agregar</button>
+            </div>
+            <table class="et">
+              <thead><tr><th>Empleado</th><th>Cargo</th><th>Estado</th><th>Ingreso</th></tr></thead>
+              <tbody id="d-emp-body"></tbody>
+            </table>
+          </div>
+
+          <!-- Pending requests -->
+          <div class="panel dash-col-side">
+            <div class="ph">
+              <div class="ptitle">Solicitudes &nbsp;<span class="nb" id="req-badge" style="display:none;"></span></div>
+            </div>
+            <div id="d-requests"></div>
+          </div>
+
+          <!-- Dept breakdown -->
+          <div class="panel dash-col-main">
+            <div class="ph"><div class="ptitle">Distribución por área</div></div>
+            <div style="padding:16px 20px;" id="d-depts"></div>
+          </div>
+
+          <!-- Activity -->
+          <div class="panel dash-col-side">
+            <div class="ph"><div class="ptitle">Actividad reciente</div></div>
+            <div style="padding:12px 16px;display:flex;flex-direction:column;gap:2px;" id="d-activity"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── EMPLEADOS ──────────────────────────────── -->
+      <div class="view" id="view-empleados">
+        <div class="panel">
+          <div class="ph">
+            <div class="ptitle">Empleados &nbsp;<span class="nb inline-nb" id="emp-count">0</span></div>
+            <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+              <input class="fi search-fi" id="emp-search" placeholder="Buscar por nombre, cargo, área...">
+              <select class="fi fsel" id="f-dept">
+                <option value="">Todas las áreas</option>
+                <option>Comercial</option><option>Tecnología</option>
+                <option>Operaciones</option><option>Marketing</option><option>Administración</option>
+              </select>
+              <select class="fi fsel" id="f-status">
+                <option value="">Todos los estados</option>
+                <option>Activo</option><option>Licencia</option><option>Onboarding</option>
+              </select>
+              <button class="btn btn-p btn-sm" onclick="openModal('emp')"><i class="fa-solid fa-plus"></i> Agregar</button>
+            </div>
+          </div>
+          <table class="et">
+            <thead><tr><th>Empleado</th><th>Cargo</th><th>Área</th><th>Ingreso</th><th>Salario</th><th>Estado</th><th></th></tr></thead>
+            <tbody id="emp-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── ONBOARDING ─────────────────────────────── -->
+      <div class="view" id="view-onboarding">
+        <div class="panel">
+          <div class="ph">
+            <div class="ptitle">Empleados en onboarding</div>
+          </div>
+          <table class="et">
+            <thead><tr><th>Empleado</th><th>Cargo</th><th>Ingreso</th><th>Progreso</th><th></th></tr></thead>
+            <tbody id="onb-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── ASISTENCIA ─────────────────────────────── -->
+      <div class="view" id="view-asistencia">
+        <div class="ph" style="padding:0;margin-bottom:16px;background:none;border:none;">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <select class="fi fsel" id="a-emp-sel"></select>
+            <select class="fi fsel" id="a-month-sel"></select>
+          </div>
+          <button class="btn btn-p btn-sm" onclick="openModal('asistencia')"><i class="fa-solid fa-plus"></i> Registrar asistencia</button>
+        </div>
+
+        <div class="asist-grid">
+          <div class="panel">
+            <div class="ph">
+              <div class="ptitle" id="a-cal-title">Calendario</div>
+            </div>
+            <div style="padding:14px;">
+              <div class="cal-header">
+                <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+              </div>
+              <div class="cal-grid" id="a-cal-grid"></div>
+              <div class="cal-legend">
+                <span><i class="fa-solid fa-circle" style="color:var(--green);font-size:8px;"></i> Presente</span>
+                <span><i class="fa-solid fa-circle" style="color:var(--red);font-size:8px;"></i> Ausente</span>
+                <span><i class="fa-solid fa-circle" style="color:var(--y400);font-size:8px;"></i> Licencia</span>
+              </div>
+            </div>
+          </div>
+          <div class="panel" id="a-summary"></div>
+        </div>
+
+        <div class="panel" style="margin-top:16px;">
+          <div class="ph"><div class="ptitle">Registros del período</div></div>
+          <table class="et">
+            <thead><tr><th>Empleado</th><th>Fecha</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Observaciones</th><th></th></tr></thead>
+            <tbody id="a-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── LICENCIAS ─────────────────────────────── -->
+      <div class="view" id="view-licencias">
+        <div style="margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div class="mc" style="flex:none;min-width:160px;">
+            <div class="mt">
+              <div class="mlbl">Pendientes</div>
+              <div class="mi mi-y"><i class="fa-solid fa-hourglass-half"></i></div>
+            </div>
+            <div class="mv" id="lp-count">0</div>
+          </div>
+          <div style="flex:1;"></div>
+          <button class="btn btn-p btn-sm" onclick="openModal('licencia')"><i class="fa-solid fa-plus"></i> Nueva solicitud</button>
+        </div>
+
+        <div class="panel">
+          <div class="ph">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button class="tab-btn active" data-ltab="pendientes">Pendientes</button>
+              <button class="tab-btn" data-ltab="aprobadas">Aprobadas</button>
+              <button class="tab-btn" data-ltab="todas">Todas</button>
+            </div>
+            <div class="ptitle" id="lic-panel-title" style="display:none;"></div>
+          </div>
+          <table class="et">
+            <thead><tr><th>Empleado</th><th>Tipo</th><th>Desde</th><th>Hasta</th><th>Días</th><th>Estado</th><th></th></tr></thead>
+            <tbody id="lic-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── LIQUIDACION ────────────────────────────── -->
+      <div class="view" id="view-liquidacion">
+        <div class="ph" style="padding:0;margin-bottom:16px;background:none;border:none;">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <select class="fi fsel" id="liq-month"></select>
+            <select class="fi fsel" id="liq-emp"></select>
+          </div>
+          <button class="btn btn-g btn-sm" onclick="exportLiq()"><i class="fa-solid fa-download"></i> Exportar</button>
+        </div>
+
+        <div id="liq-metrics" class="metrics-row" style="margin-bottom:16px;"></div>
+
+        <div class="panel">
+          <div class="ph"><div class="ptitle">Detalle de liquidación</div></div>
+          <table class="et">
+            <thead><tr><th>Empleado</th><th>Área</th><th>Bruto</th><th>Presencias</th><th>Ausencias</th><th>Licencias</th><th>Líquido</th><th></th></tr></thead>
+            <tbody id="liq-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── EVALUACIONES ───────────────────────────── -->
+      <div class="view" id="view-evaluaciones">
+        <div style="margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div class="mc" style="flex:none;min-width:160px;">
+            <div class="mt">
+              <div class="mlbl">Pendientes</div>
+              <div class="mi mi-y"><i class="fa-solid fa-star"></i></div>
+            </div>
+            <div class="mv" id="ep-count">0</div>
+          </div>
+          <div style="flex:1;"></div>
+          <button class="btn btn-p btn-sm" onclick="openModal('eval')"><i class="fa-solid fa-plus"></i> Nueva evaluación</button>
+        </div>
+
+        <div class="panel">
+          <div class="ph">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button class="tab-btn active" data-etab="pendientes">Pendientes</button>
+              <button class="tab-btn" data-etab="completadas">Completadas</button>
+            </div>
+            <div class="ptitle" id="eval-panel-title" style="display:none;"></div>
+          </div>
+          <table class="et">
+            <thead><tr><th>Empleado</th><th>Período</th><th>Evaluador</th><th>Puntaje</th><th>Desempeño</th><th></th></tr></thead>
+            <tbody id="eval-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── ESTRUCTURA ─────────────────────────────── -->
+      <div class="view" id="view-estructura">
+        <div class="estruct-grid">
+          <div>
+            <div class="panel">
+              <div class="ph">
+                <div class="ptitle">Departamentos &nbsp;<span class="nb inline-nb" id="dept-count-lbl">0</span></div>
+                <button class="btn btn-p btn-sm" onclick="openModal('dept')"><i class="fa-solid fa-plus"></i> Nuevo</button>
+              </div>
+              <div id="dept-list-full"></div>
+            </div>
+
+            <div class="panel" style="margin-top:16px;">
+              <div class="ph">
+                <div class="ptitle">Cargos &nbsp;<span class="nb inline-nb" id="pos-count-lbl">0</span></div>
+                <button class="btn btn-p btn-sm" onclick="openModal('position')"><i class="fa-solid fa-plus"></i> Nuevo</button>
+              </div>
+              <div id="pos-list"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Organigrama</div></div>
+            <div style="padding:16px;" id="org-chart"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── DOCUMENTOS ─────────────────────────────── -->
+      <div class="view" id="view-documentos">
+        <div class="panel">
+          <div class="ph">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <input class="fi search-fi" id="doc-search" placeholder="Buscar documento...">
+              <select class="fi fsel" id="doc-cat">
+                <option value="">Todas las categorías</option>
+                <option>Contrato</option><option>Certificado</option><option>Evaluación</option>
+                <option>Licencia</option><option>Recibo</option><option>Otro</option>
+              </select>
+              <select class="fi fsel" id="doc-emp-filt"></select>
+            </div>
+            <button class="btn btn-p btn-sm" onclick="openModal('doc')"><i class="fa-solid fa-plus"></i> Subir</button>
+          </div>
+          <table class="et">
+            <thead><tr><th>Documento</th><th>Empleado</th><th>Categoría</th><th>Fecha</th><th>Tamaño</th><th>Estado</th><th></th></tr></thead>
+            <tbody id="doc-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── REPORTES ───────────────────────────────── -->
+      <div class="view" id="view-reportes">
+        <div class="ph" style="padding:0;margin-bottom:16px;background:none;border:none;">
+          <div class="ptitle">Período</div>
+          <select class="fi fsel" id="rep-month"></select>
+        </div>
+
+        <div id="rep-metrics" class="metrics-row" style="margin-bottom:16px;"></div>
+
+        <div class="rep-grid">
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Asistencia por área</div></div>
+            <div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px;" id="rep-dept-bars"></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Estado del personal</div></div>
+            <div id="rep-status-chart" style="padding:16px 20px;"></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Masa salarial por área</div></div>
+            <div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px;" id="rep-salary-bars"></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Evaluaciones</div></div>
+            <div id="rep-eval-summary" style="padding:16px 20px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CONFIGURACION ──────────────────────────── -->
+      <div class="view" id="view-configuracion">
+        <div class="cfg-layout">
+          <div class="panel cfg-menu-panel">
+            <div id="cfg-menu"></div>
+          </div>
+          <div id="cfg-content" style="flex:1;min-width:0;"></div>
+        </div>
+      </div>
+
+      <!-- ── SOON ───────────────────────────────────── -->
+      <div class="view" id="view-soon">
+        <div class="empty" style="padding:60px;">
+          <i class="fa-solid fa-rocket" style="font-size:32px;color:var(--y400);margin-bottom:12px;"></i>
+          <p>Próximamente disponible</p>
+        </div>
+      </div>
+
+    </div><!-- /views-wrap -->
+  </div><!-- /main -->
+
+  <!-- ── DETAIL PANEL (position: fixed) ───────────────── -->
+  <div class="dp" id="detail-panel">
+    <div class="dph">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div id="dp-av" class="eavatar av-a" style="width:42px;height:42px;font-size:14px;">?</div>
+        <div>
+          <div id="dp-name" style="font-size:14px;font-weight:700;color:var(--ink);font-family:var(--fd);">—</div>
+          <div id="dp-sub" style="font-size:12px;color:var(--ink3);margin-top:2px;"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span id="dp-badge"></span>
+        <button class="rb" onclick="closeDetail()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+    </div>
+    <div class="dpb">
+      <div id="dp-chips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
+
+      <div class="dp-sect-lbl">Información personal</div>
+      <div id="dp-info" class="dp-section"></div>
+
+      <div class="dp-sect-lbl" style="margin-top:14px;">Contrato</div>
+      <div id="dp-contract" class="dp-section"></div>
+
+      <div class="dp-sect-lbl" style="margin-top:14px;">Asistencia (mes actual)</div>
+      <div id="dp-attendance" class="dp-section"></div>
+
+      <div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-p btn-sm" onclick="openEditFromDetail()"><i class="fa-solid fa-pen"></i> Editar</button>
+        <button class="btn btn-d btn-sm" id="dp-del"><i class="fa-solid fa-trash"></i> Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MODALS ─────────────────────────────────────────── -->
+
+  <!-- Employee modal -->
+  <div class="moverlay" id="modal-emp" onclick="closeOnOverlay(event,'modal-emp')">
+    <div class="modal">
+      <div class="mh">
+        <div class="mtitle" id="memp-title">Agregar empleado</div>
+        <button class="mclose" onclick="closeModal('emp')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <input type="hidden" id="memp-id">
+      <div class="mbody">
+        <div class="fgrid">
+          <div class="fg"><label class="fl">Nombre *</label><input class="fi" id="e-nom" placeholder="Nombre"></div>
+          <div class="fg"><label class="fl">Apellido *</label><input class="fi" id="e-ape" placeholder="Apellido"></div>
+          <div class="fg"><label class="fl">Email</label><input class="fi" id="e-email" type="email" placeholder="email@empresa.com"></div>
+          <div class="fg"><label class="fl">Teléfono</label><input class="fi" id="e-tel" placeholder="+598 99 ..."></div>
+          <div class="fg">
+            <label class="fl">Área *</label>
+            <select class="fi" id="e-dept">
+              <option value="">Seleccioná...</option>
+              <option>Comercial</option><option>Tecnología</option>
+              <option>Operaciones</option><option>Marketing</option><option>Administración</option>
+            </select>
+          </div>
+          <div class="fg"><label class="fl">Cargo *</label><input class="fi" id="e-cargo" placeholder="Ej: Desarrollador senior"></div>
+          <div class="fg"><label class="fl">Fecha de ingreso</label><input class="fi" id="e-ingreso" type="date"></div>
+          <div class="fg">
+            <label class="fl">Tipo de contrato</label>
+            <select class="fi" id="e-contrato">
+              <option value="">Seleccioná...</option>
+              <option>Tiempo completo</option><option>Tiempo parcial</option><option>Por proyecto</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="fl">Estado</label>
+            <select class="fi" id="e-estado">
+              <option>Activo</option><option>Licencia</option><option>Onboarding</option>
+            </select>
+          </div>
+          <div class="fg"><label class="fl">Salario bruto</label><input class="fi" id="e-salario" type="number" placeholder="0"></div>
+          <div class="fg ffull"><label class="fl">Notas</label><textarea class="fi" id="e-notas" rows="2" placeholder="Información adicional..."></textarea></div>
+        </div>
+      </div>
+      <div class="mfooter">
+        <button class="btn btn-g btn-sm" onclick="closeModal('emp')">Cancelar</button>
+        <button class="btn btn-p btn-sm" onclick="saveEmp()"><span id="memp-btn-lbl">Guardar</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Asistencia modal -->
+  <div class="moverlay" id="modal-asistencia" onclick="closeOnOverlay(event,'modal-asistencia')">
+    <div class="modal">
+      <div class="mh">
+        <div class="mtitle">Registrar asistencia</div>
+        <button class="mclose" onclick="closeModal('asistencia')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="mbody">
+        <div class="fgrid">
+          <div class="fg ffull"><label class="fl">Empleado</label><select class="fi" id="a-emp-modal"></select></div>
+          <div class="fg"><label class="fl">Fecha</label><input class="fi" id="a-fecha" type="date"></div>
+          <div class="fg">
+            <label class="fl">Estado</label>
+            <select class="fi" id="a-estado">
+              <option>Presente</option><option>Ausente</option><option>Licencia</option><option>Feriado</option>
+            </select>
+          </div>
+          <div class="fg"><label class="fl">Entrada</label><input class="fi" id="a-entrada" type="time" value="09:00"></div>
+          <div class="fg"><label class="fl">Salida</label><input class="fi" id="a-salida" type="time" value="18:00"></div>
+          <div class="fg ffull"><label class="fl">Observaciones</label><input class="fi" id="a-obs" placeholder="Opcional..."></div>
+        </div>
+      </div>
+      <div class="mfooter">
+        <button class="btn btn-g btn-sm" onclick="closeModal('asistencia')">Cancelar</button>
+        <button class="btn btn-p btn-sm" onclick="saveAsistencia()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Licencia modal -->
+  <div class="moverlay" id="modal-licencia" onclick="closeOnOverlay(event,'modal-licencia')">
+    <div class="modal">
+      <div class="mh">
+        <div class="mtitle">Nueva solicitud de licencia</div>
+        <button class="mclose" onclick="closeModal('licencia')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="mbody">
+        <div class="fgrid">
+          <div class="fg ffull"><label class="fl">Empleado</label><select class="fi" id="l-emp"></select></div>
+          <div class="fg">
+            <label class="fl">Tipo de licencia</label>
+            <select class="fi" id="l-tipo">
+              <option>Vacaciones</option><option>Médica</option><option>Estudio</option>
+              <option>Maternidad/Paternidad</option><option>Otro</option>
+            </select>
+          </div>
+          <div class="fg"><label class="fl">Fecha desde</label><input class="fi" id="l-desde" type="date"></div>
+          <div class="fg"><label class="fl">Fecha hasta</label><input class="fi" id="l-hasta" type="date"></div>
+          <div class="fg ffull"><label class="fl">Motivo</label><textarea class="fi" id="l-motivo" rows="2" placeholder="Opcional..."></textarea></div>
+        </div>
+      </div>
+      <div class="mfooter">
+        <button class="btn btn-g btn-sm" onclick="closeModal('licencia')">Cancelar</button>
+        <button class="btn btn-p btn-sm" onclick="saveLicencia()">Enviar solicitud</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Evaluación modal -->
+  <div class="moverlay" id="modal-eval" onclick="closeOnOverlay(event,'modal-eval')">
+    <div class="modal">
+      <div class="mh">
+        <div class="mtitle" id="meval-title">Nueva evaluación</div>
+        <button class="mclose" onclick="closeModal('eval')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <input type="hidden" id="meval-id">
+      <div class="mbody">
+        <div class="fgrid">
+          <div class="fg ffull"><label class="fl">Empleado</label><select class="fi" id="ev-emp"></select></div>
+          <div class="fg"><label class="fl">Período</label><input class="fi" id="ev-periodo" placeholder="Ej: Q2 2025"></div>
+          <div class="fg"><label class="fl">Evaluador</label><input class="fi" id="ev-eval" placeholder="Nombre del evaluador"></div>
+          <div class="fg ffull">
+            <label class="fl">Puntaje</label>
+            <div id="ev-stars" style="display:flex;gap:6px;margin-top:6px;">
+              <span class="star on" data-v="1" style="cursor:pointer;font-size:24px;">★</span>
+              <span class="star on" data-v="2" style="cursor:pointer;font-size:24px;">★</span>
+              <span class="star on" data-v="3" style="cursor:pointer;font-size:24px;">★</span>
+              <span class="star"    data-v="4" style="cursor:pointer;font-size:24px;">★</span>
+              <span class="star"    data-v="5" style="cursor:pointer;font-size:24px;">★</span>
+            </div>
+            <input type="hidden" id="ev-score" value="3">
+          </div>
+          <div class="fg">
+            <label class="fl">Desempeño</label>
+            <select class="fi" id="ev-des">
+              <option>Destacado</option><option>Cumple expectativas</option><option>A mejorar</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="fl">Estado</label>
+            <select class="fi" id="ev-status">
+              <option>Pendiente</option><option>Completada</option>
+            </select>
+          </div>
+          <div class="fg ffull"><label class="fl">Comentarios</label><textarea class="fi" id="ev-comments" rows="2" placeholder="Observaciones..."></textarea></div>
+        </div>
+      </div>
+      <div class="mfooter">
+        <button class="btn btn-g btn-sm" onclick="closeModal('eval')">Cancelar</button>
+        <button class="btn btn-p btn-sm" onclick="saveEval()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Departamento modal -->
+  <div class="moverlay" id="modal-dept" onclick="closeOnOverlay(event,'modal-dept')">
+    <div class="modal">
+      <div class="mh">
+        <div class="mtitle">Departamento</div>
+        <button class="mclose" onclick="closeModal('dept')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <input type="hidden" id="md-id">
+      <div class="mbody">
+        <div class="fgrid">
+          <div class="fg"><label class="fl">Nombre *</label><input class="fi" id="md-nombre" placeholder="Nombre del área"></div>
+          <div class="fg"><label class="fl">Color</label><input class="fi" id="md-color" type="color" value="#FBBF24" style="height:40px;padding:4px;cursor:pointer;"></div>
+          <div class="fg ffull"><label class="fl">Descripción</label><input class="fi" id="md-desc" placeholder="Descripción del área"></div>
+          <div class="fg ffull"><label class="fl">Jefe de área</label><select class="fi" id="md-jefe"></select></div>
+        </div>
+      </div>
+      <div class="mfooter">
+        <button class="btn btn-g btn-sm" onclick="closeModal('dept')">Cancelar</button>
+        <button class="btn btn-p btn-sm" onclick="saveDept()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cargo modal -->
+  <div class="moverlay" id="modal-position" onclick="closeOnOverlay(event,'modal-position')">
+    <div class="modal">
+      <div class="mh">
+        <div class="mtitle">Nuevo cargo</div>
+        <button class="mclose" onclick="closeModal('position')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="mbody">
+        <div class="fgrid">
+          <div class="fg ffull"><label class="fl">Nombre del cargo *</label><input class="fi" id="mp-nombre" placeholder="Ej: Analista de datos"></div>
+          <div class="fg">
+            <label class="fl">Área</label>
+            <select class="fi" id="mp-dept">
+              <option value="">Seleccioná...</option>
+              <option>Comercial</option><option>Tecnología</option>
+              <option>Operaciones</option><option>Marketing</option><option>Administración</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="fl">Nivel</label>
+            <select class="fi" id="mp-nivel">
+              <option>Junior</option><option>Semi-senior</option><option>Senior</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="mfooter">
+        <button class="btn btn-g btn-sm" onclick="closeModal('position')">Cancelar</button>
+        <button class="btn btn-p btn-sm" onclick="savePos()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Documento modal -->
+  <div class="moverlay" id="modal-doc" onclick="closeOnOverlay(event,'modal-doc')">
+    <div class="modal">
+      <div class="mh">
+        <div class="mtitle">Subir documento</div>
+        <button class="mclose" onclick="closeModal('doc')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="mbody">
+        <div class="fgrid">
+          <div class="fg ffull"><label class="fl">Nombre del documento *</label><input class="fi" id="doc-nombre" placeholder="Ej: Contrato Juan Pérez.pdf"></div>
+          <div class="fg ffull"><label class="fl">Empleado *</label><select class="fi" id="doc-emp"></select></div>
+          <div class="fg">
+            <label class="fl">Categoría *</label>
+            <select class="fi" id="doc-categoria">
+              <option>Contrato</option><option>Certificado</option><option>Evaluación</option>
+              <option>Licencia</option><option>Recibo</option><option>Otro</option>
+            </select>
+          </div>
+          <div class="fg"><label class="fl">Fecha</label><input class="fi" id="doc-fecha" type="date"></div>
+        </div>
+      </div>
+      <div class="mfooter">
+        <button class="btn btn-g btn-sm" onclick="closeModal('doc')">Cancelar</button>
+        <button class="btn btn-p btn-sm" onclick="saveDoc()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recibo modal -->
+  <div class="moverlay" id="modal-recibo" onclick="closeOnOverlay(event,'modal-recibo')">
+    <div class="modal">
+      <div class="mh">
+        <div class="mtitle" id="rec-title">Recibo de sueldo</div>
+        <button class="mclose" onclick="closeModal('recibo')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="mbody" id="rec-body"></div>
+      <div class="mfooter">
+        <button class="btn btn-g btn-sm" onclick="closeModal('recibo')">Cerrar</button>
+        <button class="btn btn-p btn-sm" onclick="showToast('Descargando recibo...','s')"><i class="fa-solid fa-download"></i> Descargar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container (position: fixed) -->
+  <div class="tcon" id="tcon"></div>
+
+</div>
