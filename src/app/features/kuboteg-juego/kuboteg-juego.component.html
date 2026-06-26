@@ -526,12 +526,13 @@
                       </div>
                     }
 
-                    @if (objetivoTresMayorias) {
-                      <div class="obj-item" [class.obj-done]="mayoriasActuales >= 3">
-                        <span class="obj-mark">{{ mayoriasActuales >= 3 ? '✓' : '◑' }}</span>
-                        <span>Mayoría en 3 continentes</span>
-                        <span class="obj-prog">{{ mayoriasActuales }}/3</span>
-                      </div>
+                    @if (objetivoTresMayorias; as ids) {
+                      @for (cid of ids; track cid) {
+                        <div class="obj-item" [class.obj-done]="mayoriaEnContinente(cid)">
+                          <span class="obj-mark">{{ mayoriaEnContinente(cid) ? '✓' : '◑' }}</span>
+                          <span>Mayoría en {{ getNombreContinente(cid) }}</span>
+                        </div>
+                      }
                     }
 
                     @if (objetivoCuatroMayorias) {
@@ -729,21 +730,21 @@
                   <span class="nuclear-progreso-label">Cartas robadas</span>
                   <div class="nuclear-progreso-bar-wrap">
                     <div class="nuclear-progreso-bar"
-                         [style.width.%]="tieneBomba ? 100 : (cartasRobadasTotal / 9 * 100)">
+                         [style.width.%]="tieneBomba ? 100 : (cartasRobadasTotal / cartasParaBomba * 100)">
                     </div>
                   </div>
                   <span class="nuclear-progreso-contador">
-                    @if (tieneBomba || cartasRobadasTotal >= 9) {
+                    @if (tieneBomba || cartasRobadasTotal >= cartasParaBomba) {
                       <span class="nuclear-obtenida-badge">☢ ¡BOMBA OBTENIDA!</span>
                     } @else {
-                      {{ cartasRobadasTotal }} / 9
+                      {{ cartasRobadasTotal }} / {{ cartasParaBomba }}
                     }
                   </span>
                 </div>
                 <div class="nuclear-bomba-wrap">
                   <img class="nuclear-bomba-img nuclear-bomba-dark" src="assets/KuboTeg/bomba.png" alt=""/>
                   <img class="nuclear-bomba-img nuclear-bomba-color" src="assets/KuboTeg/bomba.png" alt="Bomba Atómica"
-                       [style.clip-path]="bombaNuclearClipPath"/>
+                       [style.--bomba-pct]="bombaPct"/>
                 </div>
                 <div class="nuclear-completado">
                   <span class="nuclear-completado-label">Programa completado</span>
@@ -757,23 +758,26 @@
                   <div class="nuclear-lanzar-section">
                     @for (bomba of bombas; track $index; let i = $index) {
                       @if (bomba !== null) {
-                        <button class="btn-bomba-lanzar"
-                          [class.btn-bomba-activo]="modoUsandoBomba && bombaUsandoIdx === i"
-                          [disabled]="fase !== 'ataque' || (esMiTurno && !!conquistaPendiente) || (combateEnCurso && !(modoUsandoBomba && bombaUsandoIdx === i))"
-                          (click)="toggleModoUsandoBomba(i)">
-                          <svg viewBox="0 0 24 24" fill="currentColor" class="btn-bomba-ico">
-                            <circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1"/>
-                            <path d="M10 8.54A4 4 0 0 1 14 8.54L17.5 2.47A11 11 0 0 0 6.5 2.47Z"/>
-                            <path d="M16 12A4 4 0 0 1 14 15.46L17.5 21.53A11 11 0 0 0 23 12Z"/>
-                            <path d="M10 15.46A4 4 0 0 1 8 12L1 12A11 11 0 0 0 6.5 21.53Z"/>
-                            <circle cx="12" cy="12" r="2"/>
-                          </svg>
-                          @if (modoUsandoBomba && bombaUsandoIdx === i) {
-                            Cancelar bomba{{ bombas.length > 1 ? ' ' + (i + 1) : '' }}
-                          } @else {
-                            Lanzar{{ bombas.length > 1 ? ' ' + (i + 1) : '' }}
-                          }
-                        </button>
+                        <span class="bomba-btn-wrap" [attr.data-tooltip]="bombaTooltip(i) || null">
+                          <button class="btn-bomba-lanzar"
+                            [class.btn-bomba-activo]="modoUsandoBomba && bombaUsandoIdx === i"
+                            [class.btn-bomba-espera]="bombaEnEspera(i)"
+                            [disabled]="fase !== 'ataque' || (esMiTurno && !!conquistaPendiente) || (combateEnCurso && !(modoUsandoBomba && bombaUsandoIdx === i)) || bombaEnEspera(i)"
+                            (click)="toggleModoUsandoBomba(i)">
+                            <svg viewBox="0 0 24 24" fill="currentColor" class="btn-bomba-ico">
+                              <circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1"/>
+                              <path d="M10 8.54A4 4 0 0 1 14 8.54L17.5 2.47A11 11 0 0 0 6.5 2.47Z"/>
+                              <path d="M16 12A4 4 0 0 1 14 15.46L17.5 21.53A11 11 0 0 0 23 12Z"/>
+                              <path d="M10 15.46A4 4 0 0 1 8 12L1 12A11 11 0 0 0 6.5 21.53Z"/>
+                              <circle cx="12" cy="12" r="2"/>
+                            </svg>
+                            @if (modoUsandoBomba && bombaUsandoIdx === i) {
+                              Cancelar bomba{{ bombas.length > 1 ? ' ' + (i + 1) : '' }}
+                            } @else {
+                              Lanzar{{ bombas.length > 1 ? ' ' + (i + 1) : '' }}
+                            }
+                          </button>
+                        </span>
                       } @else {
                         <p class="nuclear-bomba-sin-colocar">
                           Colocá la bomba{{ bombas.length > 1 ? ' ' + (i + 1) : '' }} en el mapa primero
@@ -953,7 +957,7 @@
           [territorioQuitandose]="territorioQuitandose"
           [territorioMovilizandose]="territorioMovilizandose"
           [territorioCartaAcierta]="territorioCartaAcierta"
-          [territoriosBomba]="panelActivo === 'internacionales' ? [] : bombasEnMapa"
+          [territoriosBomba]="verPactosEnMapa ? [] : bombasEnMapa"
           [territoriosBombaAlcance]="modoUsandoBomba ? bombaAlcanceEnemigos : []"
           [territoriosDestruidos]="territoriosDestruidosArray"
           [territorioMisilId]="territorioMisilActivoId"
@@ -972,6 +976,21 @@
             (continuarAtacando)="onContinuarAtacando()">
           </app-combate-panel>
         </div>
+
+        @if (mostrarPopupMiTurno) {
+          <div class="turno-popup-overlay" (click)="cerrarPopupMiTurno()">
+            <div class="turno-popup"
+                 [style.border-color]="jugadorColores[userId]"
+                 [style.box-shadow]="'0 0 32px ' + jugadorColores[userId] + '66, 0 8px 40px rgba(0,0,0,0.7)'">
+              <div class="turno-popup-banda" [style.background]="jugadorColores[userId]"></div>
+              <div class="turno-popup-body">
+                <span class="turno-popup-label">¡ES TU TURNO!</span>
+                <span class="turno-popup-nombre" [style.color]="jugadorColores[userId]">{{ miNombre }}</span>
+              </div>
+              <div class="turno-popup-hint">Toca para cerrar</div>
+            </div>
+          </div>
+        }
       </main>
 
       <!-- Panel derecho -->
@@ -1096,7 +1115,7 @@
               @if (!aprobacionCobroEnviada) {
                 <p class="phase-waiting-line">Todos colocaron sus tropas.</p>
                 <p class="phase-hint">Revisá el mapa y confirmá el cobro.</p>
-                <button class="btn-phase-action" (click)="aprobarCobro()">
+                <button class="btn-phase-action btn-aprobar-cobro" (click)="aprobarCobro()">
                   Aprobado →
                 </button>
                 <button class="btn-volver-colocacion" (click)="deshacerColocacionSimultanea()">
@@ -1156,22 +1175,26 @@
               @if (jugandoConBomba) {
                 @for (bomba of bombas; track $index; let i = $index) {
                   @if (bomba !== null && !conquistaPendiente) {
-                    <button class="btn-bomba-lanzar"
-                      [class.btn-bomba-activo]="modoUsandoBomba && bombaUsandoIdx === i"
-                      (click)="toggleModoUsandoBomba(i)">
-                      <svg viewBox="0 0 24 24" fill="currentColor" class="btn-bomba-ico">
-                        <circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1"/>
-                        <path d="M10 8.54A4 4 0 0 1 14 8.54L17.5 2.47A11 11 0 0 0 6.5 2.47Z"/>
-                        <path d="M16 12A4 4 0 0 1 14 15.46L17.5 21.53A11 11 0 0 0 23 12Z"/>
-                        <path d="M10 15.46A4 4 0 0 1 8 12L1 12A11 11 0 0 0 6.5 21.53Z"/>
-                        <circle cx="12" cy="12" r="2"/>
-                      </svg>
-                      @if (modoUsandoBomba && bombaUsandoIdx === i) {
-                        Cancelar bomba{{ bombas.length > 1 ? ' ' + (i + 1) : '' }}
-                      } @else {
-                        Lanzar Bomba{{ bombas.length > 1 ? ' ' + (i + 1) + ' — ' + nombreTerritorio(bomba) : ' Atómica' }}
-                      }
-                    </button>
+                    <span class="bomba-btn-wrap" [attr.data-tooltip]="bombaTooltip(i) || null">
+                      <button class="btn-bomba-lanzar"
+                        [class.btn-bomba-activo]="modoUsandoBomba && bombaUsandoIdx === i"
+                        [class.btn-bomba-espera]="bombaEnEspera(i)"
+                        [disabled]="bombaEnEspera(i)"
+                        (click)="toggleModoUsandoBomba(i)">
+                        <svg viewBox="0 0 24 24" fill="currentColor" class="btn-bomba-ico">
+                          <circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1"/>
+                          <path d="M10 8.54A4 4 0 0 1 14 8.54L17.5 2.47A11 11 0 0 0 6.5 2.47Z"/>
+                          <path d="M16 12A4 4 0 0 1 14 15.46L17.5 21.53A11 11 0 0 0 23 12Z"/>
+                          <path d="M10 15.46A4 4 0 0 1 8 12L1 12A11 11 0 0 0 6.5 21.53Z"/>
+                          <circle cx="12" cy="12" r="2"/>
+                        </svg>
+                        @if (modoUsandoBomba && bombaUsandoIdx === i) {
+                          Cancelar bomba{{ bombas.length > 1 ? ' ' + (i + 1) : '' }}
+                        } @else {
+                          Lanzar Bomba{{ bombas.length > 1 ? ' ' + (i + 1) + ' — ' + nombreTerritorio(bomba) : ' Atómica' }}
+                        }
+                      </button>
+                    </span>
                   }
                 }
               }
@@ -1208,23 +1231,26 @@
               @if (jugandoConBomba && tieneBomba) {
                 @for (bomba of bombas; track $index; let i = $index) {
                   @if (bomba !== null) {
-                    <button class="btn-bomba-lanzar"
-                      [class.btn-bomba-activo]="modoUsandoBomba && bombaUsandoIdx === i"
-                      [disabled]="combateEnCurso && !(modoUsandoBomba && bombaUsandoIdx === i)"
-                      (click)="toggleModoUsandoBomba(i)">
-                      <svg viewBox="0 0 24 24" fill="currentColor" class="btn-bomba-ico">
-                        <circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1"/>
-                        <path d="M10 8.54A4 4 0 0 1 14 8.54L17.5 2.47A11 11 0 0 0 6.5 2.47Z"/>
-                        <path d="M16 12A4 4 0 0 1 14 15.46L17.5 21.53A11 11 0 0 0 23 12Z"/>
-                        <path d="M10 15.46A4 4 0 0 1 8 12L1 12A11 11 0 0 0 6.5 21.53Z"/>
-                        <circle cx="12" cy="12" r="2"/>
-                      </svg>
-                      @if (modoUsandoBomba && bombaUsandoIdx === i) {
-                        Cancelar bomba{{ bombas.length > 1 ? ' ' + (i + 1) : '' }}
-                      } @else {
-                        Lanzar Bomba{{ bombas.length > 1 ? ' ' + (i + 1) + ' — ' + nombreTerritorio(bomba) : ' Atómica' }}
-                      }
-                    </button>
+                    <span class="bomba-btn-wrap" [attr.data-tooltip]="bombaTooltip(i) || null">
+                      <button class="btn-bomba-lanzar"
+                        [class.btn-bomba-activo]="modoUsandoBomba && bombaUsandoIdx === i"
+                        [class.btn-bomba-espera]="bombaEnEspera(i)"
+                        [disabled]="(combateEnCurso && !(modoUsandoBomba && bombaUsandoIdx === i)) || bombaEnEspera(i)"
+                        (click)="toggleModoUsandoBomba(i)">
+                        <svg viewBox="0 0 24 24" fill="currentColor" class="btn-bomba-ico">
+                          <circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1"/>
+                          <path d="M10 8.54A4 4 0 0 1 14 8.54L17.5 2.47A11 11 0 0 0 6.5 2.47Z"/>
+                          <path d="M16 12A4 4 0 0 1 14 15.46L17.5 21.53A11 11 0 0 0 23 12Z"/>
+                          <path d="M10 15.46A4 4 0 0 1 8 12L1 12A11 11 0 0 0 6.5 21.53Z"/>
+                          <circle cx="12" cy="12" r="2"/>
+                        </svg>
+                        @if (modoUsandoBomba && bombaUsandoIdx === i) {
+                          Cancelar bomba{{ bombas.length > 1 ? ' ' + (i + 1) : '' }}
+                        } @else {
+                          Lanzar Bomba{{ bombas.length > 1 ? ' ' + (i + 1) + ' — ' + nombreTerritorio(bomba) : ' Atómica' }}
+                        }
+                      </button>
+                    </span>
                   }
                 }
               }

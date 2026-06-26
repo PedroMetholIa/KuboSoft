@@ -86,6 +86,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   mostrarAprobacionCobro = false;
   aprobacionCobroEnviada = false;
   private _aprobacionesCobro = new Set<string>();
+  mostrarPopupMiTurno = false;
+  private _popupMiTurnoTimer: ReturnType<typeof setTimeout> | null = null;
   private _startIdxParaAtaque = 0;
   continentesColocacion: Array<{
     id: string; nombre: string; bonus: number; colocadas: number; territoriosPermitidos: string[]; tipo: 'mayoria' | 'totalidad';
@@ -132,8 +134,18 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   bombasMovidasEnRonda: (number | null)[] = [];
 
   get tieneBomba(): boolean  { return this.bombas.length > 0; }
+  bombaEnEspera(i: number): boolean {
+    const rondaMovida = this.bombasMovidasEnRonda[i] ?? null;
+    return rondaMovida !== null && rondaMovida >= (this.partida?.ronda_actual ?? 0);
+  }
+  bombaTooltip(i: number): string {
+    if (this.bombaEnEspera(i)) return 'En espera: moviste esta bomba esta ronda. Disponible a partir de la próxima ronda.';
+    if (this.fase !== 'ataque') return 'Solo disponible en la fase de ataque.';
+    return '';
+  }
   get jugandoConBomba(): boolean { return this.partida?.con_bomba_atomica !== false; }
   get jugandoConMayorias(): boolean { return this.partida?.con_mayorias !== false; }
+  get cartasParaBomba(): number { return this.partida?.cartas_para_bomba ?? 9; }
   territoriosDestruidos = new Set<string>();
   territorioMisilActivoId: string | null = null;
   gameNotif: { msg: string; tipo: 'ok' | 'info' | 'warn' | 'error' } | null = null;
@@ -291,6 +303,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     if (this._colocacionHighlightTimer)   clearTimeout(this._colocacionHighlightTimer);
     if (this._quitarHighlightTimer)        clearTimeout(this._quitarHighlightTimer);
     if (this._movilizacionHighlightTimer)  clearTimeout(this._movilizacionHighlightTimer);
+    if (this._popupMiTurnoTimer)           clearTimeout(this._popupMiTurnoTimer);
     if (this._cartaAciertaTimer)           clearTimeout(this._cartaAciertaTimer);
     if (this.cartaPopupTimer)            clearTimeout(this.cartaPopupTimer);
     if (this.gameNotifTimer)             clearTimeout(this.gameNotifTimer);
@@ -409,8 +422,23 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   get turnOrderDisplay(): { uid: string; pos: number; nombre: string; color: string; isActual: boolean; isAlive: boolean; isMe: boolean; liderNombre: string; liderImg: string }[] {
     if (!this.partida?.orden_jugadores) return [];
-    return [...this.partida.orden_jugadores].reverse().map((uid, _idx, arr) => {
-      const pos = arr.length - _idx;
+    const orden = this.partida.orden_jugadores;
+    const n = orden.length;
+
+    // Durante la fase de aprobación del cobro, rotar el array para que el primer
+    // atacante de la ronda quede en pos=1 (slot más a la derecha, igual que durante el ataque).
+    let displayOrden: string[];
+    let efectivoActualUid: string;
+    if (this.colocacionSimultanea && this.fase === 'colocacion' && this.partida.ronda_actual) {
+      const attackStartIdx = this.primerVivoDesde((this.partida.ronda_actual - 1) % n, orden);
+      efectivoActualUid = orden[attackStartIdx];
+      displayOrden = [...orden.slice(attackStartIdx), ...orden.slice(0, attackStartIdx)];
+    } else {
+      efectivoActualUid = this.jugadorActualId;
+      displayOrden = orden;
+    }
+
+    return [...displayOrden].reverse().map((uid, idx, arr) => {
       const j = this.jugadores.find(jj => jj.usuario_id === uid);
       const liderNombre = this.jugadorLideres[uid] ?? '';
       const lider = this.lideres.find(l => l.nombre === liderNombre);
@@ -420,17 +448,17 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
           liderImg = this.getLiderImgPath(lider);
         } else {
           const postura = j?.posturas?.[this.userId] ?? 'neutral';
-          if (postura === 'hostil')    liderImg = this.validarImgPath(lider.img_hostil   ?? lider.img_neutra ?? '');
+          if (postura === 'hostil')        liderImg = this.validarImgPath(lider.img_hostil   ?? lider.img_neutra ?? '');
           else if (postura === 'amigable') liderImg = this.validarImgPath(lider.img_amigable ?? lider.img_neutra ?? '');
-          else                         liderImg = this.getLiderImgPath(lider);
+          else                             liderImg = this.getLiderImgPath(lider);
         }
       }
       return {
         uid,
-        pos,
+        pos: arr.length - idx,
         nombre: j ? this.nombreJugador(j) : uid.slice(0, 6) + '…',
         color: this.jugadorColores[uid] || '#94a3b8',
-        isActual: uid === this.jugadorActualId,
+        isActual: uid === efectivoActualUid,
         isAlive: this.estaVivo(uid),
         isMe: uid === this.userId,
         liderNombre,
@@ -1202,6 +1230,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
             if (this.partida?.estado === 'En juego') this.cambiarMusicaLider();
             if (this.esMiTurno && prevJugadorIdx !== newPartida.jugador_actual_index) {
               this.playSfx('assets/KuboTeg/sonidos/confirma-seleccion.mp3');
+              this.abrirPopupMiTurno();
             }
             if (this.esMiTurno && (this.fase === 'colocacion' || this.fase === 'ataque')) {
               void this.verificarVictoriaPorRendicion();
@@ -1229,20 +1258,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
               ...prev,
               ...updated,
               usuario: prev.usuario,
-              // Aplicar valor de DB. Excepción: si el broadcast ya limpió el estado en memoria
-              // (prev = null) y llega un evento Realtime tardío con un valor no-null (snapshot
-              // anterior al lanzamiento), se mantiene null para no restaurar el ícono.
-              // El evento definitivo de setBombaTerritorios(null) llega después y confirma.
-              bomba_territorio: (() => {
-                const dbVal = updated.bomba_territorio !== undefined ? updated.bomba_territorio : prev.bomba_territorio;
-                if (updated.usuario_id !== this.userId && prev.bomba_territorio === null && dbVal !== null) return null;
-                return dbVal;
-              })(),
-              bomba_territorio_2: (() => {
-                const dbVal2 = updated.bomba_territorio_2 !== undefined ? updated.bomba_territorio_2 : prev.bomba_territorio_2;
-                if (updated.usuario_id !== this.userId && prev.bomba_territorio_2 === null && dbVal2 !== null) return null;
-                return dbVal2;
-              })(),
+              bomba_territorio:   updated.bomba_territorio   !== undefined ? updated.bomba_territorio   : prev.bomba_territorio,
+              bomba_territorio_2: updated.bomba_territorio_2 !== undefined ? updated.bomba_territorio_2 : prev.bomba_territorio_2,
             },
             ...this.jugadores.slice(idx + 1),
           ];
@@ -2212,7 +2229,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.misCartas = nuevasCartas;
     this.cartasRobadasTotal++;
     localStorage.setItem(`teg_cartas_total_${this.partidaId}_${this.userId}`, String(this.cartasRobadasTotal));
-    if (this.cartasRobadasTotal === 9 && this.bombas.length < 2 && this.jugandoConBomba) {
+    if (this.cartasRobadasTotal === this.cartasParaBomba && this.bombas.length < 2 && this.jugandoConBomba) {
       this.bombas = [...this.bombas, null];
       this.saveBombaState();
       this.cartasRobadasTotal = 0;
@@ -2305,6 +2322,22 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   cerrarObjetivoPopup() {
     this.mostrarObjetivoPopup = false;
     localStorage.setItem(`obj_visto_${this.partidaId}_${this.userId}`, '1');
+    this.cdr.markForCheck();
+  }
+
+  abrirPopupMiTurno() {
+    if (this._popupMiTurnoTimer) clearTimeout(this._popupMiTurnoTimer);
+    this.mostrarPopupMiTurno = true;
+    this.cdr.markForCheck();
+    this._popupMiTurnoTimer = setTimeout(() => {
+      this.mostrarPopupMiTurno = false;
+      this.cdr.markForCheck();
+    }, 3500);
+  }
+
+  cerrarPopupMiTurno() {
+    if (this._popupMiTurnoTimer) clearTimeout(this._popupMiTurnoTimer);
+    this.mostrarPopupMiTurno = false;
     this.cdr.markForCheck();
   }
 
@@ -3432,7 +3465,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       return `Destruir a ${targetName}`;
     }
     if (obj.tipo === 'tres_mayorias') {
-      return 'Mayoría en 3 continentes cualesquiera';
+      return `Mayoría en ${obj.ids.map(id => this.getNombreContinente(id)).join(', ')}`;
     }
     if (obj.tipo === 'cuatro_mayorias') {
       return 'Conquistar 4 mayorías cualesquiera';
@@ -3773,11 +3806,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   get bombaPct(): number {
-    return this.tieneBomba ? 100 : Math.min(Math.round(this.cartasRobadasTotal / 9 * 100), 100);
-  }
-
-  get bombaNuclearClipPath(): string {
-    return `inset(${100 - this.bombaPct}% 0 0 0)`;
+    return this.tieneBomba ? 100 : Math.min(Math.round(this.cartasRobadasTotal / this.cartasParaBomba * 100), 100);
   }
 
   get territoriosDestruidosArray(): string[] {
@@ -3993,8 +4022,14 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     return this.miObjetivo?.tipo === 'destruir' && !!this.miObjetivo.fallback;
   }
 
-  get objetivoTresMayorias(): boolean {
-    return this.miObjetivo?.tipo === 'tres_mayorias';
+  get objetivoTresMayorias(): [string, string, string] | null {
+    return this.miObjetivo?.tipo === 'tres_mayorias' ? this.miObjetivo.ids : null;
+  }
+
+  mayoriaEnContinente(contId: string): boolean {
+    const terrs = CONTINENT_TERRITORIES[contId] ?? [];
+    const threshold = Math.floor(terrs.length / 2) + 1;
+    return terrs.filter(tid => this.territorios[tid]?.usuario_id === this.userId).length >= threshold;
   }
 
   get objetivoCuatroMayorias(): boolean {

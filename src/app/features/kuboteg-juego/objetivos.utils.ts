@@ -28,7 +28,16 @@ export function generarObjetivosPool(jugadores: JugadorColor[]): ObjetivoSecreto
     }
   }
 
-  for (let i = 0; i < 6; i++) pool.push({ tipo: 'tres_mayorias' });
+  // 6 combinaciones balanceadas: cada continente aparece exactamente 3 veces
+  const TRES_MAYORIAS_COMBOS: [string, string, string][] = [
+    ['north_america', 'south_america', 'europe'],
+    ['north_america', 'africa',        'oceania'],
+    ['south_america', 'asia',          'oceania'],
+    ['europe',        'africa',        'asia'],
+    ['north_america', 'europe',        'asia'],
+    ['south_america', 'africa',        'oceania'],
+  ];
+  for (const ids of TRES_MAYORIAS_COMBOS) pool.push({ tipo: 'tres_mayorias', ids });
   pool.push({ tipo: 'cuatro_mayorias' });
 
   return pool;
@@ -96,10 +105,10 @@ export function verificarVictoriaObjetivo(
   }
 
   if (objetivo.tipo === 'tres_mayorias') {
-    const count = Object.entries(CONTINENT_TERRITORIES).filter(([, terrs]) =>
-      terrs.filter(tid => esMio(tid)).length >= Math.floor(terrs.length / 2) + 1
-    ).length;
-    return count >= 3;
+    return objetivo.ids.every(cid => {
+      const terrs = CONTINENT_TERRITORIES[cid] ?? [];
+      return terrs.filter(tid => esMio(tid)).length >= Math.floor(terrs.length / 2) + 1;
+    });
   }
 
   if (objetivo.tipo === 'cuatro_mayorias') {

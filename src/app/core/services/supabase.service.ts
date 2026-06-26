@@ -72,6 +72,7 @@ export interface Partida {
   acumulado_territorios?: Record<string, number> | null;
   pausado_por?: string | null;
   con_bomba_atomica?: boolean | null;
+  cartas_para_bomba?: number | null;
   con_mayorias?: boolean | null;
   colocacion_simultanea?: boolean | null;
   created_at: string;

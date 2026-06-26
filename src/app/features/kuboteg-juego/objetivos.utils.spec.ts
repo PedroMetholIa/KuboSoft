@@ -61,9 +61,13 @@ describe('generarObjetivosPool', () => {
     expect(pool.filter(o => o.tipo === 'destruir').length).toBe(0);
   });
 
-  it('adds 6 tres_mayorias objectives', () => {
+  it('adds 6 tres_mayorias objectives, each with 3 specific continent ids', () => {
     const pool = generarObjetivosPool(JUGADORES);
-    expect(pool.filter(o => o.tipo === 'tres_mayorias').length).toBe(6);
+    const tresMayorias = pool.filter(o => o.tipo === 'tres_mayorias');
+    expect(tresMayorias.length).toBe(6);
+    tresMayorias.forEach(o => {
+      if (o.tipo === 'tres_mayorias') expect(o.ids.length).toBe(3);
+    });
   });
 
   it('adds exactly 1 cuatro_mayorias objective', () => {
@@ -230,33 +234,39 @@ describe('verificarVictoriaObjetivo', () => {
 
   // ── tipo: 'tres_mayorias' ────────────────────────────────────────────────────
   describe("tipo 'tres_mayorias'", () => {
-    const obj: ObjetivoSecreto = { tipo: 'tres_mayorias' };
+    // objective: majority in south_america, oceania, africa
+    const obj: ObjetivoSecreto = { tipo: 'tres_mayorias', ids: ['south_america', 'oceania', 'africa'] };
 
-    it('returns true when player has majority in exactly 3 continents', () => {
-      // SA: own 3/4 (majority=3) ✓
-      // OC: own 3/4 (majority=3) ✓
-      // AF: own 4/6 (majority=4) ✓
+    it('returns true when player has majority in all 3 specified continents', () => {
+      // SA: own 3/4 (majority=3) ✓  OC: own 3/4 (majority=3) ✓  AF: own 4/6 (majority=4) ✓
       const territorios = myTerrs([...SA.slice(0, 3), ...OC.slice(0, 3), ...AF.slice(0, 4)]);
       const result = verificarVictoriaObjetivo(obj, SA[0], null, territorios, MY_ID, JUGADORES_BASE);
       expect(result).toBeTrue();
     });
 
-    it('returns true when player has majority in 4 continents (more than needed)', () => {
+    it('returns true when player also has majority in extra continents beyond the 3 specified', () => {
       const territorios = myTerrs([...SA.slice(0, 3), ...OC.slice(0, 3), ...AF.slice(0, 4), ...EU.slice(0, 4)]);
       const result = verificarVictoriaObjetivo(obj, SA[0], null, territorios, MY_ID, JUGADORES_BASE);
       expect(result).toBeTrue();
     });
 
-    it('returns false when player has majority in only 2 continents', () => {
+    it('returns false when missing majority in one of the 3 specified continents', () => {
       // SA: 3/4 ✓, OC: 3/4 ✓, AF: only 2/6 ✗
       const territorios = myTerrs([...SA.slice(0, 3), ...OC.slice(0, 3), ...AF.slice(0, 2)]);
       const result = verificarVictoriaObjetivo(obj, SA[0], null, territorios, MY_ID, JUGADORES_BASE);
       expect(result).toBeFalse();
     });
 
+    it('returns false when player has majority in 3 continents but not the specified ones', () => {
+      // Has majority in SA, OC, EU — but objective requires SA, OC, AF
+      const territorios = myTerrs([...SA.slice(0, 3), ...OC.slice(0, 3), ...EU.slice(0, 4)]);
+      const result = verificarVictoriaObjetivo(obj, SA[0], null, territorios, MY_ID, JUGADORES_BASE);
+      expect(result).toBeFalse();
+    });
+
     it('counts conquistadoId toward majority', () => {
       // Own OC[0..1] (2/4, not yet majority) and SA (3/4) and AF (4/6).
-      // Conquering OC[2] gives 3/4 = majority → 3 continents total → true
+      // Conquering OC[2] gives 3/4 = majority → all 3 specified continents have majority → true
       const territorios = mixedTerrs([...SA.slice(0, 3), ...OC.slice(0, 2), ...AF.slice(0, 4)], [OC[2]]);
       const result = verificarVictoriaObjetivo(obj, OC[2], null, territorios, MY_ID, JUGADORES_BASE);
       expect(result).toBeTrue();
@@ -296,7 +306,7 @@ describe('verificarVictoriaObjetivo', () => {
     it('returns false for any objective type when territorios is empty (except valid destruir-fallback logic)', () => {
       const territorios = {};
       expect(verificarVictoriaObjetivo({ tipo: 'continentes', ids: ['south_america', 'oceania'] }, 'any', null, territorios, MY_ID, JUGADORES_BASE)).toBeFalse();
-      expect(verificarVictoriaObjetivo({ tipo: 'tres_mayorias' }, 'any', null, territorios, MY_ID, JUGADORES_BASE)).toBeFalse();
+      expect(verificarVictoriaObjetivo({ tipo: 'tres_mayorias', ids: ['south_america', 'oceania', 'africa'] }, 'any', null, territorios, MY_ID, JUGADORES_BASE)).toBeFalse();
       expect(verificarVictoriaObjetivo({ tipo: 'cuatro_mayorias' }, 'any', null, territorios, MY_ID, JUGADORES_BASE)).toBeFalse();
     });
   });

@@ -338,6 +338,18 @@ interface PartidaFinalizada {
                   </label>
                 </div>
               </div>
+              @if (form.con_bomba_atomica) {
+                <div class="form-row">
+                  <div class="field field-narrow">
+                    <label>Cartas para bomba (3–15)</label>
+                    <div class="num-stepper">
+                      <button type="button" class="step-btn" [disabled]="form.cartas_para_bomba <= 3" (click)="form.cartas_para_bomba = form.cartas_para_bomba - 1">−</button>
+                      <span class="step-value">{{ form.cartas_para_bomba }}</span>
+                      <button type="button" class="step-btn" [disabled]="form.cartas_para_bomba >= 15" (click)="form.cartas_para_bomba = form.cartas_para_bomba + 1">+</button>
+                    </div>
+                  </div>
+                </div>
+              }
               <div class="form-row">
                 <div class="field field-narrow">
                   <label>Tropas iniciales (4–10)</label>
@@ -458,6 +470,7 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     requiere_contrasena: false,
     contrasena: '',
     con_bomba_atomica: true,
+    cartas_para_bomba: 9,
     colocacion_simultanea: true
   };
 
@@ -692,6 +705,7 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       requiere_contrasena: false,
       contrasena: '',
       con_bomba_atomica: true,
+      cartas_para_bomba: 9,
       colocacion_simultanea: true
     };
   }
@@ -714,6 +728,7 @@ export class GameLobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       tropas_iniciales: this.form.tropas_iniciales,
       limite_rondas: this.form.limite_rondas,
       con_bomba_atomica: this.form.con_bomba_atomica,
+      cartas_para_bomba: this.form.con_bomba_atomica ? this.form.cartas_para_bomba : null,
       colocacion_simultanea: this.form.colocacion_simultanea
     });
     if (nuevaPartida) {

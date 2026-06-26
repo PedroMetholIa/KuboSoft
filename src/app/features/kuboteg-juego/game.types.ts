@@ -1,7 +1,7 @@
 export type ObjetivoSecreto =
   | { tipo: 'continentes'; ids: [string, string] }
   | { tipo: 'destruir'; color: string; fallback?: true }
-  | { tipo: 'tres_mayorias' }
+  | { tipo: 'tres_mayorias'; ids: [string, string, string] }
   | { tipo: 'cuatro_mayorias' };
 
 export interface ConquistaPendiente {
