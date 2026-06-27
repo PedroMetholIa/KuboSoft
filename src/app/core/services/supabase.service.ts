@@ -92,8 +92,7 @@ export interface PartidaJugador {
   cartas?: string[] | null;
   posturas?: Record<string, 'amigable' | 'neutral' | 'hostil'> | null;
   rendido?: boolean;
-  bomba_territorio?: string | null;
-  bomba_territorio_2?: string | null;
+  bomba_territorios?: (string | null)[] | null;
   usuario?: { nombre: string | null; apellido: string | null; email: string } | null;
   created_at: string;
 }
@@ -329,15 +328,15 @@ export class SupabaseService {
 
   getPartidaJugadores(partidaId: string) {
     return this.supabase.from('partida_jugador')
-      .select('id, usuario_id, orden_turno, puntos, esta_dentro, tropas_por_colocar, color, lider, objetivo, posturas, rendido, bomba_territorio, bomba_territorio_2, usuario!left(nombre, apellido, email)')
+      .select('id, usuario_id, orden_turno, puntos, esta_dentro, tropas_por_colocar, color, lider, objetivo, posturas, rendido, bomba_territorios, usuario!left(nombre, apellido, email)')
       .eq('partida_id', partidaId)
       .order('orden_turno')
       .then(r => ({ ...r, data: r.data as unknown as PartidaJugador[] | null }));
   }
 
-  setBombaTerritorios(partidaId: string, usuarioId: string, t1: string | null, t2: string | null) {
+  setBombaTerritorios(partidaId: string, usuarioId: string, territorios: (string | null)[]) {
     return this.supabase.from('partida_jugador')
-      .update({ bomba_territorio: t1, bomba_territorio_2: t2 })
+      .update({ bomba_territorios: territorios.filter(t => t !== null) })
       .eq('partida_id', partidaId)
       .eq('usuario_id', usuarioId);
   }

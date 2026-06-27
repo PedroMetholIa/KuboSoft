@@ -730,11 +730,11 @@
                   <span class="nuclear-progreso-label">Cartas robadas</span>
                   <div class="nuclear-progreso-bar-wrap">
                     <div class="nuclear-progreso-bar"
-                         [style.width.%]="tieneBomba ? 100 : (cartasRobadasTotal / cartasParaBomba * 100)">
+                         [style.width.%]="cartasRobadasTotal / cartasParaBomba * 100">
                     </div>
                   </div>
                   <span class="nuclear-progreso-contador">
-                    @if (tieneBomba || cartasRobadasTotal >= cartasParaBomba) {
+                    @if (cartasRobadasTotal >= cartasParaBomba) {
                       <span class="nuclear-obtenida-badge">☢ ¡BOMBA OBTENIDA!</span>
                     } @else {
                       {{ cartasRobadasTotal }} / {{ cartasParaBomba }}
@@ -755,6 +755,20 @@
                 </div>
 
                 @if (tieneBomba) {
+                  <div class="nuclear-posesion">
+                    <span class="nuclear-posesion-label">En posesión</span>
+                    <div class="nuclear-posesion-iconos">
+                      @for (bomba of bombas; track $index) {
+                        <svg viewBox="0 0 24 24" fill="currentColor" class="bomba-posesion-ico">
+                          <circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1"/>
+                          <path d="M10 8.54A4 4 0 0 1 14 8.54L17.5 2.47A11 11 0 0 0 6.5 2.47Z"/>
+                          <path d="M16 12A4 4 0 0 1 14 15.46L17.5 21.53A11 11 0 0 0 23 12Z"/>
+                          <path d="M10 15.46A4 4 0 0 1 8 12L1 12A11 11 0 0 0 6.5 21.53Z"/>
+                          <circle cx="12" cy="12" r="2"/>
+                        </svg>
+                      }
+                    </div>
+                  </div>
                   <div class="nuclear-lanzar-section">
                     @for (bomba of bombas; track $index; let i = $index) {
                       @if (bomba !== null) {
@@ -772,15 +786,15 @@
                               <circle cx="12" cy="12" r="2"/>
                             </svg>
                             @if (modoUsandoBomba && bombaUsandoIdx === i) {
-                              Cancelar bomba{{ bombas.length > 1 ? ' ' + (i + 1) : '' }}
+                              Cancelar bomba de {{ nombreTerritorio(bomba) }}
                             } @else {
-                              Lanzar{{ bombas.length > 1 ? ' ' + (i + 1) : '' }}
+                              Lanzar bomba de {{ nombreTerritorio(bomba) }}
                             }
                           </button>
                         </span>
                       } @else {
                         <p class="nuclear-bomba-sin-colocar">
-                          Colocá la bomba{{ bombas.length > 1 ? ' ' + (i + 1) : '' }} en el mapa primero
+                          Colocá la bomba {{ i + 1 }} en el mapa primero
                         </p>
                       }
                     }
@@ -958,6 +972,7 @@
           [territorioMovilizandose]="territorioMovilizandose"
           [territorioCartaAcierta]="territorioCartaAcierta"
           [territoriosBomba]="verPactosEnMapa ? [] : bombasEnMapa"
+          [territoriosBombaCount]="verPactosEnMapa ? {} : bombasEnMapaCount"
           [territoriosBombaAlcance]="modoUsandoBomba ? bombaAlcanceEnemigos : []"
           [territoriosDestruidos]="territoriosDestruidosArray"
           [territorioMisilId]="territorioMisilActivoId"

@@ -425,14 +425,17 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     const orden = this.partida.orden_jugadores;
     const n = orden.length;
 
-    // Durante la fase de aprobación del cobro, rotar el array para que el primer
-    // atacante de la ronda quede en pos=1 (slot más a la derecha, igual que durante el ataque).
+    // Rotar siempre el array para que el primer atacante de la ronda quede en
+    // pos=1 (slot más a la derecha) durante todas las fases del turno.
+    // En colocación simultánea no hay un "jugador actual", se resalta al primero.
     let displayOrden: string[];
     let efectivoActualUid: string;
-    if (this.colocacionSimultanea && this.fase === 'colocacion' && this.partida.ronda_actual) {
+    if (this.partida.ronda_actual) {
       const attackStartIdx = this.primerVivoDesde((this.partida.ronda_actual - 1) % n, orden);
-      efectivoActualUid = orden[attackStartIdx];
       displayOrden = [...orden.slice(attackStartIdx), ...orden.slice(0, attackStartIdx)];
+      efectivoActualUid = (this.colocacionSimultanea && this.fase === 'colocacion')
+        ? orden[attackStartIdx]
+        : this.jugadorActualId;
     } else {
       efectivoActualUid = this.jugadorActualId;
       displayOrden = orden;
@@ -774,15 +777,11 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       } catch { /* ignore */ }
       // Fallback desde DB si localStorage está vacío
       const miJDb = jugadores?.find((j: PartidaJugador) => j.usuario_id === this.userId);
-      if (this.bombas.length === 0 && (miJDb?.bomba_territorio || miJDb?.bomba_territorio_2)) {
-        const dbPlaced: (string | null)[] = [];
-        if (miJDb.bomba_territorio)   dbPlaced.push(miJDb.bomba_territorio);
-        if (miJDb.bomba_territorio_2) dbPlaced.push(miJDb.bomba_territorio_2);
-        this.bombas = dbPlaced;
+      if (this.bombas.length === 0 && (miJDb?.bomba_territorios?.length ?? 0) > 0) {
+        this.bombas = (miJDb?.bomba_territorios ?? []).filter(Boolean) as string[];
       }
       // Garantizar que jugadores refleja el estado local de bombas (fuente de verdad: localStorage)
-      const [initT1, initT2] = this.bombasT1T2();
-      this.syncBombasJugador(this.userId, initT1, initT2);
+      this.syncBombasJugador(this.userId, this.bombas);
 
       const terrArray = territorios ?? [];
       this.territorios = {};
@@ -1109,20 +1108,18 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         this.cdr.markForCheck();
       })
       .on('broadcast', { event: 'bomba_posicion' }, ({ payload }) => {
-        const e = payload as { jugadorId: string; bomba1: string | null; bomba2: string | null };
+        const e = payload as { jugadorId: string; bombas: (string | null)[] };
         if (e.jugadorId === this.userId) return;
-        this.syncBombasJugador(e.jugadorId, e.bomba1 ?? null, e.bomba2 ?? null);
+        this.syncBombasJugador(e.jugadorId, e.bombas ?? []);
         this.cdr.markForCheck();
       })
       .on('broadcast', { event: 'bomba_capturada' }, ({ payload }) => {
         // Evento específico para cuando un atacante captura la bomba del defensor.
         // A diferencia de bomba_posicion, el DEFENSOR (dueño original) también lo procesa.
-        const e = payload as { jugadorId: string; bomba1: string | null; bomba2: string | null };
-        this.syncBombasJugador(e.jugadorId, e.bomba1 ?? null, e.bomba2 ?? null);
+        const e = payload as { jugadorId: string; bombas: (string | null)[] };
+        this.syncBombasJugador(e.jugadorId, e.bombas ?? []);
         if (e.jugadorId === this.userId) {
-          // Actualizar estado local: quitar la bomba capturada
-          const nuevasBombas = ([e.bomba1, e.bomba2] as (string | null)[]).filter(b => b !== null) as string[];
-          this.bombas = nuevasBombas;
+          this.bombas = (e.bombas ?? []).filter(b => b !== null) as string[];
           this.bombasMovidasEnRonda = [];
           this.saveBombaState();
           this.modoUsandoBomba = false;
@@ -1131,10 +1128,10 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         this.cdr.markForCheck();
       })
       .on('broadcast', { event: 'bomba_atomica' }, ({ payload }) => {
-        const e = payload as { territorioId: string; jugadorId: string; victimaId?: string; bomba1: string | null; bomba2: string | null };
+        const e = payload as { territorioId: string; jugadorId: string; victimaId?: string; bombas: (string | null)[] };
         if (e.jugadorId === this.userId) return;
         if (e.victimaId === this.userId) void this.aplicarPostura(e.jugadorId, 'hostil');
-        this.syncBombasJugador(e.jugadorId, e.bomba1 ?? null, e.bomba2 ?? null);
+        this.syncBombasJugador(e.jugadorId, e.bombas ?? []);
         this.territorioMisilActivoId = e.territorioId;
         this.cdr.markForCheck();
         setTimeout(() => { this.territorioMisilActivoId = null; this.cdr.markForCheck(); }, 1500);
@@ -1258,8 +1255,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
               ...prev,
               ...updated,
               usuario: prev.usuario,
-              bomba_territorio:   updated.bomba_territorio   !== undefined ? updated.bomba_territorio   : prev.bomba_territorio,
-              bomba_territorio_2: updated.bomba_territorio_2 !== undefined ? updated.bomba_territorio_2 : prev.bomba_territorio_2,
+              bomba_territorios: updated.bomba_territorios !== undefined ? updated.bomba_territorios : prev.bomba_territorios,
             },
             ...this.jugadores.slice(idx + 1),
           ];
@@ -1277,8 +1273,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
               this.bombas = bombasSaneadas.filter(b => b !== null) as string[];
               this.saveBombaState();
             }
-            const [pjT1, pjT2] = this.bombasT1T2();
-            this.syncBombasJugador(this.userId, pjT1, pjT2);
+            this.syncBombasJugador(this.userId, this.bombas);
 
             if (updated.objetivo) {
               this.miObjetivo = updated.objetivo as ObjetivoSecreto;
@@ -1296,9 +1291,6 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
               this.addNotif({ tipo: 'conquista', icono: '🏳', linea1: `${nombre} se rindió`, linea2: 'abandonó la partida', color: '#94a3b8', ts: Date.now() });
             }
             void this.verificarVictoriaPorRendicion();
-          }
-          if (updated.bomba_territorio !== prev.bomba_territorio && updated.usuario_id !== this.userId) {
-            this.cdr.markForCheck();
           }
           this.rebuildJugadores();
           this.cdr.markForCheck();
@@ -1368,8 +1360,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         if (jugadores) {
           this.jugadores = jugadores;
           // Re-aplicar posición de bomba propia (el broadcast es efímero; puede haberse perdido)
-          const [rcT1, rcT2] = this.bombasT1T2();
-          this.syncBombasJugador(this.userId, rcT1, rcT2);
+          this.syncBombasJugador(this.userId, this.bombas);
           this.rebuildJugadores();
         }
         if (territorios) {
@@ -1582,9 +1573,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       }
       this.cdr.markForCheck();
     } else {
-      // Guardia defensiva: detecta estado incoherente (base pero con continentes pendientes)
+      // Guardia defensiva: detecta estado incoherente (base pero con continentes sin completar)
       // y lo corrige antes de permitir colocar. Cubre edge cases de reconexión o undo fallido.
-      if (this.continentesColocacion.length > 0) {
+      if (this.continentesColocacion.some(c => c.colocadas < c.bonus)) {
         this.iniciarSubFaseColocacion();
         return;
       }
@@ -1628,7 +1619,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   async confirmarColocacion() {
-    if (this.confirmandoColocacion) return;
+    if (this.confirmandoColocacion || this.canjeandoCartas) return;
     if (this.subFaseColocacion !== 'base' || this.misTropasParaColocar !== 0 || !this.partida) return;
     if (this.bombas.some(b => b === null)) {
       this.showGameNotif('Debés colocar todas las Bombas Atómicas antes de continuar', 'warn');
@@ -1698,9 +1689,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       }
 
       // Garantizar que la posición de bomba esté persistida antes de avanzar de fase.
-      const [cbT1, cbT2] = this.bombasT1T2();
-      if (cbT1 || cbT2) {
-        await this.service.setBombaTerritorios(this.partidaId, this.userId, cbT1, cbT2);
+      if (this.bombas.some(b => b !== null)) {
+        await this.service.setBombaTerritorios(this.partidaId, this.userId, this.bombas);
       }
 
       await this.service.setTropasPorColocar(this.partidaId, this.userId, 0);
@@ -1777,9 +1767,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.rebuildTropasMap();
 
     // Garantizar posición de bomba persistida.
-    const [cbT1, cbT2] = this.bombasT1T2();
-    if (cbT1 || cbT2) {
-      await this.service.setBombaTerritorios(this.partidaId, this.userId, cbT1, cbT2);
+    if (this.bombas.some(b => b !== null)) {
+      await this.service.setBombaTerritorios(this.partidaId, this.userId, this.bombas);
     }
 
     this._aprobacionesCobro.add(this.userId);
@@ -1952,38 +1941,31 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       this.conquistoEnEsteTurno = true;
       this.ultimoTerritorioConquistadoId = destinoId;
 
-      // Transferir bomba si el territorio conquistado la tenía
-      const jugadorConBomba = this.jugadores.find(
+      // Transferir bombas si el territorio conquistado las tenía (puede haber N de distintos jugadores)
+      const jugadoresConBomba = this.jugadores.filter(
         j => j.usuario_id !== this.userId &&
-             (j.bomba_territorio === destinoId || j.bomba_territorio_2 === destinoId)
+             (j.bomba_territorios ?? []).includes(destinoId)
       );
-      if (jugadorConBomba) {
-        // El defensor pierde esa bomba específica
-        const nuevaT1 = jugadorConBomba.bomba_territorio === destinoId ? null : (jugadorConBomba.bomba_territorio ?? null);
-        const nuevaT2 = jugadorConBomba.bomba_territorio_2 === destinoId ? null : (jugadorConBomba.bomba_territorio_2 ?? null);
-        this.syncBombasJugador(jugadorConBomba.usuario_id, nuevaT1, nuevaT2);
-        // Broadcast primero: el defensor y los demás eliminan el ícono inmediatamente
+      for (const jugadorConBomba of jugadoresConBomba) {
+        const bombasCapturadas = (jugadorConBomba.bomba_territorios ?? []).filter(t => t === destinoId);
+        const nuevasBombasDefensor = (jugadorConBomba.bomba_territorios ?? []).filter(t => t !== destinoId);
+        this.syncBombasJugador(jugadorConBomba.usuario_id, nuevasBombasDefensor);
         this.channelEventos?.send({ type: 'broadcast', event: 'bomba_capturada',
-          payload: { jugadorId: jugadorConBomba.usuario_id, bomba1: nuevaT1, bomba2: nuevaT2 } });
-        // Await garantiza que el DB write se ejecuta
-        await this.service.setBombaTerritorios(this.partidaId, jugadorConBomba.usuario_id, nuevaT1, nuevaT2);
+          payload: { jugadorId: jugadorConBomba.usuario_id, bombas: nuevasBombasDefensor } });
+        await this.service.setBombaTerritorios(this.partidaId, jugadorConBomba.usuario_id, nuevasBombasDefensor);
 
-        if (this.bombas.length < 2) {
-          // El atacante captura la bomba (queda colocada en el territorio conquistado)
-          this.bombas = [...this.bombas, destinoId];
-          this.saveBombaState();
-          this.syncBombasJugador(this.userId, this.bombas[0] ?? null, this.bombas[1] ?? null);
-          await this.service.setBombaTerritorios(this.partidaId, this.userId, this.bombas[0] ?? null, this.bombas[1] ?? null);
-          this.channelEventos?.send({ type: 'broadcast', event: 'bomba_posicion',
-            payload: { jugadorId: this.userId, bomba1: this.bombas[0] ?? null, bomba2: this.bombas[1] ?? null } });
-          this.playSfx('assets/KuboTeg/sonidos/alerta-bomba.mp3');
-          this.addNotif({ tipo: 'conquista', icono: '☢', linea1: '¡Bomba Atómica capturada!',
-            linea2: `La bomba de ${defensorNombre} es tuya`, color: '#fbbf24', ts: Date.now() });
-        } else {
-          // Ya tiene 2 bombas → la capturada se destruye
-          this.addNotif({ tipo: 'conquista', icono: '☢', linea1: 'Bomba enemiga destruida',
-            linea2: 'Ya tenés 2 bombas activas', color: '#94a3b8', ts: Date.now() });
-        }
+        // El atacante captura TODAS las bombas del territorio (una entrada por cada una)
+        this.bombas = [...this.bombas, ...bombasCapturadas.map(() => destinoId)];
+        this.saveBombaState();
+        this.syncBombasJugador(this.userId, this.bombas);
+        await this.service.setBombaTerritorios(this.partidaId, this.userId, this.bombas);
+        this.channelEventos?.send({ type: 'broadcast', event: 'bomba_posicion',
+          payload: { jugadorId: this.userId, bombas: this.bombas } });
+        this.playSfx('assets/KuboTeg/sonidos/alerta-bomba.mp3');
+        const n = bombasCapturadas.length;
+        this.addNotif({ tipo: 'conquista', icono: '☢',
+          linea1: n > 1 ? `¡${n} Bombas Atómicas capturadas!` : '¡Bomba Atómica capturada!',
+          linea2: `Las bombas de ${defensorNombre} son tuyas`, color: '#fbbf24', ts: Date.now() });
       }
 
       const defensorQuedan = defensorId
@@ -2232,7 +2214,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.misCartas = nuevasCartas;
     this.cartasRobadasTotal++;
     localStorage.setItem(`teg_cartas_total_${this.partidaId}_${this.userId}`, String(this.cartasRobadasTotal));
-    if (this.cartasRobadasTotal === this.cartasParaBomba && this.bombas.length < 2 && this.jugandoConBomba) {
+    if (this.cartasRobadasTotal === this.cartasParaBomba && this.jugandoConBomba) {
       this.bombas = [...this.bombas, null];
       this.saveBombaState();
       this.cartasRobadasTotal = 0;
@@ -2271,13 +2253,23 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     if (this.misCartas.length < 3 || this.canjeandoCartas) return;
     this.canjeandoCartas = true;
     const nuevasCartas = this.misCartas.slice(3);
-    const miJ = this.jugadores.find(j => j.usuario_id === this.userId);
-    const tropasActuales = miJ?.tropas_por_colocar ?? 0;
+    const myIdx = this.jugadores.findIndex(j => j.usuario_id === this.userId);
+    const tropasActuales = this.jugadores[myIdx]?.tropas_por_colocar ?? 0;
+    const nuevasTropas = tropasActuales + 3;
     await Promise.all([
       this.service.setCartas(this.partidaId, this.userId, nuevasCartas),
-      this.service.setTropasPorColocar(this.partidaId, this.userId, tropasActuales + 3),
+      this.service.setTropasPorColocar(this.partidaId, this.userId, nuevasTropas),
     ]);
     this.misCartas = nuevasCartas;
+    // Actualizar estado local antes del Realtime para que misTropasParaColocar
+    // refleje inmediatamente las tropas extra y no permita confirmar sin colocarlas.
+    if (myIdx !== -1) {
+      this.jugadores = [
+        ...this.jugadores.slice(0, myIdx),
+        { ...this.jugadores[myIdx], tropas_por_colocar: nuevasTropas },
+        ...this.jugadores.slice(myIdx + 1),
+      ];
+    }
     this.canjeandoCartas = false;
     this.cdr.markForCheck();
   }
@@ -3783,18 +3775,14 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
 
   // ── Bomba Atómica ─────────────────────────────────────
 
-  private syncBombasJugador(userId: string, t1: string | null, t2: string | null) {
+  private syncBombasJugador(userId: string, territorios: (string | null)[]) {
     const idx = this.jugadores.findIndex(j => j.usuario_id === userId);
     if (idx === -1) return;
     this.jugadores = [
       ...this.jugadores.slice(0, idx),
-      { ...this.jugadores[idx], bomba_territorio: t1, bomba_territorio_2: t2 },
+      { ...this.jugadores[idx], bomba_territorios: territorios },
       ...this.jugadores.slice(idx + 1),
     ];
-  }
-
-  private bombasT1T2(): [string | null, string | null] {
-    return [this.bombas[0] ?? null, this.bombas[1] ?? null];
   }
 
   saveBombaState() {
@@ -3809,7 +3797,7 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   get bombaPct(): number {
-    return this.tieneBomba ? 100 : Math.min(Math.round(this.cartasRobadasTotal / this.cartasParaBomba * 100), 100);
+    return Math.min(Math.round(this.cartasRobadasTotal / this.cartasParaBomba * 100), 100);
   }
 
   get territoriosDestruidosArray(): string[] {
@@ -3822,9 +3810,27 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
   }
 
   get bombasEnMapa(): string[] {
-    return this.jugadores.flatMap(j =>
-      [j.bomba_territorio, j.bomba_territorio_2].filter(Boolean) as string[]
-    );
+    const propias = this.bombas.filter(Boolean) as string[];
+    const ajenas  = this.jugadores
+      .filter(j => j.usuario_id !== this.userId)
+      .flatMap(j => (j.bomba_territorios ?? []).filter(Boolean) as string[]);
+    return [...propias, ...ajenas];
+  }
+
+  get bombasEnMapaCount(): Record<string, number> {
+    const count: Record<string, number> = {};
+    // Jugador propio: this.bombas es la fuente de verdad (localStorage), evita stale de Realtime DB
+    for (const t of this.bombas) {
+      if (t) count[t] = (count[t] ?? 0) + 1;
+    }
+    // Otros jugadores: desde jugadores[]
+    for (const j of this.jugadores) {
+      if (j.usuario_id === this.userId) continue;
+      for (const t of (j.bomba_territorios ?? [])) {
+        if (t) count[t] = (count[t] ?? 0) + 1;
+      }
+    }
+    return count;
   }
 
   get bombaAlcanceEnemigos(): string[] {
@@ -3869,10 +3875,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.bombaColocandoIdx = idx;
     this.modoColocandoBomba = true;
     this.saveBombaState();
-    const [t1, t2] = this.bombasT1T2();
-    this.syncBombasJugador(this.userId, t1, t2);
-    void this.service.setBombaTerritorios(this.partidaId, this.userId, t1, t2);
-    this.channelEventos?.send({ type: 'broadcast', event: 'bomba_posicion', payload: { jugadorId: this.userId, bomba1: t1, bomba2: t2 } });
+    this.syncBombasJugador(this.userId, this.bombas);
+    void this.service.setBombaTerritorios(this.partidaId, this.userId, this.bombas);
+    this.channelEventos?.send({ type: 'broadcast', event: 'bomba_posicion', payload: { jugadorId: this.userId, bombas: this.bombas } });
     this.cdr.markForCheck();
   }
 
@@ -3886,9 +3891,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
         this.bombas = this.bombas.filter((_, i) => i !== idx);
         this.bombasMovidasEnRonda = this.bombasMovidasEnRonda.filter((_, i) => i !== idx);
         this.saveBombaState();
-        const [t1, t2] = this.bombasT1T2();
-        this.syncBombasJugador(this.userId, t1, t2);
-        this.service.setBombaTerritorios(this.partidaId, this.userId, t1, t2).then();
+        this.syncBombasJugador(this.userId, this.bombas);
+        this.service.setBombaTerritorios(this.partidaId, this.userId, this.bombas).then();
         this.showGameNotif('El territorio con tu bomba fue conquistado. La bomba fue capturada.', 'warn');
         this.cdr.markForCheck();
         return;
@@ -3923,10 +3927,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.bombas = nuevas;
     this.modoColocandoBomba = false;
     this.saveBombaState();
-    const [t1, t2] = this.bombasT1T2();
-    this.syncBombasJugador(this.userId, t1, t2);
-    void this.service.setBombaTerritorios(this.partidaId, this.userId, t1, t2);
-    this.channelEventos?.send({ type: 'broadcast', event: 'bomba_posicion', payload: { jugadorId: this.userId, bomba1: t1, bomba2: t2 } });
+    this.syncBombasJugador(this.userId, this.bombas);
+    void this.service.setBombaTerritorios(this.partidaId, this.userId, this.bombas);
+    this.channelEventos?.send({ type: 'broadcast', event: 'bomba_posicion', payload: { jugadorId: this.userId, bombas: this.bombas } });
     this.playSfx('assets/KuboTeg/sonidos/alerta-bomba.mp3');
     this.showGameNotif(`Bomba ${this.bombaColocandoIdx + 1} colocada en ${this.nombreTerritorio(territorioId)}`, 'ok');
     this.cdr.markForCheck();
@@ -3947,10 +3950,9 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       this.bombas = this.bombas.filter((_, i) => i !== this.bombaUsandoIdx);
       this.bombasMovidasEnRonda = this.bombasMovidasEnRonda.filter((_, i) => i !== this.bombaUsandoIdx);
       this.saveBombaState();
-      const [t1, t2] = this.bombasT1T2();
-      this.syncBombasJugador(this.userId, t1, t2);
+      this.syncBombasJugador(this.userId, this.bombas);
       // .then() dispara el fetch (void no lo haría en Supabase PromiseLike)
-      this.service.setBombaTerritorios(this.partidaId, this.userId, t1, t2).then();
+      this.service.setBombaTerritorios(this.partidaId, this.userId, this.bombas).then();
       this.showGameNotif('El territorio con tu bomba fue conquistado. La bomba fue capturada.', 'warn');
       this.cdr.markForCheck();
       return;
@@ -3973,15 +3975,14 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     this.bombas = this.bombas.filter((_, i) => i !== this.bombaUsandoIdx);
     this.bombaUsandoIdx = 0;
     this.saveBombaState();
-    const [t1, t2] = this.bombasT1T2();
-    this.syncBombasJugador(this.userId, t1, t2);
+    this.syncBombasJugador(this.userId, this.bombas);
     // Broadcast primero: actualización inmediata del ícono para todos los jugadores
     this.channelEventos?.send({
       type: 'broadcast', event: 'bomba_atomica',
-      payload: { territorioId, jugadorId: this.userId, victimaId, bomba1: t1, bomba2: t2 },
+      payload: { territorioId, jugadorId: this.userId, victimaId, bombas: this.bombas },
     });
     // Await garantiza que el DB write se ejecuta (void no dispara el fetch en Supabase PromiseLike)
-    await this.service.setBombaTerritorios(this.partidaId, this.userId, t1, t2);
+    await this.service.setBombaTerritorios(this.partidaId, this.userId, this.bombas);
     this.marcarDestruido(territorioId);
     void this.aplicarPostura(victimaId, 'hostil');
     this.playSfx('assets/KuboTeg/sonidos/bomba-nuclear.mp3');

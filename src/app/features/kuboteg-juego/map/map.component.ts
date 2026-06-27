@@ -42,6 +42,10 @@ export class MapComponent implements OnInit, AfterViewInit {
     this._bombaColocadaSet = new Set(val);
   }
 
+  @Input() set territoriosBombaCount(val: Record<string, number>) {
+    this._bombaCountMap = val;
+  }
+
   @Input() set territoriosBombaAlcance(val: string[]) {
     this._bombaAlcanceSet = new Set(val);
   }
@@ -82,6 +86,7 @@ export class MapComponent implements OnInit, AfterViewInit {
   private _pactoRotosSet   = new Set<string>();
   private _bombaColocadaSet = new Set<string>();
   private _bombaAlcanceSet  = new Set<string>();
+  private _bombaCountMap: Record<string, number> = {};
   private _destruidosSet    = new Set<string>();
   _misilTerrId: string | null = null;
   _misilTerr:   Territory | null = null;
@@ -188,6 +193,10 @@ export class MapComponent implements OnInit, AfterViewInit {
 
   isBomba(t: Territory): boolean {
     return this._bombaColocadaSet.has(t.id);
+  }
+
+  bombaCount(t: Territory): number {
+    return this._bombaCountMap[t.id] ?? 0;
   }
 
   isBombaAlcance(t: Territory): boolean {

@@ -1,0 +1,325 @@
+<div class="metricas-wrap">
+
+  <!-- SIDEBAR -->
+  <aside class="sb">
+    <div class="sb-logo-area">
+      <img src="assets/categorias/favicon-kubometricas.svg" class="sb-logoimg" alt="KuboMétricas">
+      <span class="sb-brand" style="color:#1428b8">Métricas</span>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-section-lbl">Análisis</div>
+      <button class="ni active" data-view="overview"    onclick="navigate('overview')"><i class="nic fa-solid fa-gauge-high"></i> Resumen general</button>
+      <button class="ni" data-view="ventas"       onclick="navigate('ventas')"><i class="nic fa-solid fa-chart-line"></i> Ventas e ingresos</button>
+      <button class="ni" data-view="clientes"     onclick="navigate('clientes')"><i class="nic fa-solid fa-users"></i> Clientes</button>
+      <button class="ni" data-view="productos"    onclick="navigate('productos')"><i class="nic fa-solid fa-box"></i> Productos</button>
+      <button class="ni" data-view="operaciones"  onclick="navigate('operaciones')"><i class="nic fa-solid fa-gears"></i> Operaciones</button>
+      <div class="sb-section-lbl">Inteligencia</div>
+      <button class="ni" data-view="alertas"  onclick="navigate('alertas')"><i class="nic fa-solid fa-bell"></i> Alertas <span class="nb" id="nb-al">0</span></button>
+      <button class="ni" data-view="reportes" onclick="navigate('reportes')"><i class="nic fa-solid fa-file-chart-column"></i> Reportes</button>
+      <button class="ni" data-view="ia"       onclick="navigate('ia')"><i class="nic fa-solid fa-microchip"></i> Análisis IA</button>
+      <div class="sb-section-lbl">Sistema</div>
+      <button class="ni" data-view="config"   onclick="navigate('config')"><i class="nic fa-solid fa-gear"></i> Configuración</button>
+    </nav>
+    <div class="sb-foot">
+      <button class="ni-back" onclick="window.__metricasGoBack && window.__metricasGoBack()">
+        <i class="fa-solid fa-arrow-left"></i> KuboSoft
+      </button>
+      <div class="upill">
+        <div class="uav">PM</div>
+        <div><div class="uname">Pedro Methol</div><div class="urole">Administrador</div></div>
+        <i class="fa-solid fa-ellipsis-vertical" style="color:var(--ink4);font-size:11px;margin-left:auto;"></i>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <header class="topbar">
+      <div class="tb-title" id="tb-title">Resumen general</div>
+
+      <button class="ibt"><i class="fa-solid fa-bell"></i><div class="ndot"></div></button>
+      <button class="btn btn-g btn-sm" onclick="exportar()"><i class="fa-solid fa-download"></i> Exportar</button>
+      <button class="btn btn-p btn-sm" onclick="openM('tx')"><i class="fa-solid fa-plus"></i> Nueva venta</button>
+    </header>
+
+    <div class="content">
+
+      <!-- OVERVIEW -->
+      <div class="view active" id="view-overview">
+        <div class="kpi-strip" id="ov-kpis"></div>
+        <div class="g2" style="margin-bottom:18px;">
+          <div class="panel">
+            <div class="ph">
+              <div class="ptitle">Actividad reciente</div>
+              <button class="btn btn-p btn-sm" onclick="openM('tx')"><i class="fa-solid fa-plus"></i> Nueva venta</button>
+            </div>
+            <div id="ov-activity"></div>
+          </div>
+          <div class="panel">
+            <div class="ph">
+              <div class="ptitle">Metas del período</div>
+              <button class="pa" onclick="openM('meta')"><i class="fa-solid fa-plus"></i> Agregar</button>
+            </div>
+            <div id="goals-list"></div>
+          </div>
+        </div>
+        <div class="g3">
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Canales de venta</div></div>
+            <div id="ov-canales" class="pbody"></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Top productos</div><button class="pa" onclick="navigate('productos')">Ver todos →</button></div>
+            <div id="ov-top-prods"></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Alertas activas</div><button class="pa" onclick="navigate('alertas')">Ver todas →</button></div>
+            <div id="ov-alertas"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VENTAS -->
+      <div class="view" id="view-ventas">
+        <div class="kpi-strip" id="vt-kpis"></div>
+        <div class="g2" style="margin-bottom:18px;">
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Ingresos por canal</div></div>
+            <div class="pbody" id="vt-canales"></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Estado de transacciones</div></div>
+            <div class="pbody" id="vt-estados"></div>
+          </div>
+        </div>
+        <div class="g2">
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Ticket promedio por producto</div></div>
+            <div id="vt-ticket-prod"></div>
+          </div>
+          <div class="panel">
+            <div class="ph">
+              <div class="ptitle">Transacciones <span id="tx-count-lbl" style="font-size:12px;font-weight:400;color:var(--ink3);"></span></div>
+              <button class="btn btn-p btn-sm" onclick="openM('tx')"><i class="fa-solid fa-plus"></i> Agregar</button>
+            </div>
+            <div style="max-height:280px;overflow-y:auto;">
+              <table class="tbl"><thead><tr><th>Cliente</th><th>Monto</th><th>Canal</th><th>Estado</th><th>Fecha</th><th></th></tr></thead><tbody id="tx-body"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CLIENTES -->
+      <div class="view" id="view-clientes">
+        <div class="kpi-strip" id="cl-kpis"></div>
+        <div class="gw2">
+          <div class="panel"><div class="ph"><div class="ptitle">Segmentación</div></div><div id="seg-donut"></div></div>
+          <div class="panel"><div class="ph"><div class="ptitle">Retención mensual</div><div class="psub" id="ret-sub"></div></div><div id="cl-ret-css" class="pbody"></div></div>
+        </div>
+        <div class="panel" style="margin-bottom:18px;">
+          <div class="ph">
+            <div class="ptitle">Clientes <span id="cl-count-lbl" style="font-size:12px;font-weight:400;color:var(--ink3);"></span></div>
+            <button class="btn btn-p btn-sm" onclick="openM('cliente')"><i class="fa-solid fa-plus"></i> Agregar</button>
+          </div>
+          <table class="tbl"><thead><tr><th>Cliente</th><th>Segmento</th><th>LTV</th><th>Último contacto</th><th>Estado</th><th>Riesgo churn</th><th></th></tr></thead><tbody id="cl-body"></tbody></table>
+        </div>
+      </div>
+
+      <!-- PRODUCTOS -->
+      <div class="view" id="view-productos">
+        <div class="kpi-strip" id="pr-kpis"></div>
+        <div class="g2" style="margin-bottom:18px;">
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Ingresos por producto</div><div class="psub" id="pr-rev-sub"></div></div>
+            <div id="pr-rev-bars"></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Margen por producto</div></div>
+            <div id="margin-list"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ph">
+            <div class="ptitle">Catálogo <span id="pr-count-lbl" style="font-size:12px;font-weight:400;color:var(--ink3);"></span></div>
+            <button class="btn btn-p btn-sm" onclick="openM('producto')"><i class="fa-solid fa-plus"></i> Agregar</button>
+          </div>
+          <table class="tbl"><thead><tr><th>Producto</th><th>Cat.</th><th>Precio</th><th>Vendidos</th><th>Ingresos</th><th>Margen</th><th></th></tr></thead><tbody id="pr-body"></tbody></table>
+        </div>
+      </div>
+
+      <!-- OPERACIONES -->
+      <div class="view" id="view-operaciones">
+        <div class="kpi-strip" id="op-kpis"></div>
+        <div class="g2" style="margin-bottom:18px;">
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Tiempo de respuesta por hora</div><div class="psub">Últimas 8 horas · promedio simulado</div></div>
+            <div id="op-resp-bars" class="pbody"></div>
+          </div>
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Uptime del sistema</div></div>
+            <div id="op-uptime" class="pbody"></div>
+          </div>
+        </div>
+        <div class="g2">
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Tickets de soporte</div><button class="btn btn-p btn-sm" onclick="openM('ticket')"><i class="fa-solid fa-plus"></i> Nuevo</button></div>
+            <div id="tickets-list"></div>
+          </div>
+          <div class="panel"><div class="ph"><div class="ptitle">Capacidad por equipo</div></div><div id="capacity-list"></div></div>
+        </div>
+      </div>
+
+      <!-- ALERTAS -->
+      <div class="view" id="view-alertas">
+        <div class="tbar">
+          <button class="tab active" data-atab="activas">Activas <span class="badge br" id="tab-ac" style="margin-left:4px;"></span></button>
+          <button class="tab" data-atab="resueltas">Resueltas</button>
+          <button class="tab" data-atab="todas">Todas las reglas</button>
+        </div>
+        <div class="panel">
+          <div class="ph"><div class="ptitle" id="al-panel-title">Alertas activas</div><button class="btn btn-p btn-sm" onclick="openM('alerta')"><i class="fa-solid fa-plus"></i> Nueva regla</button></div>
+          <div id="al-body"></div>
+        </div>
+      </div>
+
+      <!-- REPORTES -->
+      <div class="view" id="view-reportes">
+        <div class="fbar">
+          <select class="fsel" id="rep-type"><option>Resumen ejecutivo</option><option>Ventas detalladas</option><option>Clientes</option><option>Operaciones</option></select>
+          <button class="btn btn-p" onclick="genReport()"><i class="fa-solid fa-wand-magic-sparkles"></i> Generar</button>
+          <button class="btn btn-g" onclick="showToast('Descargando PDF...','s')"><i class="fa-solid fa-download"></i> Descargar</button>
+        </div>
+        <div id="rep-out"></div>
+      </div>
+
+      <!-- IA -->
+      <div class="view" id="view-ia">
+        <div class="hero" style="margin-bottom:18px;">
+          <div class="hero-icon"><i class="fa-solid fa-robot"></i></div>
+          <div class="hero-text">
+            <h3>Asistente IA</h3>
+            <p>Consultá tus datos en lenguaje natural. Las respuestas se generan con tu información real del sistema.</p>
+          </div>
+        </div>
+        <div class="panel" style="margin-bottom:18px;">
+          <div class="ph"><div class="ptitle">Consulta</div></div>
+          <div class="pbody">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+              <button class="btn btn-g btn-sm" onclick="setQ('¿Qué clientes tienen mayor riesgo de abandono?')">Riesgo churn</button>
+              <button class="btn btn-g btn-sm" onclick="setQ('¿Cuál es mi producto más rentable?')">Mejor producto</button>
+              <button class="btn btn-g btn-sm" onclick="setQ('¿Cómo están mis ingresos este mes?')">Estado ingresos</button>
+              <button class="btn btn-g btn-sm" onclick="setQ('¿Qué alertas tengo activas?')">Ver alertas</button>
+            </div>
+            <div id="ia-chat" style="min-height:60px;margin-bottom:12px;max-height:320px;overflow-y:auto;"></div>
+            <div style="display:flex;gap:10px;">
+              <input class="fi" id="ia-q" placeholder="Preguntá sobre tus datos..." style="flex:1;">
+              <button class="btn btn-p" onclick="runIA()"><i class="fa-solid fa-paper-plane"></i> Consultar</button>
+            </div>
+          </div>
+        </div>
+        <div class="g2">
+          <div class="panel"><div class="ph"><div class="ptitle">Predicciones</div><div class="psub">Basadas en datos reales</div></div><div id="pred-list"></div></div>
+          <div class="panel"><div class="ph"><div class="ptitle">Anomalías detectadas</div></div><div id="anom-list"></div></div>
+        </div>
+      </div>
+
+      <!-- CONFIG -->
+      <div class="view" id="view-config">
+        <div class="g2" style="align-items:start;">
+          <div class="panel" style="overflow:visible;"><div class="ph"><div class="ptitle">Secciones</div></div><div style="padding:8px;" id="cfg-menu"></div></div>
+          <div id="cfg-content"></div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </main>
+
+  <!-- MODAL VENTA/TX -->
+  <div class="moverlay" id="modal-tx" onclick="closeOvl(event,'tx')">
+    <div class="modal">
+      <div class="mh"><div class="mtitle" id="tx-modal-title">Nueva venta</div><button class="mclose" onclick="closeM('tx')"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="mbody"><div class="fgrid">
+        <div class="fg ffull"><label class="fl">Cliente</label><select class="fi" id="tx-cli"></select></div>
+        <div class="fg"><label class="fl">Monto ($)</label><input class="fi" id="tx-monto" type="number" placeholder="ej. 15000"></div>
+        <div class="fg"><label class="fl">Canal</label><select class="fi" id="tx-canal"><option>Digital</option><option>Presencial</option><option>Partner</option></select></div>
+        <div class="fg"><label class="fl">Producto</label><select class="fi" id="tx-prod"></select></div>
+        <div class="fg"><label class="fl">Estado</label><select class="fi" id="tx-est"><option>Pagado</option><option>Pendiente</option></select></div>
+        <div class="fg"><label class="fl">Fecha</label><input class="fi" id="tx-fecha" type="date"></div>
+      </div></div>
+      <div class="mfoot"><button class="btn btn-g" onclick="closeM('tx')">Cancelar</button><button class="btn btn-p" onclick="saveTx()"><i class="fa-solid fa-check"></i> Registrar venta</button></div>
+    </div>
+  </div>
+
+  <!-- MODAL CLIENTE -->
+  <div class="moverlay" id="modal-cliente" onclick="closeOvl(event,'cliente')">
+    <div class="modal">
+      <div class="mh"><div class="mtitle" id="cl-modal-title">Nuevo cliente</div><button class="mclose" onclick="closeM('cliente')"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="mbody"><div class="fgrid">
+        <div class="fg ffull"><label class="fl">Nombre</label><input class="fi" id="cl-nombre" placeholder="ej. TechCorp SA"></div>
+        <div class="fg"><label class="fl">Segmento</label><select class="fi" id="cl-seg"><option>Enterprise</option><option>Mid-market</option><option>SMB</option></select></div>
+        <div class="fg"><label class="fl">Estado</label><select class="fi" id="cl-est"><option>Activo</option><option>En riesgo</option><option>Inactivo</option></select></div>
+        <div class="fg"><label class="fl">LTV inicial ($)</label><input class="fi" id="cl-ltv" type="number" placeholder="ej. 50000"></div>
+        <div class="fg"><label class="fl">Riesgo churn (%)</label><input class="fi" id="cl-churn" type="number" placeholder="ej. 20" min="0" max="100"></div>
+      </div></div>
+      <div class="mfoot"><button class="btn btn-g" onclick="closeM('cliente')">Cancelar</button><button class="btn btn-p" onclick="saveCl()"><i class="fa-solid fa-check"></i> Agregar cliente</button></div>
+    </div>
+  </div>
+
+  <!-- MODAL PRODUCTO -->
+  <div class="moverlay" id="modal-producto" onclick="closeOvl(event,'producto')">
+    <div class="modal">
+      <div class="mh"><div class="mtitle" id="pr-modal-title">Nuevo producto</div><button class="mclose" onclick="closeM('producto')"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="mbody"><div class="fgrid">
+        <div class="fg ffull"><label class="fl">Nombre</label><input class="fi" id="pr-nombre" placeholder="ej. KuboPlan Pro"></div>
+        <div class="fg"><label class="fl">Categoría</label><select class="fi" id="pr-cat"><option>SaaS</option><option>Servicio</option><option>One-time</option></select></div>
+        <div class="fg"><label class="fl">Precio ($)</label><input class="fi" id="pr-precio" type="number" placeholder="ej. 299"></div>
+        <div class="fg"><label class="fl">Margen (%)</label><input class="fi" id="pr-margen" type="number" placeholder="ej. 75" min="0" max="100"></div>
+      </div></div>
+      <div class="mfoot"><button class="btn btn-g" onclick="closeM('producto')">Cancelar</button><button class="btn btn-p" onclick="savePr()"><i class="fa-solid fa-check"></i> Agregar</button></div>
+    </div>
+  </div>
+
+  <!-- MODAL ALERTA -->
+  <div class="moverlay" id="modal-alerta" onclick="closeOvl(event,'alerta')">
+    <div class="modal">
+      <div class="mh"><div class="mtitle">Nueva regla de alerta</div><button class="mclose" onclick="closeM('alerta')"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="mbody">
+        <div class="fg"><label class="fl">Métrica</label><select class="fi" id="al-m"><option>Ingresos totales</option><option>Ticket promedio</option><option>Clientes en riesgo</option><option>Churn rate</option><option>Tickets abiertos</option></select></div>
+        <div class="fg"><label class="fl">Condición</label><select class="fi" id="al-c"><option>Menor a</option><option>Mayor a</option></select></div>
+        <div class="fg"><label class="fl">Umbral</label><input class="fi" id="al-v" type="number" placeholder="ej. 10000"></div>
+        <div class="fg"><label class="fl">Canal</label><select class="fi" id="al-ch"><option>Dashboard</option><option>Email</option><option>Email + Dashboard</option></select></div>
+      </div>
+      <div class="mfoot"><button class="btn btn-g" onclick="closeM('alerta')">Cancelar</button><button class="btn btn-p" onclick="saveAl()"><i class="fa-solid fa-check"></i> Crear regla</button></div>
+    </div>
+  </div>
+
+  <!-- MODAL META -->
+  <div class="moverlay" id="modal-meta" onclick="closeOvl(event,'meta')">
+    <div class="modal">
+      <div class="mh"><div class="mtitle">Nueva meta</div><button class="mclose" onclick="closeM('meta')"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="mbody">
+        <div class="fg"><label class="fl">Descripción</label><input class="fi" id="me-d" placeholder="ej. Superar $700k en ventas"></div>
+        <div class="fg"><label class="fl">Métrica vinculada</label><select class="fi" id="me-link"><option value="ingresos">Ingresos totales</option><option value="clientes">Total clientes</option><option value="ticket">Ticket promedio</option><option value="churn">Churn rate (%)</option></select></div>
+        <div class="fg"><label class="fl">Objetivo</label><input class="fi" id="me-g" type="number" placeholder="ej. 700000"></div>
+        <div class="fg"><label class="fl">Color</label><select class="fi" id="me-col"><option value="b">Azul</option><option value="g">Verde</option><option value="a">Ámbar</option><option value="r">Rojo</option></select></div>
+      </div>
+      <div class="mfoot"><button class="btn btn-g" onclick="closeM('meta')">Cancelar</button><button class="btn btn-p" onclick="saveMeta()"><i class="fa-solid fa-check"></i> Guardar</button></div>
+    </div>
+  </div>
+
+  <!-- MODAL TICKET -->
+  <div class="moverlay" id="modal-ticket" onclick="closeOvl(event,'ticket')">
+    <div class="modal">
+      <div class="mh"><div class="mtitle">Nuevo ticket de soporte</div><button class="mclose" onclick="closeM('ticket')"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="mbody">
+        <div class="fg"><label class="fl">Título</label><input class="fi" id="tk-t" placeholder="ej. Error al exportar PDF"></div>
+        <div class="fg"><label class="fl">Prioridad</label><select class="fi" id="tk-p"><option>Baja</option><option>Media</option><option>Alta</option><option>Crítica</option></select></div>
+        <div class="fg"><label class="fl">Estado</label><select class="fi" id="tk-e"><option>Abierto</option><option>En curso</option></select></div>
+      </div>
+      <div class="mfoot"><button class="btn btn-g" onclick="closeM('ticket')">Cancelar</button><button class="btn btn-p" onclick="saveTk()"><i class="fa-solid fa-check"></i> Crear</button></div>
+    </div>
+  </div>
+
+  <div class="tcon" id="tcon"></div>
+
+</div><!-- /metricas-wrap -->

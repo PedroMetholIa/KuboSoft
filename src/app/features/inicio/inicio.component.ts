@@ -207,17 +207,26 @@ export class InicioComponent implements OnInit {
 
   private readonly categoryOrder: Record<string, number> = {
     'KuboGestión':  0,
-    'KuboReservas': 1,
-    'KuboRRHH':     2,
-    'KuboStock':    3,
-    'KuboMétricas': 4,
-    'KuboJuegos':   5,
+    'KuboMétricas': 1,
+    'KuboTareas':   2,
+    'KuboRRHH':     3,
+    'KuboStock':    4,
+    'KuboReservas': 5,
+    'KuboJuegos':   6,
   };
 
   async loadCategorias() {
     const { data, error } = await this.supabase.getCategorias();
     if (error) this.toast.show('Error al cargar los productos.', 'error');
-    const cats = (data as Categoria[]) ?? [];
+    let cats = (data as Categoria[]) ?? [];
+    if (!cats.find(c => c.nombre === 'KuboTareas')) {
+      cats = [...cats, {
+        id: 'static-tareas',
+        nombre: 'KuboTareas',
+        descripcion: 'Gestión de tareas y proyectos colaborativos para tu equipo.',
+        logo: 'assets/categorias/favicon-kubotareas.svg',
+      }];
+    }
     this.categorias = cats.sort((a, b) =>
       (this.categoryOrder[a.nombre] ?? 99) - (this.categoryOrder[b.nombre] ?? 99)
     );
@@ -225,8 +234,9 @@ export class InicioComponent implements OnInit {
   }
 
   private readonly routeMap: Record<string, string> = {
-    'KuboJuegos': '/kubojuegos',
-    'KuboRRHH':   '/kubo-rrhh',
+    'KuboJuegos':   '/kubojuegos',
+    'KuboRRHH':     '/kubo-rrhh',
+    'KuboMétricas': '/kubo-metricas',
   };
 
   hasRoute(nombre: string): boolean { return nombre in this.routeMap; }
@@ -240,10 +250,11 @@ export class InicioComponent implements OnInit {
     'KuboGestión':    '#10C878',
     'KuboInventario': '#F5A623',
     'KuboJuegos':     '#FF4757',
-    'KuboMétricas':   '#1b35df',
+    'KuboMétricas':   '#1428b8',
     'KuboReservas':   '#E91E8C',
     'KuboRRHH':       '#00BCD4',
     'KuboStock':      'rgb(237, 172, 39)',
+    'KuboTareas':     '#784494',
   };
 
   getCategoryColor(nombre: string): string {

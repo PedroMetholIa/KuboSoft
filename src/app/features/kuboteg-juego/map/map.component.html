@@ -169,6 +169,17 @@
               <path fill="#fbbf24" d="M10 15.46A4 4 0 0 1 8 12L1 12A11 11 0 0 0 6.5 21.53Z"/>
               <circle cx="12" cy="12" r="2" fill="#fbbf24"/>
             </g>
+            @if (bombaCount(t) > 1) {
+              <text
+                [attr.x]="t.labelPosition.x + 19.5"
+                [attr.y]="t.labelPosition.y - 2"
+                font-size="4.5"
+                font-weight="700"
+                fill="#fbbf24"
+                text-anchor="middle"
+                dominant-baseline="middle"
+              >{{ bombaCount(t) }}</text>
+            }
           }
         }
       </g>

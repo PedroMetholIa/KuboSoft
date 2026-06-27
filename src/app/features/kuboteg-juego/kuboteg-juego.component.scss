@@ -112,20 +112,20 @@
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  background: linear-gradient(135deg, #dc2626, #b91c1c);
-  border: none;
-  color: #fff;
+  background: #3a0a0a;
+  border: 1px solid rgba(180, 60, 60, 0.25);
+  color: #b0b8c8;
   border-radius: 8px;
   padding: 0.65rem 1rem;
   font-size: 0.84rem;
   font-weight: 700;
   letter-spacing: 0.01em;
   cursor: pointer;
-  transition: opacity 0.15s, filter 0.15s;
+  transition: background 0.15s, border-color 0.15s;
   white-space: nowrap;
   flex-shrink: 0;
 
-  &:hover { filter: brightness(1.1); }
+  &:hover { background: #4d1111; border-color: rgba(180, 60, 60, 0.45); }
 
   &--panel {
     width: 100%;
@@ -871,6 +871,36 @@
     color: #fbbf24;
     text-shadow: 0 0 16px rgba(251,191,36,0.55);
   }
+}
+
+.nuclear-posesion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.9rem;
+  width: 100%;
+}
+
+.nuclear-posesion-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+}
+
+.nuclear-posesion-iconos {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.bomba-posesion-ico {
+  width: 30px;
+  height: 30px;
+  color: #fbbf24;
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.55));
 }
 
 .nuclear-lanzar-section {
@@ -2867,9 +2897,9 @@
 }
 
 .btn-rendicion-confirmar {
-  background: rgba(239,68,68,.12);
-  border: 1px solid rgba(239,68,68,.3);
-  color: #2e0d0d;
+  background: #3a0a0a;
+  border: 1px solid rgba(180, 60, 60, 0.25);
+  color: #b0b8c8;
   border-radius: 9px;
   padding: 0.6rem 1.4rem;
   font-size: 0.85rem;
@@ -2878,8 +2908,8 @@
   transition: background .15s, border-color .15s;
 
   &:hover {
-    background: rgba(239,68,68,.22);
-    border-color: rgba(239,68,68,.5);
+    background: #4d1111;
+    border-color: rgba(180, 60, 60, 0.45);
   }
 }
 

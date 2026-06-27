@@ -33,10 +33,6 @@ export class KuboJuegosComponent implements OnInit {
   categoriaNombre: string | null = null;
   categoriaLogo: string | null = null;
 
-  get emptySlots() {
-    return Array.from({ length: Math.max(0, 6 - this.juegos.length) });
-  }
-
   constructor(private supabase: SupabaseService, private router: Router, private toast: ToastService) {}
 
   ngOnInit() {
