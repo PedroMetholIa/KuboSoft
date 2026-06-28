@@ -134,6 +134,7 @@
 
   const ini = (e) => (e.nombre[0] + (e.apellido[0] || '')).toUpperCase();
   const avCls = (e) => e.av || AVC[(e.id - 1) % AVC.length];
+  const pbGrad = col => ({'var(--y400)':'linear-gradient(90deg,var(--y100),var(--y400))','var(--green)':'linear-gradient(90deg,#6EE7B7,var(--green))','var(--red)':'linear-gradient(90deg,#FCA5A5,var(--red))','var(--blue)':'linear-gradient(90deg,#93C5FD,var(--blue))','var(--purple)':'linear-gradient(90deg,#C4B5FD,var(--purple))'}[col] || col);
   const fmtDate = (d) => {
     if (!d) return '—';
     const dt = new Date(d + 'T12:00:00');
@@ -357,7 +358,7 @@
         <td>${e.cargo}</td><td>${fmtFull(e.ingreso)}</td>
         <td><div style="display:flex;align-items:center;gap:8px;">
           <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
-            <div style="height:100%;width:${pct}%;background:var(--y400);border-radius:3px;"></div>
+            <div style="height:100%;width:${pct}%;background:${pbGrad('var(--y400)')};border-radius:3px;"></div>
           </div><span style="font-size:12px;color:var(--ink3);min-width:30px;">${pct}%</span></div></td>
         <td><button class="btn btn-g btn-sm" onclick="completeOnb(${e.id})">Completar</button></td></tr>`;
     }).join('');
@@ -425,11 +426,11 @@
     if (sumEl) {
       sumEl.innerHTML = `<div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px;">
         <div><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:13px;color:var(--ink3);">Presentes</span><strong>${pres}</strong></div>
-          <div class="pbar"><div class="pbar-fill" style="width:${Math.round(pres/total*100)}%;background:var(--green);"></div></div></div>
+          <div class="pbar"><div class="pbar-fill" style="width:${Math.round(pres/total*100)}%;background:${pbGrad('var(--green)')};"></div></div></div>
         <div><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:13px;color:var(--ink3);">Ausentes</span><strong>${aus}</strong></div>
-          <div class="pbar"><div class="pbar-fill" style="width:${Math.round(aus/total*100)}%;background:var(--red);"></div></div></div>
+          <div class="pbar"><div class="pbar-fill" style="width:${Math.round(aus/total*100)}%;background:${pbGrad('var(--red)')};"></div></div></div>
         <div><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:13px;color:var(--ink3);">Licencias</span><strong>${licD}</strong></div>
-          <div class="pbar"><div class="pbar-fill" style="width:${Math.round(licD/total*100)}%;background:var(--y400);"></div></div></div>
+          <div class="pbar"><div class="pbar-fill" style="width:${Math.round(licD/total*100)}%;background:${pbGrad('var(--y400)')};"></div></div></div>
         <div style="border-top:1px solid var(--border);padding-top:10px;font-size:13px;color:var(--ink3);">% asistencia: <strong style="color:var(--ink)">${pres+licD > 0 ? Math.round(pres/(pres+aus||1)*100) : 0}%</strong></div></div>`;
     }
 

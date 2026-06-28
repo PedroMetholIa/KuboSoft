@@ -151,6 +151,8 @@ function destroyCharts() {
 const fM = v=>'$'+(v>=1e6?(v/1e6).toFixed(1)+'M':v>=1000?(v/1000).toFixed(0)+'k':v.toLocaleString('es-UY'));
 const fN = v=>Number(v).toLocaleString('es-UY');
 const rnd = (a,b)=>Math.floor(Math.random()*(b-a)+a);
+const accentGrad=col=>({'#1b35df':'linear-gradient(90deg,#6A7FFF,#1b35df)','#1428b8':'linear-gradient(90deg,#3D57F5,#1428b8)','#10B981':'linear-gradient(90deg,#6EE7B7,#10B981)','#F59E0B':'linear-gradient(90deg,#FCD34D,#F59E0B)','#EF4444':'linear-gradient(90deg,#FCA5A5,#EF4444)','#14B8A6':'linear-gradient(90deg,#5EEAD4,#14B8A6)','#38BDF8':'linear-gradient(90deg,#BAE6FD,#38BDF8)'}[col]||col);
+const pbGrad=col=>({'#1b35df':'linear-gradient(90deg,#6A7FFF,#1b35df)','#1428b8':'linear-gradient(90deg,#3D57F5,#1428b8)','#10B981':'linear-gradient(90deg,#6EE7B7,#10B981)','#F59E0B':'linear-gradient(90deg,#FCD34D,#F59E0B)','#EF4444':'linear-gradient(90deg,#FCA5A5,#EF4444)','#14B8A6':'linear-gradient(90deg,#5EEAD4,#14B8A6)','#38BDF8':'linear-gradient(90deg,#BAE6FD,#38BDF8)'}[col]||col);
 
 function showToast(msg, type='s') {
   const c = document.getElementById('tcon');
@@ -224,7 +226,7 @@ function kpiHtml(cfg) {
   const dc=dir==='up'?'up':dir==='dn'?'dn':'neu';
   const arr=dir==='up'?'fa-arrow-trend-up':dir==='dn'?'fa-arrow-trend-down':'fa-minus';
   return `<div class="kpi" ${oc?`onclick="${oc}"`:''}>
-    <div class="kpi-accent" style="background:${col}"></div>
+    <div class="kpi-accent" style="background:${accentGrad(col)}"></div>
     <div class="kpi-label">${label}<div class="kpi-icon" style="background:${bg};color:${ic};"><i class="fa-solid ${icon}"></i></div></div>
     <div class="kpi-value ${value.length>8?'sm':''}">${value}</div>
     <div class="kpi-delta ${dc}"><i class="fa-solid ${arr}"></i> ${delta}</div>
@@ -282,7 +284,7 @@ function renderOverview() {
             <span style="font-size:13px;font-weight:500;">${canal}</span>
             <span style="font-size:12px;font-family:var(--fm);color:var(--ink3);">${fM(v)} · ${pct}%</span>
           </div>
-          <div class="pbar" style="height:8px;"><div class="pbar-fill" style="width:${pct}%;background:${col};"></div></div>
+          <div class="pbar" style="height:8px;"><div class="pbar-fill" style="width:${pct}%;background:${pbGrad(col)};"></div></div>
         </div>`;
       }).join('');
     }
@@ -360,7 +362,7 @@ function renderGoals() {
           <span style="font-size:11px;font-weight:700;color:${statusCol};">${pct}%</span>
         </div>
       </div>
-      <div class="pbar"><div class="pbar-fill" style="width:${pct}%;background:${col};"></div></div>
+      <div class="pbar"><div class="pbar-fill" style="width:${pct}%;background:${pbGrad(col)};"></div></div>
     </div>`;
   }).join('');
 }
@@ -397,7 +399,7 @@ function renderVentas() {
             <div style="display:flex;align-items:center;gap:8px;"><div style="width:10px;height:10px;border-radius:50%;background:${col};"></div><span style="font-size:13px;font-weight:500;">${canal}</span><span style="font-size:11px;color:var(--ink4);">${count} tx</span></div>
             <div><span style="font-family:var(--fm);font-size:13px;font-weight:600;">${fM(v)}</span><span style="font-size:11px;color:var(--ink4);margin-left:5px;">${pct}%</span></div>
           </div>
-          <div class="pbar" style="height:9px;"><div class="pbar-fill" style="width:${pct}%;background:${col};"></div></div>
+          <div class="pbar" style="height:9px;"><div class="pbar-fill" style="width:${pct}%;background:${pbGrad(col)};"></div></div>
         </div>`;
       }).join('');
     }
@@ -435,7 +437,7 @@ function renderVentas() {
         const pct=Math.round(p.precio/maxP*100);
         return `<div class="ri" style="flex-direction:column;align-items:stretch;gap:4px;padding:11px 20px;">
           <div style="display:flex;justify-content:space-between;"><span style="font-size:13px;font-weight:500;">${p.nombre}</span><span style="font-family:var(--fm);font-size:12px;color:var(--ink3);">${fM(p.precio)}</span></div>
-          <div class="pbar" style="height:5px;"><div class="pbar-fill" style="width:${pct}%;background:var(--b500);"></div></div>
+          <div class="pbar" style="height:5px;"><div class="pbar-fill" style="width:${pct}%;background:${pbGrad('#1b35df')};"></div></div>
         </div>`;
       }).join('')+`<div style="padding:10px 20px;font-size:11px;color:var(--ink4);">Precio de lista · sin transacciones aún</div>`;
     } else {
@@ -444,7 +446,7 @@ function renderVentas() {
         const avg=Math.round(prodRev[p.id]/prodCnt[p.id]), pct=Math.round(avg/maxT*100);
         return `<div class="ri" style="flex-direction:column;align-items:stretch;gap:4px;padding:11px 20px;">
           <div style="display:flex;justify-content:space-between;"><span style="font-size:13px;font-weight:500;">${p.nombre}</span><span style="font-family:var(--fm);font-size:12px;font-weight:600;">${fM(avg)}</span></div>
-          <div class="pbar" style="height:5px;"><div class="pbar-fill" style="width:${pct}%;background:var(--b500);"></div></div>
+          <div class="pbar" style="height:5px;"><div class="pbar-fill" style="width:${pct}%;background:${pbGrad('#1b35df')};"></div></div>
           <span style="font-size:11px;color:var(--ink4);">${prodCnt[p.id]} venta${prodCnt[p.id]!==1?'s':''}</span>
         </div>`;
       }).join('');
@@ -611,7 +613,7 @@ function renderProductos() {
             <div style="display:flex;align-items:center;gap:8px;"><div style="width:10px;height:10px;border-radius:3px;background:${col};flex-shrink:0;"></div><span style="font-size:13px;font-weight:500;">${p.nombre}</span></div>
             <div><span style="font-family:var(--fm);font-size:13px;font-weight:600;">${fM(rev)}</span><span style="font-size:11px;color:var(--ink4);margin-left:5px;">${fN(p.vendidos)} uds</span></div>
           </div>
-          <div class="pbar" style="height:8px;"><div class="pbar-fill" style="width:${pct}%;background:${col};"></div></div>
+          <div class="pbar" style="height:8px;"><div class="pbar-fill" style="width:${pct}%;background:${pbGrad(col)};"></div></div>
         </div>`;
       }).join('');
   }
@@ -927,7 +929,7 @@ function renderConfig() {
         const col=colMap[g.col]||P.b500, display=curr>1000?fM(curr):curr+'', goalDisplay=g.goal>1000?fM(g.goal):g.goal+'';
         return `<div class="ri" style="flex-direction:column;align-items:stretch;gap:5px;padding:14px 20px;">
           <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:13px;font-weight:500;">${g.desc}</span><div style="display:flex;align-items:center;gap:8px;"><span style="font-family:var(--fm);font-size:12px;color:var(--ink3);">${display} / ${goalDisplay}</span><button style="border:none;background:none;cursor:pointer;color:var(--red);font-size:11px;" onclick="deleteGoal(${g.id})"><i class="fa-solid fa-trash"></i></button></div></div>
-          <div style="display:flex;align-items:center;gap:8px;"><div class="pbar" style="flex:1;"><div class="pbar-fill" style="width:${pct}%;background:${col};"></div></div><span style="font-size:11px;font-weight:600;color:${pct>=100?P.green:P.b500};">${pct}%</span></div>
+          <div style="display:flex;align-items:center;gap:8px;"><div class="pbar" style="flex:1;"><div class="pbar-fill" style="width:${pct}%;background:${pbGrad(col)};"></div></div><span style="font-size:11px;font-weight:600;color:${pct>=100?P.green:P.b500};">${pct}%</span></div>
         </div>`;
       }).join('')}</div>`;
   } else if(cfgSection==='alertas') {

@@ -87,23 +87,42 @@ interface Categoria {
             <span class="section-tag">Otros productos</span>
             <h2>Soluciones especializadas para industrias específicas.</h2>
             <span class="section-lead">También desarrollamos para otros rubros</span>
-            @if (!loading && categoriaJuegos) {
-              <div class="card prod-card otros-card"
-                   [class.card--clickable]="hasRoute(categoriaJuegos.nombre)"
-                   (click)="navigateTo(categoriaJuegos.nombre)">
-                <div class="card-header">
-                  @if (categoriaJuegos.logo) {
-                    <div class="card-logo">
-                      <img loading="lazy" [src]="categoriaJuegos.logo" [alt]="categoriaJuegos.nombre" />
-                    </div>
-                  }
-                  <h3 class="cat-title">
-                    <span [style.color]="getCategoryColor(categoriaJuegos.nombre)">{{ getCategorySuffix(categoriaJuegos.nombre) }}</span>
-                  </h3>
+            <div class="grid-3">
+              @if (!loading && categoriaJuegos) {
+                <div class="card prod-card otros-card"
+                     [class.card--clickable]="hasRoute(categoriaJuegos.nombre)"
+                     (click)="navigateTo(categoriaJuegos.nombre)">
+                  <div class="card-header">
+                    @if (categoriaJuegos.logo) {
+                      <div class="card-logo">
+                        <img loading="lazy" [src]="categoriaJuegos.logo" [alt]="categoriaJuegos.nombre" />
+                      </div>
+                    }
+                    <h3 class="cat-title">
+                      <span [style.color]="getCategoryColor(categoriaJuegos.nombre)">{{ getCategorySuffix(categoriaJuegos.nombre) }}</span>
+                    </h3>
+                  </div>
+                  <p class="prod-desc">{{ getCategoryDescription(categoriaJuegos) }}</p>
                 </div>
-                <p class="prod-desc">{{ getCategoryDescription(categoriaJuegos) }}</p>
-              </div>
-            }
+              }
+              @for (cat of otrosProductos; track cat.id) {
+                <div class="card prod-card otros-card"
+                     [class.card--clickable]="hasRoute(cat.nombre)"
+                     (click)="navigateTo(cat.nombre)">
+                  <div class="card-header">
+                    @if (cat.logo) {
+                      <div class="card-logo">
+                        <img loading="lazy" [src]="cat.logo" [alt]="cat.nombre" />
+                      </div>
+                    }
+                    <h3 class="cat-title">
+                      <span [style.color]="getCategoryColor(cat.nombre)">{{ getCategorySuffix(cat.nombre) }}</span>
+                    </h3>
+                  </div>
+                  <p class="prod-desc">{{ getCategoryDescription(cat) }}</p>
+                </div>
+              }
+            </div>
           </div>
         </div>
       </div>
@@ -205,6 +224,21 @@ export class InicioComponent implements OnInit {
     return this.categorias.find(c => c.nombre === 'KuboJuegos');
   }
 
+  readonly otrosProductos: Categoria[] = [
+    {
+      id: 'static-sorteos',
+      nombre: 'KuboSorteos',
+      descripcion: 'Plataforma para lanzar sorteos y promociones para tu negocio.',
+      logo: 'assets/categorias/favicon-kubosorteosypromo.svg',
+    },
+    {
+      id: 'static-autogestion',
+      nombre: 'KuboAutogestión',
+      descripcion: 'Herramienta de autogestión para que tus clientes operen de forma autónoma.',
+      logo: 'assets/categorias/favicon-autogestion.svg',
+    },
+  ];
+
   private readonly categoryOrder: Record<string, number> = {
     'KuboGestión':  0,
     'KuboMétricas': 1,
@@ -237,6 +271,7 @@ export class InicioComponent implements OnInit {
     'KuboJuegos':   '/kubojuegos',
     'KuboRRHH':     '/kubo-rrhh',
     'KuboMétricas': '/kubo-metricas',
+    'KuboGestión':  '/kubo-gestion',
   };
 
   hasRoute(nombre: string): boolean { return nombre in this.routeMap; }
@@ -253,8 +288,10 @@ export class InicioComponent implements OnInit {
     'KuboMétricas':   '#1428b8',
     'KuboReservas':   '#E91E8C',
     'KuboRRHH':       '#00BCD4',
-    'KuboStock':      'rgb(237, 172, 39)',
-    'KuboTareas':     '#784494',
+    'KuboStock':        'rgb(237, 172, 39)',
+    'KuboTareas':       '#784494',
+    'KuboSorteos':      '#8A124C',
+    'KuboAutogestión':  '#C37C1C',
   };
 
   getCategoryColor(nombre: string): string {
@@ -262,7 +299,9 @@ export class InicioComponent implements OnInit {
   }
 
   private readonly displayNameMap: Record<string, string> = {
-    'KuboJuegos': 'Entretenimiento',
+    'KuboJuegos':      'Entretenimiento',
+    'KuboSorteos':     'Sorteos y Promociones',
+    'KuboAutogestión': 'Autogestión',
   };
 
   private readonly descriptionMap: Record<string, string> = {

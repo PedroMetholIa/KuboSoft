@@ -1,0 +1,306 @@
+<div class="gestion-wrap">
+
+  <!-- SIDEBAR -->
+  <aside class="sb">
+    <div class="sb-logo">
+      <img src="assets/categorias/favicon-kubogestion.svg" class="sb-logoimg" alt="KuboGestión">
+      <span class="logo-brand">Gestión</span>
+    </div>
+    <div class="sb-nav">
+      <div class="nlbl">Principal</div>
+      <button class="ni active" data-view="dashboard"><i class="nic fa-solid fa-gauge-high"></i> Panel general</button>
+      <button class="ni" data-view="clientes"><i class="nic fa-solid fa-building"></i> Clientes <span class="nb g" id="nb-cli">0</span></button>
+      <button class="ni" data-view="proyectos"><i class="nic fa-solid fa-diagram-project"></i> Proyectos <span class="nb g" id="nb-proy">0</span></button>
+      <button class="ni" data-view="tareas"><i class="nic fa-solid fa-list-check"></i> Tareas <span class="nb" id="nb-tar">0</span></button>
+      <div class="nlbl">Finanzas</div>
+      <button class="ni" data-view="facturas"><i class="nic fa-solid fa-file-invoice-dollar"></i> Facturación <span class="nb" id="nb-fac" style="display:none;">0</span></button>
+      <button class="ni" data-view="presupuestos"><i class="nic fa-solid fa-file-lines"></i> Presupuestos</button>
+      <div class="nlbl">Actividad</div>
+      <button class="ni" data-view="historial"><i class="nic fa-solid fa-clock-rotate-left"></i> Historial</button>
+      <div class="nlbl">Sistema</div>
+      <button class="ni" data-view="config"><i class="nic fa-solid fa-gear"></i> Configuración</button>
+    </div>
+    <div class="sb-foot">
+      <button class="ni-back" onclick="window.history.back()"><i class="fa-solid fa-arrow-left"></i> KuboSoft</button>
+      <div class="upill">
+        <div class="uav">PM</div>
+        <div><div class="uname">Pedro Methol</div><div class="urole">Administrador</div></div>
+        <i class="fa-solid fa-ellipsis-vertical" style="color:var(--ink4);font-size:11px;margin-left:auto;"></i>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <header class="topbar">
+      <div class="tb-title" id="g-tb-title">Panel general</div>
+      <button class="ibt"><i class="fa-solid fa-bell"></i><div class="ndot" id="g-notif-dot" style="display:none;"></div></button>
+      <button class="btn btn-g btn-sm" onclick="navigate('historial')"><i class="fa-solid fa-clock-rotate-left"></i></button>
+      <button class="btn btn-p" id="g-btn-top" onclick="openTopAction()"><i class="fa-solid fa-plus"></i> <span id="g-btn-top-lbl">Nueva acción</span></button>
+    </header>
+
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div class="view active" id="view-g-dashboard">
+        <div class="g4" id="dash-kpis"></div>
+        <div class="gw">
+          <div>
+            <div class="panel">
+              <div class="ph"><div class="ptitle">Pipeline de proyectos</div><button class="pa" onclick="navigate('proyectos')">Ver todos →</button></div>
+              <div style="padding:14px;" id="dash-pipeline"></div>
+            </div>
+            <div class="panel">
+              <div class="ph"><div class="ptitle">Tareas pendientes</div><button class="pa" onclick="navigate('tareas')">Ver todas →</button></div>
+              <div id="dash-tareas"></div>
+            </div>
+          </div>
+          <div>
+            <div class="panel">
+              <div class="ph"><div class="ptitle">Facturas recientes</div><button class="pa" onclick="navigate('facturas')">Ver todas →</button></div>
+              <div id="dash-facturas"></div>
+            </div>
+            <div class="panel">
+              <div class="ph"><div class="ptitle">Actividad reciente</div></div>
+              <div class="tl-wrap" id="dash-activity" style="max-height:270px;overflow-y:auto;padding-top:8px;padding-bottom:8px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CLIENTES -->
+      <div class="view" id="view-g-clientes">
+        <div class="fbar">
+          <div class="fsearch"><i class="fa-solid fa-magnifying-glass"></i><input id="cli-search" placeholder="Buscar cliente..."></div>
+          <select class="fsel" id="cli-fest"><option value="">Todos los estados</option><option>Activo</option><option>Prospecto</option><option>Inactivo</option></select>
+          <select class="fsel" id="cli-frub"><option value="">Todos los rubros</option><option>Tecnología</option><option>Retail</option><option>Salud</option><option>Construcción</option><option>Alimentos</option><option>Educación</option><option>Otro</option></select>
+          <button class="btn btn-p" onclick="openM('cliente')"><i class="fa-solid fa-plus"></i> Nuevo cliente</button>
+        </div>
+        <div class="g4" id="cli-kpis"></div>
+        <div class="panel">
+          <div class="ph"><div class="ptitle">Cartera · <span id="cli-count">0</span></div></div>
+          <table class="tbl"><thead><tr><th>Cliente</th><th>Rubro</th><th>Contacto</th><th>Proyectos</th><th>Facturado</th><th>Estado</th><th></th></tr></thead>
+          <tbody id="cli-body"></tbody></table>
+        </div>
+      </div>
+
+      <!-- PROYECTOS -->
+      <div class="view" id="view-g-proyectos">
+        <div class="fbar">
+          <div class="fsearch"><i class="fa-solid fa-magnifying-glass"></i><input id="proy-search" placeholder="Buscar proyecto..."></div>
+          <select class="fsel" id="proy-fest"><option value="">Todos los estados</option><option>Propuesta</option><option>En curso</option><option>En revisión</option><option>Completado</option><option>Pausado</option></select>
+          <select class="fsel" id="proy-fcli"><option value="">Todos los clientes</option></select>
+          <div style="margin-left:auto;display:flex;gap:8px;">
+            <button class="btn btn-g btn-sm" id="vk-btn" onclick="setProyView('kanban')"><i class="fa-solid fa-table-columns"></i> Kanban</button>
+            <button class="btn btn-g btn-sm" id="vl-btn" onclick="setProyView('lista')"><i class="fa-solid fa-list"></i> Lista</button>
+            <button class="btn btn-p" onclick="openM('proyecto')"><i class="fa-solid fa-plus"></i> Nuevo</button>
+          </div>
+        </div>
+        <div class="g4" id="proy-kpis"></div>
+        <div id="proy-kanban"></div>
+        <div id="proy-lista" style="display:none;">
+          <div class="panel"><table class="tbl"><thead><tr><th>Proyecto</th><th>Cliente</th><th>Estado</th><th>Presupuesto</th><th>Progreso</th><th>Vence</th><th></th></tr></thead><tbody id="proy-body"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- TAREAS -->
+      <div class="view" id="view-g-tareas">
+        <div class="fbar">
+          <div class="fsearch"><i class="fa-solid fa-magnifying-glass"></i><input id="tar-search" placeholder="Buscar tarea..."></div>
+          <select class="fsel" id="tar-fest"><option value="">Todos los estados</option><option>Pendiente</option><option>En curso</option><option>Completada</option></select>
+          <select class="fsel" id="tar-fproy"><option value="">Todos los proyectos</option></select>
+          <select class="fsel" id="tar-fprio"><option value="">Todas las prioridades</option><option>Alta</option><option>Media</option><option>Baja</option></select>
+          <button class="btn btn-p" onclick="openM('tarea')"><i class="fa-solid fa-plus"></i> Nueva tarea</button>
+        </div>
+        <div class="g4" id="tar-kpis"></div>
+        <div class="panel">
+          <div class="ph"><div class="ptitle">Tareas · <span id="tar-count">0</span></div></div>
+          <table class="tbl"><thead><tr><th>Tarea</th><th>Proyecto</th><th>Prioridad</th><th>Asignado</th><th>Vence</th><th>Estado</th><th></th></tr></thead>
+          <tbody id="tar-body"></tbody></table>
+        </div>
+      </div>
+
+      <!-- FACTURAS -->
+      <div class="view" id="view-g-facturas">
+        <div class="fbar">
+          <div class="fsearch"><i class="fa-solid fa-magnifying-glass"></i><input id="fac-search" placeholder="Buscar factura..."></div>
+          <select class="fsel" id="fac-fest"><option value="">Todos los estados</option><option>Borrador</option><option>Enviada</option><option>Pagada</option><option>Vencida</option></select>
+          <select class="fsel" id="fac-fcli"><option value="">Todos los clientes</option></select>
+          <button class="btn btn-p" onclick="openM('factura')"><i class="fa-solid fa-plus"></i> Nueva factura</button>
+        </div>
+        <div class="g4" id="fac-kpis"></div>
+        <div class="g2">
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Facturas · <span id="fac-count">0</span></div></div>
+            <table class="tbl"><thead><tr><th>#</th><th>Cliente</th><th>Monto</th><th>Estado</th><th>Vence</th><th></th></tr></thead>
+            <tbody id="fac-body"></tbody></table>
+          </div>
+          <div>
+            <div class="panel">
+              <div class="ph"><div class="ptitle">Resumen financiero</div></div>
+              <div id="fac-resumen" class="pbody"></div>
+            </div>
+            <div class="panel">
+              <div class="ph"><div class="ptitle">Cobros pendientes</div></div>
+              <div id="fac-vencer"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRESUPUESTOS -->
+      <div class="view" id="view-g-presupuestos">
+        <div class="fbar"><button class="btn btn-p" onclick="openM('presupuesto')"><i class="fa-solid fa-plus"></i> Nuevo presupuesto</button></div>
+        <div class="panel">
+          <div class="ph"><div class="ptitle">Presupuestos · <span id="pre-count">0</span></div></div>
+          <table class="tbl"><thead><tr><th>#</th><th>Cliente</th><th>Descripción</th><th>Monto</th><th>Estado</th><th>Válido hasta</th><th></th></tr></thead>
+          <tbody id="pre-body"></tbody></table>
+        </div>
+      </div>
+
+      <!-- HISTORIAL -->
+      <div class="view" id="view-g-historial">
+        <div class="fbar">
+          <select class="fsel" id="hist-fil"><option value="">Toda la actividad</option><option value="cliente">Clientes</option><option value="proyecto">Proyectos</option><option value="tarea">Tareas</option><option value="factura">Facturas</option><option value="presupuesto">Presupuestos</option></select>
+          <button class="btn btn-g btn-sm" onclick="clearGestionHistory()"><i class="fa-solid fa-trash"></i> Limpiar</button>
+        </div>
+        <div class="panel">
+          <div class="ph"><div class="ptitle">Historial · <span id="hist-count">0</span> eventos</div></div>
+          <div class="tl-wrap" id="hist-body" style="padding-top:8px;padding-bottom:8px;"></div>
+        </div>
+      </div>
+
+      <!-- CONFIG -->
+      <div class="view" id="view-g-config">
+        <div class="g2" style="align-items:start;">
+          <div class="panel">
+            <div class="ph"><div class="ptitle">Empresa</div><button class="btn btn-p btn-sm" onclick="showToast('Datos guardados','s')"><i class="fa-solid fa-check"></i> Guardar</button></div>
+            <div class="pbody" style="display:flex;flex-direction:column;gap:14px;">
+              <div class="fg"><label class="fl">Razón social</label><input class="fi" value="KuboSoft S.A."></div>
+              <div class="fg"><label class="fl">RUT / NIT</label><input class="fi" value="21.234.567-8"></div>
+              <div class="fg"><label class="fl">Email de facturación</label><input class="fi" type="email" value="admin@kubosoft.com"></div>
+              <div class="fg"><label class="fl">Moneda</label><select class="fi"><option>UYU ($)</option><option>USD (US$)</option></select></div>
+              <div class="fg"><label class="fl">Prefijo facturas</label><input class="fi" value="KS-"></div>
+            </div>
+          </div>
+          <div>
+            <div class="panel">
+              <div class="ph"><div class="ptitle">Equipo</div><button class="btn btn-p btn-sm" onclick="showToast('Invitación enviada','s')"><i class="fa-solid fa-user-plus"></i> Invitar</button></div>
+              <div id="cfg-team"></div>
+            </div>
+            <div class="panel">
+              <div class="ph"><div class="ptitle">Etiquetas de proyectos</div><button class="btn btn-g btn-sm" onclick="showToast('Próximamente','s')"><i class="fa-solid fa-plus"></i></button></div>
+              <div id="cfg-tags" class="pbody" style="display:flex;flex-wrap:wrap;gap:6px;padding:14px 20px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </main>
+
+  <!-- DETAIL PANEL -->
+  <div class="dp-overlay" id="g-dp-overlay" onclick="closeDetail()"></div>
+  <div class="dp" id="g-dp">
+    <div class="dp-head">
+      <button class="btn btn-g btn-sm" onclick="closeDetail()"><i class="fa-solid fa-arrow-left"></i></button>
+      <div class="av av-lg" id="g-dp-av"></div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-family:var(--fd);font-size:17px;font-weight:800;color:var(--ink);" id="g-dp-name"></div>
+        <div style="font-size:12px;color:var(--ink3);margin-top:2px;" id="g-dp-sub"></div>
+      </div>
+      <div id="g-dp-badge"></div>
+    </div>
+    <div class="dp-body" id="g-dp-body"></div>
+  </div>
+
+  <!-- MODAL CLIENTE -->
+  <div class="moverlay" id="gmodal-cliente" onclick="closeOvl(event,'cliente')">
+    <div class="modal">
+      <div class="mh"><div class="mtitle" id="gmcli-t">Nuevo cliente</div><button class="mclose" onclick="closeM('cliente')"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="mbody"><div class="fgrid">
+        <div class="fg ffull"><label class="fl">Nombre / Razón social *</label><input class="fi" id="cf-nom" placeholder="ej. TechCorp SA"></div>
+        <div class="fg"><label class="fl">Rubro</label><select class="fi" id="cf-rub"><option>Tecnología</option><option>Retail</option><option>Salud</option><option>Construcción</option><option>Alimentos</option><option>Educación</option><option>Otro</option></select></div>
+        <div class="fg"><label class="fl">Estado</label><select class="fi" id="cf-est"><option>Activo</option><option>Prospecto</option><option>Inactivo</option></select></div>
+        <div class="fg"><label class="fl">Email</label><input class="fi" id="cf-email" type="email" placeholder="contacto@empresa.com"></div>
+        <div class="fg"><label class="fl">Teléfono</label><input class="fi" id="cf-tel" placeholder="+598 9x xxx xxx"></div>
+        <div class="fg"><label class="fl">Contacto principal</label><input class="fi" id="cf-contacto" placeholder="Nombre"></div>
+        <div class="fg"><label class="fl">Ciudad</label><input class="fi" id="cf-ciudad" placeholder="ej. Montevideo"></div>
+        <div class="fg ffull"><label class="fl">Notas</label><textarea class="fi" id="cf-notas" placeholder="Información adicional..."></textarea></div>
+      </div></div>
+      <div class="mfoot"><button class="btn btn-g" onclick="closeM('cliente')">Cancelar</button><button class="btn btn-p" onclick="saveCli()"><i class="fa-solid fa-check"></i> <span id="gmcli-btn">Guardar</span></button></div>
+    </div>
+  </div>
+
+  <!-- MODAL PROYECTO -->
+  <div class="moverlay" id="gmodal-proyecto" onclick="closeOvl(event,'proyecto')">
+    <div class="modal">
+      <div class="mh"><div class="mtitle" id="gmproy-t">Nuevo proyecto</div><button class="mclose" onclick="closeM('proyecto')"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="mbody"><div class="fgrid">
+        <div class="fg ffull"><label class="fl">Nombre del proyecto *</label><input class="fi" id="pf-nom" placeholder="ej. Rediseño web corporativo"></div>
+        <div class="fg"><label class="fl">Cliente *</label><select class="fi" id="g-pf-cli"></select></div>
+        <div class="fg"><label class="fl">Estado</label><select class="fi" id="pf-est"><option>Propuesta</option><option>En curso</option><option>En revisión</option><option>Completado</option><option>Pausado</option></select></div>
+        <div class="fg"><label class="fl">Presupuesto ($)</label><input class="fi" id="pf-presup" type="number" placeholder="ej. 50000"></div>
+        <div class="fg"><label class="fl">Fecha inicio</label><input class="fi" id="pf-inicio" type="date"></div>
+        <div class="fg"><label class="fl">Fecha fin</label><input class="fi" id="pf-fin" type="date"></div>
+        <div class="fg"><label class="fl">Prioridad</label><select class="fi" id="pf-prio"><option>Alta</option><option>Media</option><option>Baja</option></select></div>
+        <div class="fg"><label class="fl">Progreso (%)</label><input class="fi" id="pf-prog" type="number" min="0" max="100" value="0"></div>
+        <div class="fg ffull"><label class="fl">Descripción</label><textarea class="fi" id="pf-desc" placeholder="Alcance y objetivos..."></textarea></div>
+      </div></div>
+      <div class="mfoot"><button class="btn btn-g" onclick="closeM('proyecto')">Cancelar</button><button class="btn btn-p" onclick="saveProy()"><i class="fa-solid fa-check"></i> <span id="gmproy-btn">Guardar</span></button></div>
+    </div>
+  </div>
+
+  <!-- MODAL TAREA -->
+  <div class="moverlay" id="gmodal-tarea" onclick="closeOvl(event,'tarea')">
+    <div class="modal">
+      <div class="mh"><div class="mtitle" id="gmtar-t">Nueva tarea</div><button class="mclose" onclick="closeM('tarea')"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="mbody"><div class="fgrid">
+        <div class="fg ffull"><label class="fl">Título *</label><input class="fi" id="tf-nom" placeholder="ej. Diseñar wireframes"></div>
+        <div class="fg"><label class="fl">Proyecto</label><select class="fi" id="g-tf-proy"></select></div>
+        <div class="fg"><label class="fl">Estado</label><select class="fi" id="tf-est"><option>Pendiente</option><option>En curso</option><option>Completada</option></select></div>
+        <div class="fg"><label class="fl">Prioridad</label><select class="fi" id="tf-prio"><option>Alta</option><option>Media</option><option>Baja</option></select></div>
+        <div class="fg"><label class="fl">Asignado a</label><input class="fi" id="tf-asig" placeholder="ej. Laura Gómez"></div>
+        <div class="fg"><label class="fl">Vencimiento</label><input class="fi" id="tf-vence" type="date"></div>
+        <div class="fg ffull"><label class="fl">Descripción</label><textarea class="fi" id="tf-desc" placeholder="Detalle de la tarea..."></textarea></div>
+      </div></div>
+      <div class="mfoot"><button class="btn btn-g" onclick="closeM('tarea')">Cancelar</button><button class="btn btn-p" onclick="saveTar()"><i class="fa-solid fa-check"></i> <span id="gmtar-btn">Guardar</span></button></div>
+    </div>
+  </div>
+
+  <!-- MODAL FACTURA -->
+  <div class="moverlay" id="gmodal-factura" onclick="closeOvl(event,'factura')">
+    <div class="modal">
+      <div class="mh"><div class="mtitle" id="gmfac-t">Nueva factura</div><button class="mclose" onclick="closeM('factura')"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="mbody"><div class="fgrid">
+        <div class="fg"><label class="fl">Cliente *</label><select class="fi" id="g-ff-cli"></select></div>
+        <div class="fg"><label class="fl">Proyecto</label><select class="fi" id="g-ff-proy"><option value="">Sin proyecto</option></select></div>
+        <div class="fg"><label class="fl">Monto ($) *</label><input class="fi" id="g-ff-monto" type="number" placeholder="25000"></div>
+        <div class="fg"><label class="fl">Estado</label><select class="fi" id="g-ff-est"><option>Borrador</option><option>Enviada</option><option>Pagada</option></select></div>
+        <div class="fg"><label class="fl">Emisión</label><input class="fi" id="g-ff-emision" type="date"></div>
+        <div class="fg"><label class="fl">Vencimiento</label><input class="fi" id="g-ff-vence" type="date"></div>
+        <div class="fg ffull"><label class="fl">Concepto</label><textarea class="fi" id="g-ff-desc" placeholder="Servicios de desarrollo – Junio 2025..."></textarea></div>
+      </div></div>
+      <div class="mfoot"><button class="btn btn-g" onclick="closeM('factura')">Cancelar</button><button class="btn btn-p" onclick="saveFac()"><i class="fa-solid fa-check"></i> <span id="gmfac-btn">Emitir</span></button></div>
+    </div>
+  </div>
+
+  <!-- MODAL PRESUPUESTO -->
+  <div class="moverlay" id="gmodal-presupuesto" onclick="closeOvl(event,'presupuesto')">
+    <div class="modal">
+      <div class="mh"><div class="mtitle">Nuevo presupuesto</div><button class="mclose" onclick="closeM('presupuesto')"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="mbody"><div class="fgrid">
+        <div class="fg"><label class="fl">Cliente *</label><select class="fi" id="g-bf-cli"></select></div>
+        <div class="fg"><label class="fl">Monto ($) *</label><input class="fi" id="g-bf-monto" type="number" placeholder="35000"></div>
+        <div class="fg ffull"><label class="fl">Descripción *</label><textarea class="fi" id="g-bf-desc" placeholder="Alcance del trabajo..."></textarea></div>
+        <div class="fg"><label class="fl">Válido hasta</label><input class="fi" id="g-bf-valid" type="date"></div>
+        <div class="fg"><label class="fl">Estado</label><select class="fi" id="g-bf-est"><option>Borrador</option><option>Enviado</option><option>Aprobado</option><option>Rechazado</option></select></div>
+      </div></div>
+      <div class="mfoot"><button class="btn btn-g" onclick="closeM('presupuesto')">Cancelar</button><button class="btn btn-p" onclick="savePre()"><i class="fa-solid fa-check"></i> Guardar</button></div>
+    </div>
+  </div>
+
+  <!-- TOASTS -->
+  <div class="tcon" id="g-tcon"></div>
+
+</div>

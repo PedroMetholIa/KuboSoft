@@ -921,6 +921,14 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
             }
           }
         }
+        // Safety net: si la eliminación ocurre mientras hay colocación simultánea en curso
+        // (p. ej. un bot u otro edge case), re-verificar para no dejar el juego trabado.
+        if (this.esHost && this.colocacionSimultanea && this.fase === 'colocacion') {
+          void this.checkTodosConfirmaronColocacion();
+        }
+        if (this.esHost && this.mostrarAprobacionCobro) {
+          void this.checkTodosAprobaron();
+        }
         this.cdr.markForCheck();
       })
       .on('broadcast', { event: 'pacto_propuesta' }, ({ payload }) => {
@@ -1291,6 +1299,15 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
               this.addNotif({ tipo: 'conquista', icono: '🏳', linea1: `${nombre} se rindió`, linea2: 'abandonó la partida', color: '#94a3b8', ts: Date.now() });
             }
             void this.verificarVictoriaPorRendicion();
+            // Si el jugador se rindió durante colocación simultánea, re-verificar si
+            // los restantes ya confirmaron (su tropas_por_colocar no cambia a 0, por lo
+            // que el trigger normal nunca dispara y el juego quedaría trabado).
+            if (this.esHost && this.colocacionSimultanea && this.fase === 'colocacion') {
+              void this.checkTodosConfirmaronColocacion();
+            }
+            if (this.esHost && this.mostrarAprobacionCobro) {
+              void this.checkTodosAprobaron();
+            }
           }
           this.rebuildJugadores();
           this.cdr.markForCheck();

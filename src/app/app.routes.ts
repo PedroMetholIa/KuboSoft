@@ -54,5 +54,11 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/kubo-metricas/kubo-metricas.component').then(m => m.KuboMetricasComponent),
   },
+  {
+    path: 'kubo-gestion',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/kubo-gestion/kubo-gestion.component').then(m => m.KuboGestionComponent),
+  },
   { path: '**', redirectTo: 'inicio' },
 ];
