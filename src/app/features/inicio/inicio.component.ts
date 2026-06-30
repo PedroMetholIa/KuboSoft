@@ -46,9 +46,9 @@ interface Categoria {
         <div class="section">
           <div class="container">
             <span class="section-tag">Categoría Productos</span>
-            <h2>Soluciones listas para adaptar</h2>
+            <h2>Soluciones listas para adaptar a tu rubro.</h2>
             <span class="section-lead">
-              Software construido sobre una base probada. Cada producto se adapta a tu rubro y necesidades.
+              Software construido sobre una base probada que puede adaptarse a tus gustos y necesidades.
             </span>
 
             @if (!loading) {
@@ -234,16 +234,16 @@ export class InicioComponent implements OnInit {
     {
       id: 'static-autogestion',
       nombre: 'KuboAutogestión',
-      descripcion: 'Herramienta de autogestión para que tus clientes operen de forma autónoma.',
+      descripcion: 'Herramienta de autogestión para profesionales independientes.',
       logo: 'assets/categorias/favicon-autogestion.svg',
     },
   ];
 
   private readonly categoryOrder: Record<string, number> = {
     'KuboGestión':  0,
-    'KuboMétricas': 1,
-    'KuboTareas':   2,
-    'KuboRRHH':     3,
+    'KuboRRHH':     1,
+    'KuboMétricas': 2,
+    'KuboTareas':   3,
     'KuboStock':    4,
     'KuboReservas': 5,
     'KuboJuegos':   6,
@@ -289,8 +289,8 @@ export class InicioComponent implements OnInit {
     'KuboReservas':   '#E91E8C',
     'KuboRRHH':       '#00BCD4',
     'KuboStock':        'rgb(237, 172, 39)',
-    'KuboTareas':       '#784494',
-    'KuboSorteos':      '#8A124C',
+    'KuboTareas':       '#F97316',
+    'KuboSorteos':      '#84539D',
     'KuboAutogestión':  '#C37C1C',
   };
 
@@ -305,7 +305,13 @@ export class InicioComponent implements OnInit {
   };
 
   private readonly descriptionMap: Record<string, string> = {
-    'KuboJuegos': 'Plataforma para lanzar apps de entretenimiento con jugadores en tiempo real.',
+    'KuboJuegos':   'Plataforma de entretenimiento con jugadores en tiempo real.',
+    'KuboGestión':  'Organizá clientes, proyectos y facturas en un solo lugar.',
+    'KuboRRHH':     'Guías inteligentes para que empleados y clientes arranquen rápido.',
+    'KuboMétricas': 'Mirá cómo va tu negocio con gráficos simples y avisos automáticos.',
+    'KuboTareas':   'Organizá el trabajo de tu equipo: quién hace qué y cuándo.',
+    'KuboStock':    'Controlá lo que tenés y vendé más fácil, sin quedarte sin nada.',
+    'KuboReservas': 'Tus clientes reservan solos, con recordatorios automáticos.',
   };
 
   getCategorySuffix(nombre: string): string {

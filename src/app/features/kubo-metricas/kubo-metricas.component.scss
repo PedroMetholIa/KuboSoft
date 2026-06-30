@@ -40,7 +40,7 @@
   .sb {
     width: 236px;
     min-height: 100vh;
-    background: linear-gradient(180deg, #1428b8 0%, #060D4F 100%);
+    background: linear-gradient(180deg, #0a1468 0%, #03061e 100%);
     border-right: none;
     display: flex;
     flex-direction: column;
@@ -48,7 +48,7 @@
     position: fixed;
     top: 0; left: 0; bottom: 0;
     z-index: 100;
-    box-shadow: 3px 0 24px rgba(6,13,79,.5);
+    box-shadow: 3px 0 24px rgba(3,6,30,.65);
   }
 
   .sb-logo-area {

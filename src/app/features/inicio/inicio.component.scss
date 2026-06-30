@@ -1,8 +1,8 @@
 :host {
   display: block;
-  --bg-base:   #F0F2F5;
+  --bg-base:   #F6F7FB;
   --bg-raised: #FFFFFF;
-  --bg-deep:   #E4E7ED;
+  --bg-deep:   #ECEEF5;
   --bg-nav:    rgba(240,242,245,.95);
   --card-bg:   #FFFFFF;
   --card-hover:#F5F3FF;
@@ -94,8 +94,8 @@ nav {
   position: relative;
   overflow: clip;
   background: linear-gradient(180deg,
-    color-mix(in srgb,#6d8bff  8%,#E8EAF0) 0%,
-    var(--bg-base) 70%);
+    color-mix(in srgb,#6d8bff 18%,#E8EAF0) 0%,
+    var(--bg-base) 75%);
   border-bottom: 1px solid var(--border);
 
   &::before {
@@ -103,7 +103,7 @@ nav {
     position: absolute;
     top: -80px; left: -100px;
     width: 700px; height: 600px;
-    background: radial-gradient(ellipse at 30% 40%, color-mix(in srgb,#504B89 14%,transparent) 0%, transparent 60%);
+    background: radial-gradient(ellipse at 30% 40%, color-mix(in srgb,#504B89 24%,transparent) 0%, transparent 60%);
     pointer-events: none;
   }
 
@@ -112,7 +112,7 @@ nav {
     position: absolute;
     top: 0; right: -60px;
     width: 500px; height: 400px;
-    background: radial-gradient(ellipse at 70% 30%, color-mix(in srgb,#6d8bff 10%,transparent) 0%, transparent 60%);
+    background: radial-gradient(ellipse at 70% 30%, color-mix(in srgb,#6d8bff 18%,transparent) 0%, transparent 60%);
     pointer-events: none;
   }
 }
@@ -303,7 +303,7 @@ h2 {
 }
 
 .prod-desc {
-  font-size: 15px;
+  font-size: 17px;
   color: var(--sub);
   line-height: 1.75;
   display: block;
@@ -339,28 +339,39 @@ h2 {
 
 // ── OTROS PRODUCTOS ────────────────────────────────────
 .sec-wrap--alt {
-  background: var(--bg-deep);
+  background: linear-gradient(160deg,
+    color-mix(in srgb,#504B89 4%,var(--bg-deep)) 0%,
+    color-mix(in srgb,#6d8bff 3%,var(--bg-deep)) 100%);
   border-top: 1px solid var(--bd2);
 }
 
-.otros-card { max-width: 380px; }
+.otros-card { max-width: 380px; background: #F8F9FD; }
+.otros-card:hover { background: color-mix(in srgb,var(--card-hover) 80%,#ECEEF5) !important; }
 
 // ── CONTACTO ───────────────────────────────────────────
 .contact-box {
   position: relative;
   overflow: clip;
-  background: linear-gradient(160deg,
-    color-mix(in srgb,#504B89 6%,#E4E7ED) 0%,
-    var(--bg-deep) 55%,
-    color-mix(in srgb,#6d8bff 5%,#E4E7ED) 100%);
+  background: linear-gradient(180deg,
+    color-mix(in srgb,#6d8bff 10%,#ECEEF8) 0%,
+    color-mix(in srgb,#504B89 30%,#E0E3F2) 100%);
   border-top: 0.5px solid var(--border);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -80px; left: -100px;
+    width: 700px; height: 600px;
+    background: radial-gradient(ellipse at 30% 40%, color-mix(in srgb,#504B89 24%,transparent) 0%, transparent 60%);
+    pointer-events: none;
+  }
 
   &::after {
     content: '';
     position: absolute;
-    bottom: -100px; right: -80px;
-    width: 500px; height: 500px;
-    background: radial-gradient(ellipse,color-mix(in srgb,#9A86FC 10%,transparent) 0%,transparent 70%);
+    top: 0; right: -60px;
+    width: 500px; height: 400px;
+    background: radial-gradient(ellipse at 70% 30%, color-mix(in srgb,#6d8bff 18%,transparent) 0%, transparent 60%);
     pointer-events: none;
   }
 }
@@ -403,6 +414,16 @@ h2 {
 
     &::placeholder { color: #9999AA; }
     &:focus { outline: none; border-color: var(--ac); }
+  }
+
+  select {
+    -moz-appearance: none;
+    appearance: none;
+    padding-right: 32px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239999AA' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 11px center;
+    background-size: 16px;
   }
 
   textarea { min-height: 140px; }
