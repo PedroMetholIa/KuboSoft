@@ -2795,10 +2795,6 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     if (this.countPactosJugador(receptorId) >= 4) {
       this.showGameNotif(`${nombreReceptor} ya tiene 4 tratados. No puede recibir otro.`, 'error'); return;
     }
-    if (this.hayHostilidadEntre(this.userId, receptorId)) {
-      this.showGameNotif(`No podés proponer un tratado a ${nombreReceptor}: hay una declaración de hostilidad.`, 'error'); return;
-    }
-
     const propuesta: PropuestaPacto = {
       id: crypto.randomUUID(),
       tipo: 'no_agresion', proponenteId: this.userId, receptorId,
@@ -2906,8 +2902,8 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
       rechazarPorLimite(`${this.nombreJugadorById(p.proponenteId)} ya tiene 2 tratados. El tratado no puede establecerse.`);
       return;
     }
-    if (this.hayHostilidadEntre(this.userId, p.proponenteId)) {
-      rechazarPorLimite(`No podés aceptar este tratado: existe una declaración de hostilidad con ${this.nombreJugadorById(p.proponenteId)}.`);
+    if (this.posturas[p.proponenteId] === 'hostil') {
+      this.showGameNotif(`Cambiá tu postura a neutral con ${this.nombreJugadorById(p.proponenteId)} antes de aceptar.`, 'warn');
       return;
     }
 
@@ -2937,6 +2933,13 @@ export class KuboTegJuegoComponent implements OnInit, OnDestroy {
     await this.service.setPactos(this.partidaId, this.pactos);
     void this.aplicarPostura(p.proponenteId, 'amigable');
     this.playSfx('assets/KuboTeg/sonidos/pacto.mp3');
+    this.cdr.markForCheck();
+  }
+
+  async cambiarPosturaANeutralParaPacto() {
+    if (!this.propuestaEntrante) return;
+    await this.aplicarPostura(this.propuestaEntrante.proponenteId, 'neutral');
+    this.showGameNotif('Postura cambiada a neutral. Ahora podés aceptar el pacto.', 'ok');
     this.cdr.markForCheck();
   }
 

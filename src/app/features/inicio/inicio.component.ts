@@ -80,49 +80,105 @@ interface Categoria {
         </div>
       </div>
 
-      <!-- OTROS PRODUCTOS -->
+      <!-- OTROS PRODUCTOS / SORTEOS -->
       <div class="sec-wrap sec-wrap--alt">
         <div class="section">
           <div class="container">
-            <span class="section-tag">Otros productos</span>
-            <h2>Soluciones especializadas para industrias específicas.</h2>
-            <span class="section-lead">También desarrollamos para otros rubros</span>
-            <div class="grid-3">
-              @if (!loading && categoriaJuegos) {
-                <div class="card prod-card otros-card"
-                     [class.card--clickable]="hasRoute(categoriaJuegos.nombre)"
-                     (click)="navigateTo(categoriaJuegos.nombre)">
-                  <div class="card-header">
-                    @if (categoriaJuegos.logo) {
-                      <div class="card-logo">
-                        <img loading="lazy" [src]="categoriaJuegos.logo" [alt]="categoriaJuegos.nombre" />
-                      </div>
-                    }
-                    <h3 class="cat-title">
-                      <span [style.color]="getCategoryColor(categoriaJuegos.nombre)">{{ getCategorySuffix(categoriaJuegos.nombre) }}</span>
-                    </h3>
+
+            @if (!sorteoExpanded && !nexoExpanded && !entretenimientoExpanded) {
+              <span class="section-tag">Otros productos</span>
+              <h2>Soluciones especializadas para industrias específicas.</h2>
+              <span class="section-lead">También desarrollamos para otros rubros</span>
+              <div class="grid-3">
+                @if (!loading && categoriaJuegos) {
+                  <div class="card prod-card otros-card"
+                       [class.card--clickable]="hasRoute(categoriaJuegos.nombre)"
+                       (click)="navigateTo(categoriaJuegos.nombre)">
+                    <div class="card-header">
+                      @if (categoriaJuegos.logo) {
+                        <div class="card-logo">
+                          <img loading="lazy" [src]="categoriaJuegos.logo" [alt]="categoriaJuegos.nombre" />
+                        </div>
+                      }
+                      <h3 class="cat-title">
+                        <span [style.color]="getCategoryColor(categoriaJuegos.nombre)">{{ getCategorySuffix(categoriaJuegos.nombre) }}</span>
+                      </h3>
+                    </div>
+                    <p class="prod-desc">{{ getCategoryDescription(categoriaJuegos) }}</p>
                   </div>
-                  <p class="prod-desc">{{ getCategoryDescription(categoriaJuegos) }}</p>
-                </div>
-              }
-              @for (cat of otrosProductos; track cat.id) {
-                <div class="card prod-card otros-card"
-                     [class.card--clickable]="hasRoute(cat.nombre)"
-                     (click)="navigateTo(cat.nombre)">
-                  <div class="card-header">
-                    @if (cat.logo) {
-                      <div class="card-logo">
-                        <img loading="lazy" [src]="cat.logo" [alt]="cat.nombre" />
-                      </div>
-                    }
-                    <h3 class="cat-title">
-                      <span [style.color]="getCategoryColor(cat.nombre)">{{ getCategorySuffix(cat.nombre) }}</span>
-                    </h3>
+                }
+                @for (cat of otrosProductos; track cat.id) {
+                  <div class="card prod-card otros-card"
+                       [class.card--clickable]="hasRoute(cat.nombre)"
+                       (click)="navigateTo(cat.nombre)">
+                    <div class="card-header">
+                      @if (cat.logo) {
+                        <div class="card-logo">
+                          <img loading="lazy" [src]="cat.logo" [alt]="cat.nombre" />
+                        </div>
+                      }
+                      <h3 class="cat-title">
+                        <span [style.color]="getCategoryColor(cat.nombre)">{{ getCategorySuffix(cat.nombre) }}</span>
+                      </h3>
+                    </div>
+                    <p class="prod-desc">{{ getCategoryDescription(cat) }}</p>
                   </div>
-                  <p class="prod-desc">{{ getCategoryDescription(cat) }}</p>
+                }
+              </div>
+            } @else if (sorteoExpanded) {
+              <div class="sorteos-section-header">
+                <div class="sorteos-section-header-text">
+                  <span class="section-tag" [style.color]="getCategoryColor('KuboSorteos')">Sorteos y Promociones</span>
+                  <h2>Lanzá sorteos y promociones para tu negocio.</h2>
                 </div>
-              }
-            </div>
+                <img class="sorteos-section-logo" src="assets/categorias/favicon-kubosorteosypromo.svg" alt="KuboSorteos" />
+              </div>
+              <div class="grid-3 sorteos-section-grid">
+                <div class="card sorteos-sub-card"></div>
+                <div class="card sorteos-sub-card"></div>
+                <div class="card sorteos-sub-card"></div>
+              </div>
+              <button class="sorteos-back-btn nexo-back-btn" (click)="sorteoExpanded = false">← Volver a Otros Productos</button>
+            } @else if (nexoExpanded) {
+              <div class="sorteos-section-header">
+                <div class="sorteos-section-header-text">
+                  <span class="section-tag" [style.color]="getCategoryColor('Nexo')">Conectados</span>
+                  <h2>Unimos a quienes ofrecen un servicio con quienes lo necesitan.</h2>
+                </div>
+                <img class="sorteos-section-logo" src="assets/categorias/favicon-kubonexo.svg" alt="Nexo" />
+              </div>
+              <div class="grid-3 sorteos-section-grid">
+                <div class="card sorteos-sub-card nexo-sub-card"></div>
+                <div class="card sorteos-sub-card nexo-sub-card"></div>
+                <div class="card sorteos-sub-card nexo-sub-card"></div>
+              </div>
+              <button class="sorteos-back-btn" (click)="nexoExpanded = false">← Volver a Otros Productos</button>
+            } @else if (entretenimientoExpanded) {
+              <div class="sorteos-section-header">
+                <div class="sorteos-section-header-text">
+                  <span class="section-tag" [style.color]="getCategoryColor('KuboJuegos')">Entretenimiento</span>
+                  <h2>Plataforma de entretenimiento con jugadores en tiempo real.</h2>
+                </div>
+                @if (categoriaJuegos?.logo) {
+                  <img class="sorteos-section-logo" [src]="categoriaJuegos!.logo" alt="KuboJuegos" />
+                }
+              </div>
+              <div class="grid-3 sorteos-section-grid">
+                <div class="card prod-card card--clickable hegmony-card" (click)="abrirHegemony()">
+                  <div class="card-header">
+                    <div class="card-logo">
+                      <img loading="lazy" src="assets/productos/favicon-kuboteg.svg" alt="HEGEMONY" />
+                    </div>
+                    <h3 class="cat-title"><em class="hegmony-accent">HEGEMONY</em></h3>
+                  </div>
+                  <p class="prod-desc">Conquista territorios y dominá a tus rivales. Juego de 2 a 8 jugadores.</p>
+                </div>
+                <div class="card sorteos-sub-card entret-sub-card"></div>
+                <div class="card sorteos-sub-card entret-sub-card"></div>
+              </div>
+              <button class="sorteos-back-btn entret-back-btn" (click)="entretenimientoExpanded = false">← Volver a Otros Productos</button>
+            }
+
           </div>
         </div>
       </div>
@@ -224,18 +280,22 @@ export class InicioComponent implements OnInit {
     return this.categorias.find(c => c.nombre === 'KuboJuegos');
   }
 
+  sorteoExpanded = false;
+  nexoExpanded = false;
+  entretenimientoExpanded = false;
+
   readonly otrosProductos: Categoria[] = [
+    {
+      id: 'static-nexo',
+      nombre: 'Nexo',
+      descripcion: 'Unimos a quienes ofrecen un servicio con quienes lo necesitan.',
+      logo: 'assets/categorias/favicon-kubonexo.svg',
+    },
     {
       id: 'static-sorteos',
       nombre: 'KuboSorteos',
       descripcion: 'Plataforma para lanzar sorteos y promociones para tu negocio.',
       logo: 'assets/categorias/favicon-kubosorteosypromo.svg',
-    },
-    {
-      id: 'static-autogestion',
-      nombre: 'KuboAutogestión',
-      descripcion: 'Herramienta de autogestión para profesionales independientes.',
-      logo: 'assets/categorias/favicon-autogestion.svg',
     },
   ];
 
@@ -265,6 +325,7 @@ export class InicioComponent implements OnInit {
       (this.categoryOrder[a.nombre] ?? 99) - (this.categoryOrder[b.nombre] ?? 99)
     );
     this.loading = false;
+
   }
 
   private readonly routeMap: Record<string, string> = {
@@ -274,9 +335,14 @@ export class InicioComponent implements OnInit {
     'KuboGestión':  '/kubo-gestion',
   };
 
-  hasRoute(nombre: string): boolean { return nombre in this.routeMap; }
+  hasRoute(nombre: string): boolean {
+    return nombre in this.routeMap || nombre === 'KuboSorteos' || nombre === 'Nexo' || nombre === 'KuboJuegos';
+  }
 
   navigateTo(nombre: string) {
+    if (nombre === 'KuboSorteos') { this.sorteoExpanded          = true; return; }
+    if (nombre === 'Nexo')        { this.nexoExpanded            = true; return; }
+    if (nombre === 'KuboJuegos')  { this.entretenimientoExpanded = true; return; }
     const route = this.routeMap[nombre];
     if (route) this.router.navigate([route]);
   }
@@ -290,8 +356,8 @@ export class InicioComponent implements OnInit {
     'KuboRRHH':       '#00BCD4',
     'KuboStock':        'rgb(237, 172, 39)',
     'KuboTareas':       '#F97316',
-    'KuboSorteos':      '#84539D',
-    'KuboAutogestión':  '#C37C1C',
+    'KuboSorteos':      '#7c00ff',
+    'Nexo':             '#84539D',
   };
 
   getCategoryColor(nombre: string): string {
@@ -301,13 +367,13 @@ export class InicioComponent implements OnInit {
   private readonly displayNameMap: Record<string, string> = {
     'KuboJuegos':      'Entretenimiento',
     'KuboSorteos':     'Sorteos y Promociones',
-    'KuboAutogestión': 'Autogestión',
+    'Nexo':            'Conectados',
   };
 
   private readonly descriptionMap: Record<string, string> = {
     'KuboJuegos':   'Plataforma de entretenimiento con jugadores en tiempo real.',
     'KuboGestión':  'Organizá clientes, proyectos y facturas en un solo lugar.',
-    'KuboRRHH':     'Guías inteligentes para que empleados y clientes arranquen rápido.',
+    'KuboRRHH':     'Incorpora empleados y clientes nuevos, administrandolos sin complicaciones.',
     'KuboMétricas': 'Mirá cómo va tu negocio con gráficos simples y avisos automáticos.',
     'KuboTareas':   'Organizá el trabajo de tu equipo: quién hace qué y cuándo.',
     'KuboStock':    'Controlá lo que tenés y vendé más fácil, sin quedarte sin nada.',
@@ -320,6 +386,10 @@ export class InicioComponent implements OnInit {
 
   getCategoryDescription(cat: Categoria): string {
     return this.descriptionMap[cat.nombre] ?? cat.descripcion ?? '';
+  }
+
+  abrirHegemony() {
+    this.router.navigate(['/kuboteg']);
   }
 
   scrollTo(id: string) {

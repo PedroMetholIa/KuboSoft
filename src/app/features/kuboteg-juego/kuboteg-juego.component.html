@@ -1414,13 +1414,21 @@
                     <span class="propuesta-card-aside-badge-dot"></span>
                   </div>
 
-                  <div class="propuesta-card-aside-main">
-                    <span class="propuesta-card-aside-icon">🛡️</span>
+                  <div class="propuesta-card-aside-body">
+                    <div class="propuesta-card-aside-icon-wrap">
+                      <span class="propuesta-card-aside-icon">🛡️</span>
+                    </div>
                     <div class="propuesta-card-aside-info">
                       <span class="propuesta-card-aside-title">Pacto de No Agresión</span>
-                      <span class="propuesta-card-aside-de">de <strong>{{ nombreJugadorById(propuestaEntrante.proponenteId) }}</strong></span>
-                      <span class="propuesta-card-aside-hint">Territorios marcados en el mapa</span>
+                      <span class="propuesta-card-aside-de">
+                        propuesto por<br>
+                        <strong>{{ nombreJugadorById(propuestaEntrante.proponenteId) }}</strong>
+                      </span>
                     </div>
+                  </div>
+
+                  <div class="propuesta-card-aside-mapa-hint">
+                    <span>📍</span><span>Territorios marcados en el mapa</span>
                   </div>
 
                   @if (propuestaNoCubiertos().length > 0) {
@@ -1430,9 +1438,20 @@
                     </div>
                   }
 
+                  @if (posturas[propuestaEntrante.proponenteId] === 'hostil') {
+                    <div class="propuesta-card-hostil-warn">
+                      <span class="propuesta-card-hostil-warn-text">⚔️ Declaraste hostilidad hacia este jugador</span>
+                      <button class="propuesta-card-btn--neutral" (click)="cambiarPosturaANeutralParaPacto()">
+                        Cambiar a neutral →
+                      </button>
+                    </div>
+                  }
+
                   <div class="propuesta-card-aside-actions">
                     <button class="propuesta-card-aside-btn--rechazar" (click)="rechazarPropuesta()">✕ Rechazar</button>
-                    <button class="propuesta-card-aside-btn--aceptar" (click)="aceptarPropuesta()">✓ Aceptar</button>
+                    <button class="propuesta-card-aside-btn--aceptar"
+                      [disabled]="posturas[propuestaEntrante.proponenteId] === 'hostil'"
+                      (click)="aceptarPropuesta()">✓ Aceptar</button>
                   </div>
                 </div>
               }
